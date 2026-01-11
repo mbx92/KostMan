@@ -72,8 +72,8 @@ const deleteRoom = (room: Room) => {
 
 <template>
   <div class="p-6 space-y-8">
-    <!-- Header & Filters -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <UIcon name="i-heroicons-home-modern" class="w-8 h-8 text-primary-500" />
@@ -82,23 +82,24 @@ const deleteRoom = (room: Room) => {
         <p class="text-gray-500 dark:text-gray-400 mt-1">Manage occupancy and room details.</p>
       </div>
       
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2 bg-white dark:bg-gray-900 p-2 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
-          <UIcon name="i-heroicons-funnel" class="text-gray-400 ml-2" />
-          <USelect 
-            v-model="selectedPropertyId" 
-            :items="propertyOptions" 
-            value-key="value" 
-            label-key="label"
-            class="w-56"
-            variant="none"
-            placeholder="All Properties"
-          />
-        </div>
-        <UButton icon="i-heroicons-plus" size="lg" @click="openAddRoomModal" :disabled="properties.length === 0">
+      <UButton icon="i-heroicons-plus" size="lg" @click="openAddRoomModal" :disabled="properties.length === 0">
           Add Room
-        </UButton>
-      </div>
+      </UButton>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-funnel" class="text-gray-400" />
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Filter by Property:</span>
+            <USelect 
+                v-model="selectedPropertyId" 
+                :items="propertyOptions" 
+                value-key="value" 
+                label-key="label"
+                class="min-w-[200px]"
+            />
+        </div>
     </div>
 
     <!-- No Properties Warning -->

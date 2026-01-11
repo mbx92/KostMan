@@ -168,7 +168,10 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-6">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Billing</h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+           <UIcon name="i-heroicons-banknotes" class="w-8 h-8 text-primary-500" />
+           Billing
+        </h1>
         <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage bills across all properties.</p>
       </div>
       <UButton @click="isGenerating = !isGenerating" color="primary" icon="i-heroicons-plus">

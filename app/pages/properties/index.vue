@@ -18,8 +18,11 @@ const openAddModal = () => {
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Properties</h1>
-        <p class="text-gray-500 dark:text-gray-400">Manage your kos properties and buildings.</p>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+           <UIcon name="i-heroicons-building-office-2" class="w-8 h-8 text-primary-500" />
+           Properties
+        </h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Manage your kos properties and buildings.</p>
       </div>
       <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Add Property</UButton>
     </div>

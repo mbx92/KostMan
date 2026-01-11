@@ -29,8 +29,11 @@ const handleDelete = (id: string) => {
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Tenants</h1>
-        <p class="text-gray-500 dark:text-gray-400">Manage your tenants directory.</p>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+           <UIcon name="i-heroicons-user-group" class="w-8 h-8 text-primary-500" />
+           Tenants
+        </h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Manage your tenants directory.</p>
       </div>
       <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Add Tenant</UButton>
     </div>
