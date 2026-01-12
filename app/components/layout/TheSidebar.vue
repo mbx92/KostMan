@@ -53,6 +53,11 @@ const defaultNavigation: NavItem[] = [
     icon: 'i-heroicons-cog-6-tooth',
     to: '/settings'
   },
+  {
+    label: 'Pricing',
+    icon: 'i-heroicons-tag',
+    to: '/pricing'
+  },
 
   {
     label: 'Components',
