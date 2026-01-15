@@ -316,7 +316,7 @@ Setting default per user.
 - [ ] Property APIs
 - [ ] Room APIs
 - [ ] Tenant APIs
-- [ ] Settings APIs
+- [ ] Settings APIs 
 
 ### Phase 4: Billing (2-3 days)
 

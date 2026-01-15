@@ -1,8 +1,8 @@
 
-import { pgTable, uuid, varchar, timestamp, pgEnum, decimal, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, pgEnum, decimal, boolean, unique, date } from 'drizzle-orm/pg-core';
 
 export const roleEnum = pgEnum('role', ['owner', 'admin', 'staff']);
-
+export const roomStatusEnum = pgEnum('room_status', ['available', 'occupied', 'maintenance']);
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -49,8 +49,12 @@ export const rooms = pgTable('rooms', {
   tenantId: uuid('tenant_id').references(() => tenants.id),
   name: varchar('name', { length: 100 }).notNull(),
   price: decimal('price', { precision: 12, scale: 2 }).notNull(),
-  status: varchar('status').default('available'),
-});
+  status: roomStatusEnum('status').default('available'),
+  useTrashService: boolean('use_trash_service').default(true),
+  moveInDate: date('move_in_date'),
+}, (t) => ({
+  unq: unique().on(t.propertyId, t.name),
+}));
 
 export const bills = pgTable('bills', {
   id: uuid('id').defaultRandom().primaryKey(),
