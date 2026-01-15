@@ -111,7 +111,7 @@ Pengguna sistem (pemilik/pengelola kos).
 | email     | VARCHAR(255) | UNIQUE, NOT NULL | Email login               |
 | password  | VARCHAR(255) | NOT NULL         | Hashed password           |
 | name      | VARCHAR(255) | NOT NULL         | Nama lengkap              |
-| role      | ENUM         | DEFAULT 'owner'  | `owner`, `admin`, `staff` |
+| role      | ENUM         | DEFAULT 'owner'  | `admin`, `owner`, `staff` |
 | createdAt | TIMESTAMP    | DEFAULT now()    | -                         |
 | updatedAt | TIMESTAMP    | auto             | -                         |
 
@@ -169,7 +169,7 @@ Data penyewa/penghuni.
 | id           | UUID         | PK               | Primary key          |
 | name         | VARCHAR(255) | NOT NULL         | Nama lengkap         |
 | contact      | VARCHAR(20)  | NOT NULL         | No. telepon          |
-| idCardNumber | VARCHAR(16)  | NOT NULL         | No. KTP (16 digit)   |
+| idCardNumber | VARCHAR(16)  | NOT NULL         | No. KTP (16 digit) hashed only can see on apps  |
 | status       | ENUM         | DEFAULT 'active' | `active`, `inactive` |
 
 ### 6. MeterReading
@@ -297,19 +297,19 @@ Setting default per user.
 
 ### Phase 1: Database Setup (1-2 days)
 
-- [ ] Install Drizzle ORM, Drizzle Kit & dependencies
-- [ ] Create `drizzle.config.ts`
-- [ ] Create `server/database/schema.ts`
-- [ ] Setup PostgreSQL database
-- [ ] Run migrations using `drizzle-kit`
-- [ ] Setup Drizzle DB instance connection
+- [x] Install Drizzle ORM, Drizzle Kit & dependencies
+- [x] Create `drizzle.config.ts`
+- [x] Create `server/database/schema.ts`
+- [x] Setup PostgreSQL database
+- [x] Run migrations using `drizzle-kit`
+- [x] Setup Drizzle DB instance connection
 
 ### Phase 2: Auth & User (2-3 days)
 
-- [ ] Implement auth endpoints
-- [ ] JWT/session handling
-- [ ] Middleware for protected routes
-- [ ] Password hashing (bcrypt)
+- [x] Implement auth endpoints
+- [x] JWT/session handling
+- [x] Middleware for protected routes
+- [x] Password hashing (bcrypt)
 
 ### Phase 3: Core CRUD (3-4 days)
 

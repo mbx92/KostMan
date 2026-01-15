@@ -13,7 +13,7 @@ services:
       - NUXT_HOST=0.0.0.0
       - NUXT_PORT=3000
     volumes:
-      - ./data:/app/data  # SQLite database persistence
+      - ./data:/app/data # SQLite database persistence
     networks:
       - kosman-network
 
@@ -30,7 +30,7 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules  # Anonymous volume for node_modules
+      - /app/node_modules # Anonymous volume for node_modules
     command: sh -c "apk add --no-cache python3 make g++ libc6-compat && npm install && npm run dev"
     networks:
       - kosman-network
