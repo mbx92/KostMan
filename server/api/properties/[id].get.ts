@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { properties } from '../../database/schema';
+import { properties, propertySettings } from '../../database/schema';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -15,7 +15,14 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const property = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    const property = await db.select({
+        property: properties,
+        settings: propertySettings,
+    })
+        .from(properties)
+        .leftJoin(propertySettings, eq(properties.id, propertySettings.propertyId))
+        .where(eq(properties.id, id))
+        .limit(1);
 
     if (property.length === 0) {
         throw createError({
@@ -24,7 +31,7 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const targetProperty = property[0];
+    const { property: targetProperty, settings } = property[0];
 
     // Check ownership if not Admin
     if (user.role !== Role.ADMIN && targetProperty.userId !== user.id) {
@@ -34,5 +41,8 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    return targetProperty;
+    return {
+        ...targetProperty,
+        settings: settings || null,
+    };
 });

@@ -27,6 +27,14 @@ export const properties = pgTable('properties', {
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
+export const propertySettings = pgTable('property_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  propertyId: uuid('property_id').references(() => properties.id).notNull().unique(), // One-to-one
+  costPerKwh: decimal('cost_per_kwh', { precision: 10, scale: 2 }).notNull(),
+  waterFee: decimal('water_fee', { precision: 12, scale: 2 }).notNull(),
+  trashFee: decimal('trash_fee', { precision: 12, scale: 2 }).notNull(),
+});
+
 export const tenants = pgTable('tenants', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),

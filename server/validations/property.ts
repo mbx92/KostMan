@@ -6,6 +6,9 @@ export const propertySchema = z.object({
     description: z.string().optional(),
     image: z.string().url('Invalid URL').optional().or(z.literal('')),
     mapUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+    costPerKwh: z.number().nonnegative().optional(),
+    waterFee: z.number().nonnegative().optional(),
+    trashFee: z.number().nonnegative().optional(),
 });
 
 export type PropertyInput = z.infer<typeof propertySchema>;

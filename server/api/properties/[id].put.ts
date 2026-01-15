@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { properties } from '../../database/schema';
+import { properties, propertySettings } from '../../database/schema';
 import { propertySchema } from '../../validations/property';
 import { eq } from 'drizzle-orm';
 
@@ -47,13 +47,47 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const updatedProperty = await db.update(properties)
-        .set({
-            ...parseResult.data,
-            updatedAt: new Date(),
-        })
-        .where(eq(properties.id, id))
-        .returning();
+    const { name, address, description, image, mapUrl, costPerKwh, waterFee, trashFee } = parseResult.data;
 
-    return updatedProperty[0];
+    const updatedProperty = await db.transaction(async (tx) => {
+        const updated = await tx.update(properties)
+            .set({
+                name,
+                address,
+                description,
+                image,
+                mapUrl,
+                updatedAt: new Date(),
+            })
+            .where(eq(properties.id, id))
+            .returning();
+
+        // Handle settings
+        if (costPerKwh !== undefined || waterFee !== undefined || trashFee !== undefined) {
+            // Check if settings exist
+            const existingSettings = await tx.select().from(propertySettings).where(eq(propertySettings.propertyId, id));
+
+            if (existingSettings.length > 0) {
+                // Update
+                const updateData: any = {};
+                if (costPerKwh !== undefined) updateData.costPerKwh = costPerKwh.toString();
+                if (waterFee !== undefined) updateData.waterFee = waterFee.toString();
+                if (trashFee !== undefined) updateData.trashFee = trashFee.toString();
+
+                await tx.update(propertySettings).set(updateData).where(eq(propertySettings.propertyId, id));
+            } else {
+                // Insert
+                await tx.insert(propertySettings).values({
+                    propertyId: id,
+                    costPerKwh: costPerKwh?.toString() || '0',
+                    waterFee: waterFee?.toString() || '0',
+                    trashFee: trashFee?.toString() || '0',
+                });
+            }
+        }
+
+        return updated[0];
+    });
+
+    return updatedProperty;
 });

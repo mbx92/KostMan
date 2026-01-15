@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { properties } from '../../database/schema';
+import { properties, propertySettings } from '../../database/schema';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -34,6 +34,8 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    // Delete settings first to satisfy FK constraint (if not set to cascade)
+    await db.delete(propertySettings).where(eq(propertySettings.propertyId, id));
     await db.delete(properties).where(eq(properties.id, id));
 
     return { message: 'Property deleted successfully' };

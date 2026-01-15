@@ -16,12 +16,19 @@ interface LoginResponse {
     token: string;
 }
 
+interface PropertySettings {
+    costPerKwh: string;
+    waterFee: string;
+    trashFee: string;
+}
+
 interface PropertyResponse {
     id: string;
     name: string;
     address: string;
     description?: string;
     userId: string;
+    settings?: PropertySettings;
 }
 
 describe('Property Management Integration', async () => {
@@ -119,6 +126,9 @@ describe('Property Management Integration', async () => {
             name: 'Kost Indah',
             address: 'Jl. Merdeka No. 10',
             description: 'Nyaman dan aman',
+            costPerKwh: 1500,
+            waterFee: 50000,
+            trashFee: 20000
         };
 
         const res = await $fetch<PropertyResponse>('/api/properties', {
@@ -141,6 +151,12 @@ describe('Property Management Integration', async () => {
 
         expect(res.id).toBe(createdPropertyId);
         expect(res.name).toBe('Kost Indah');
+        expect(res.settings).toBeDefined();
+        // Drizzle/Postgres usually returns decimal as string. 
+        // 1500 might become '1500.00' depending on db settings, or just '1500' if stored as such.
+        // Let's assert parsing or string match.
+        expect(Number(res.settings?.costPerKwh)).toBe(1500);
+        expect(Number(res.settings?.waterFee)).toBe(50000);
     });
 
     it('GET /api/properties/[id] - Other Owner cannot view property (403)', async () => {
@@ -164,7 +180,8 @@ describe('Property Management Integration', async () => {
     it('PUT /api/properties/[id] - Owner can update property', async () => {
         const updatedData = {
             name: 'Kost Indah & Nyaman',
-            address: 'Jl. Merdeka No. 10 Updated'
+            address: 'Jl. Merdeka No. 10 Updated',
+            costPerKwh: 2000
         };
 
         const res = await $fetch<PropertyResponse>(`/api/properties/${createdPropertyId}`, {
@@ -175,6 +192,14 @@ describe('Property Management Integration', async () => {
 
         expect(res.name).toBe(updatedData.name);
         expect(res.address).toBe(updatedData.address);
+
+        // Verify settings update by fetching again (as PUT returns updated Property table row only in current impl? No, I returned transaction result which is property row)
+        // My PUT endpoint returns `updated[0]` which is the properties table row. Settings query was separate.
+        // So I need one more fetch to verify settings.
+        const verify = await $fetch<PropertyResponse>(`/api/properties/${createdPropertyId}`, {
+            headers: { Cookie: `auth_token=${ownerToken}` }
+        });
+        expect(Number(verify.settings?.costPerKwh)).toBe(2000);
     });
 
     it('DELETE /api/properties/[id] - Other Owner cannot delete property', async () => {
