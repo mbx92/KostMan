@@ -1,8 +1,8 @@
 # Kos-Man Database & Backend Implementation Plan
 
-> **Version:** 1.0  
-> **Date:** 14 Januari 2026  
-> **Status:** Draft - Pending Review
+> **Version:** 1.1  
+> **Date:** 15 Januari 2026  
+> **Status:** Reviewed
 
 ---
 
@@ -12,7 +12,7 @@ Dokumen ini berisi rancangan database schema dan backend API untuk sistem **Kos-
 
 ### Scope
 
-- Database schema design (PostgreSQL + Prisma ORM)
+- Database schema design (PostgreSQL + Drizzle ORM)
 - Backend API endpoints (Nuxt Server API)
 - Authentication system
 
@@ -31,7 +31,7 @@ Dokumen ini berisi rancangan database schema dan backend API untuk sistem **Kos-
 | Component | Technology          | Rationale                        |
 | --------- | ------------------- | -------------------------------- |
 | Database  | PostgreSQL          | Reliable, scalable, JSON support |
-| ORM       | Prisma              | Type-safe, great DX, migrations  |
+| ORM       | Drizzle ORM         | Type-safe, lightweight, SQL-like |
 | Runtime   | Nuxt Server (Nitro) | Already in use                   |
 
 ### Entity Relationship Diagram
@@ -297,11 +297,12 @@ Setting default per user.
 
 ### Phase 1: Database Setup (1-2 days)
 
-- [ ] Install Prisma & dependencies
-- [ ] Create schema.prisma
+- [ ] Install Drizzle ORM, Drizzle Kit & dependencies
+- [ ] Create `drizzle.config.ts`
+- [ ] Create `server/database/schema.ts`
 - [ ] Setup PostgreSQL database
-- [ ] Run initial migration
-- [ ] Setup Prisma Client
+- [ ] Run migrations using `drizzle-kit`
+- [ ] Setup Drizzle DB instance connection
 
 ### Phase 2: Auth & User (2-3 days)
 
@@ -365,6 +366,7 @@ Untuk mendukung pembayaran multiple bulan sekaligus, ditambahkan field pada tabe
 | Date       | Version | Author       | Changes       |
 | ---------- | ------- | ------------ | ------------- |
 | 2026-01-14 | 1.0     | AI Assistant | Initial draft |
+| 2026-01-15 | 1.1     | Gunawan      | Update        |
 
 ---
 
