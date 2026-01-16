@@ -3,12 +3,11 @@ import { useKosStore } from '~/stores/kos';
 
 const kosStore = useKosStore();
 
-// Redirect based on auth
-if (import.meta.client) {
-  const isAuthenticated = localStorage.getItem('kos-man-auth') === 'true'
-  if (!isAuthenticated) {
-     await navigateTo('/login')
-  }
+// Check authentication from API (cookie-based)
+const { data: authData, error } = await useFetch('/api/auth/me');
+
+if (error.value || !authData.value) {
+  await navigateTo('/login');
 }
 
 // Summary Data

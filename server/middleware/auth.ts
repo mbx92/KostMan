@@ -1,7 +1,7 @@
 
 import jwt from 'jsonwebtoken';
 
-import { defineEventHandler, getCookie, createError } from 'h3';
+import { defineEventHandler, getCookie } from 'h3';
 
 export default defineEventHandler((event) => {
     const token = getCookie(event, 'auth_token');
@@ -11,11 +11,9 @@ export default defineEventHandler((event) => {
             const decoded = jwt.verify(token, process.env.NUXT_SESSION_PASSWORD || 'default_secret');
             event.context.user = decoded;
         } catch (e) {
-            // Token invalid or expired, just ignore
-            throw createError({
-                statusCode: 403,
-                statusMessage: 'Token invalid or expired',
-            });
+            // Token invalid or expired, clear the cookie and ignore
+            // Don't throw error here - let individual routes handle auth requirements
+            event.context.user = null;
         }
     }
 });

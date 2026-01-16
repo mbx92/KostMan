@@ -4,28 +4,69 @@ definePageMeta({
 });
 
 const router = useRouter();
+const toast = useToast();
 const isLoading = ref(false);
+const config = useRuntimeConfig();
 
 const form = reactive({
-  username: "admin@example.com",
+  email: "",
   password: "",
 });
 
+const errorMessage = ref("");
+const isDev = computed(() => config.public.NODE_ENV === 'development' || import.meta.dev);
+
+// Fill dev credentials
+const fillDevCredentials = () => {
+  form.email = "admin@example.com";
+  form.password = "password123";
+  toast.add({
+    title: "Dev credentials filled",
+    description: "Ready to login with admin account",
+    color: "blue",
+  });
+};
+
 const handleLogin = async () => {
-  if (form.username !== 'admin@example.com') {
-    alert('Invalid username. Please use admin@example.com');
+  if (!form.email || !form.password) {
+    errorMessage.value = "Email and password are required";
     return;
   }
 
+  errorMessage.value = "";
   isLoading.value = true;
-  // Simulating process but allowing it to proceed
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  isLoading.value = false;
 
-  if (process.client) {
-    localStorage.setItem('kos-man-auth', 'true')
+  try {
+    const response = await $fetch("/api/auth/login", {
+      method: "POST",
+      body: {
+        email: form.email,
+        password: form.password,
+      },
+    });
+
+    // Show success message
+    toast.add({
+      title: "Login successful",
+      description: `Welcome back, ${response.user.name}!`,
+      color: "green",
+    });
+
+    // Redirect to homepage
+    await router.push("/");
+  } catch (error: any) {
+    // Handle error
+    const message = error.data?.statusMessage || error.message || "Login failed";
+    errorMessage.value = message;
+    
+    toast.add({
+      title: "Login failed",
+      description: message,
+      color: "red",
+    });
+  } finally {
+    isLoading.value = false;
   }
-  await router.push("/");
 };
 </script>
 
@@ -73,15 +114,27 @@ const handleLogin = async () => {
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-6 mt-8">
+          <!-- Error Message -->
+          <UAlert
+            v-if="errorMessage"
+            color="red"
+            variant="soft"
+            :title="errorMessage"
+            :close-button="{ icon: 'i-heroicons-x-mark-20-solid', color: 'red', variant: 'link' }"
+            @close="errorMessage = ''"
+          />
+
           <div class="space-y-1">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
             <UInput 
-              v-model="form.username" 
-              icon="i-heroicons-user" 
+              v-model="form.email" 
+              type="email"
+              icon="i-heroicons-envelope" 
               placeholder="admin@example.com" 
               size="lg"
               class="w-full"
               autofocus
+              required
             />
           </div>
 
@@ -94,6 +147,7 @@ const handleLogin = async () => {
               placeholder="••••••••" 
               size="lg"
               class="w-full"
+              required
             />
           </div>
 
@@ -114,6 +168,20 @@ const handleLogin = async () => {
             class="font-bold"
           >
             Sign in
+          </UButton>
+
+          <!-- Dev Credentials Button (Only in Development) -->
+          <UButton
+            v-if="isDev"
+            type="button"
+            block
+            size="lg"
+            variant="outline"
+            color="blue"
+            icon="i-heroicons-code-bracket"
+            @click="fillDevCredentials"
+          >
+            Fill Dev Credentials
           </UButton>
         </form>
 

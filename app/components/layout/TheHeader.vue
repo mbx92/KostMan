@@ -11,6 +11,13 @@ const emit = defineEmits<{
   toggleColorMode: []
 }>()
 
+const router = useRouter()
+const toast = useToast()
+
+// Fetch current user
+const { data: authData, refresh: refreshUser } = await useFetch('/api/auth/me')
+const currentUser = computed(() => authData.value?.user)
+
 // Search
 const searchOpen = ref(false)
 const searchQuery = ref('')
@@ -24,18 +31,65 @@ const notifications = ref([
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 
+// Logout handler
+const handleLogout = async () => {
+  console.log('Logout clicked') // Debug log
+  try {
+    await $fetch('/api/auth/logout', { method: 'POST' })
+    toast.add({
+      title: 'Logged out successfully',
+      color: 'green',
+    })
+    // Force page reload to clear all state and redirect
+    if (process.client) {
+      window.location.href = '/login'
+    }
+  } catch (error: any) {
+    console.error('Logout error:', error) // Debug log
+    toast.add({
+      title: 'Logout failed',
+      description: error.message,
+      color: 'red',
+    })
+  }
+}
+
+// User menu actions
+const handleUserAction = (action: string) => {
+  console.log('User action:', action) // Debug log
+  switch (action) {
+    case 'profile':
+      router.push('/examples/profile')
+      break
+    case 'settings':
+      router.push('/settings')
+      break
+    case 'logout':
+      handleLogout()
+      break
+  }
+}
+
 // User dropdown items
 const userItems = [
   [
-    { label: 'Profile', icon: 'i-heroicons-user', to: '/examples/profile' },
-    { label: 'Settings', icon: 'i-heroicons-cog-6-tooth', to: '/examples/settings' }
+    {
+      label: 'Profile',
+      icon: 'i-heroicons-user',
+      click: () => handleUserAction('profile')
+    },
+    {
+      label: 'Settings',
+      icon: 'i-heroicons-cog-6-tooth',
+      click: () => handleUserAction('settings')
+    }
   ],
   [
-    { label: 'Documentation', icon: 'i-heroicons-book-open', to: '/components' },
-    { label: 'Changelog', icon: 'i-heroicons-document-text' }
-  ],
-  [
-    { label: 'Sign out', icon: 'i-heroicons-arrow-right-on-rectangle', click: () => console.log('Sign out') }
+    {
+      label: 'Keluar',
+      icon: 'i-heroicons-arrow-right-on-rectangle',
+      click: () => handleUserAction('logout')
+    }
   ]
 ]
 
@@ -184,16 +238,59 @@ onMounted(() => {
       </UPopover>
 
       <!-- User dropdown -->
-      <UDropdownMenu :items="userItems">
+      <UPopover :popper="{ placement: 'bottom-end' }">
         <UButton variant="ghost" color="neutral" class="gap-2" trailing-icon="i-heroicons-chevron-down">
           <UAvatar
-            icon="i-heroicons-user"
+            :alt="currentUser?.name"
             size="xs"
             class="bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200"
-          />
-          <span class="hidden lg:inline text-sm">John Doe</span>
+          >
+            <template v-if="currentUser?.name">
+              {{ currentUser.name.charAt(0).toUpperCase() }}
+            </template>
+            <template v-else>
+              <UIcon name="i-heroicons-user" />
+            </template>
+          </UAvatar>
+          <span class="hidden lg:inline text-sm">{{ currentUser?.name || 'User' }}</span>
+          <UBadge v-if="currentUser?.role" color="primary" variant="subtle" size="xs" class="hidden xl:inline">
+            {{ currentUser.role }}
+          </UBadge>
         </UButton>
-      </UDropdownMenu>
+
+        <template #content>
+          <div class="w-56 p-1">
+            <!-- Profile -->
+            <button
+              @click="handleUserAction('profile')"
+              class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+            >
+              <UIcon name="i-heroicons-user" class="w-4 h-4 text-gray-500" />
+              <span class="text-gray-700 dark:text-gray-300">Profile</span>
+            </button>
+
+            <!-- Settings -->
+            <button
+              @click="handleUserAction('settings')"
+              class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+            >
+              <UIcon name="i-heroicons-cog-6-tooth" class="w-4 h-4 text-gray-500" />
+              <span class="text-gray-700 dark:text-gray-300">Settings</span>
+            </button>
+
+            <div class="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
+
+            <!-- Logout -->
+            <button
+              @click="handleUserAction('logout')"
+              class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
+            >
+              <UIcon name="i-heroicons-arrow-right-on-rectangle" class="w-4 h-4 text-red-500" />
+              <span class="text-red-600 dark:text-red-400">Keluar</span>
+            </button>
+          </div>
+        </template>
+      </UPopover>
     </div>
 
     <!-- Search Modal -->
