@@ -141,7 +141,54 @@ Bobot Task = (K × 2) + (W × 1.5) + (R × 1.5) + (D × 1) + (S × 1)
 | **Total Nilai Project** | Rp 15.000.000      | Rp 15.000.000      |
 | Safety Net (10%)        | Rp 1.500.000       | Rp 1.500.000       |
 | Management Fee          | Rp 1.350.000 (10%) | Rp 2.025.000 (15%) |
-| **Fee Kerja Tim**       | **Rp 12.150.000**  | **Rp 11.475.000**  |
+| Deployment Fee          | Rp 1.000.000       | Rp 1.000.000       |
+| **Fee Kerja Tim**       | **Rp 11.150.000**  | **Rp 10.475.000**  |
+
+> [!IMPORTANT] > **Biaya Infrastruktur (Ditanggung Client)**
+>
+> Item berikut **TIDAK termasuk** dalam fee project dan dibayar langsung oleh client:
+>
+> - VPS/Hosting: ~Rp 100.000 - 500.000/bulan
+> - Domain: ~Rp 150.000 - 300.000/tahun
+> - SSL Certificate: Gratis (Let's Encrypt) atau ~Rp 500.000/tahun
+> - Backup storage (opsional): ~Rp 50.000 - 100.000/bulan
+
+---
+
+## 🚀 Deployment Fee
+
+### Apa yang Termasuk Deployment?
+
+| Task                   | Deskripsi                                     | Bobot         |
+| ---------------------- | --------------------------------------------- | ------------- |
+| **Server Setup**       | Install dependencies, konfigurasi environment | 19            |
+| **CI/CD Pipeline**     | Auto deploy dari git push                     | 17            |
+| **Database Migration** | Setup production database                     | 17.5          |
+| **Documentation**      | Deployment guide, credentials handover        | 10            |
+| **Total**              |                                               | **63.5 poin** |
+
+### Siapa yang Mengerjakan Deployment?
+
+Deployment biasanya dikerjakan oleh **Dev 1 (Database & Auth Lead)** atau bisa dibagi:
+
+| Opsi | Assignee   | Keterangan                           |
+| ---- | ---------- | ------------------------------------ |
+| A    | Dev 1 saja | Paling efisien, 1 orang handle semua |
+| B    | Dev 1 + PM | PM bantu dokumentasi                 |
+| C    | Semua      | Masing-masing deploy bagiannya       |
+
+### Deployment Fee Distribution (Jika Dev 1 handle semua)
+
+```
+Deployment Fee: Rp 1.000.000 → 100% ke Dev 1
+```
+
+Atau jika dibagi:
+
+| Developer | Kontribusi              | Fee        |
+| --------- | ----------------------- | ---------- |
+| Dev 1     | 70% (server, db, CI/CD) | Rp 700.000 |
+| PM/Lead   | 30% (dokumentasi)       | Rp 300.000 |
 
 ---
 
