@@ -169,7 +169,7 @@ Data penyewa/penghuni.
 | id           | UUID         | PK               | Primary key          |
 | name         | VARCHAR(255) | NOT NULL         | Nama lengkap         |
 | contact      | VARCHAR(20)  | NOT NULL         | No. telepon          |
-| idCardNumber | VARCHAR(16)  | NOT NULL         | No. KTP (16 digit) hashed only can see on apps  |
+| idCardNumber | VARCHAR(16)  | NOT NULL         | No. KTP (16 digit) hashed only can see on response  |
 | status       | ENUM         | DEFAULT 'active' | `active`, `inactive` |
 
 ### 6. MeterReading
@@ -184,6 +184,9 @@ Pembacaan meter listrik.
 | meterStart | INT        | NOT NULL   | Angka awal       |
 | meterEnd   | INT        | NOT NULL   | Angka akhir      |
 | recordedAt | TIMESTAMP  | NOT NULL   | Waktu pencatatan |
+| recorderBy | UUID       | FK → User  | Pencatat         |
+| createdAt  | TIMESTAMP  | DEFAULT now() | - |
+| updatedAt  | TIMESTAMP  | auto | - |
 
 **Constraint:** `UNIQUE(roomId, period)`, `CHECK(meterEnd >= meterStart)`
 
@@ -273,7 +276,9 @@ Setting default per user.
 | ------ | -------------------------------- | --------------------- |
 | GET    | `/api/meter-readings?roomId=:id` | List readings by room |
 | POST   | `/api/meter-readings`            | Record new reading    |
-| DELETE | `/api/meter-readings/:id`        | Delete reading        |
+| GET    | `/api/meter-readings/:id`        | Get reading detail    |
+| PATCH  | `/api/meter-readings/:id`        | Update reading        |
+| DELETE | `/api/meter-readings/:id`        | Delete reading (only owner and user that record it)      |
 
 ### Bills
 

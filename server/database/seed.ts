@@ -22,40 +22,26 @@ async function main() {
             password: hashedPassword,
             role: 'admin',
         }).onConflictDoNothing();
-
         console.log('Admin seeded successfully');
-    } catch (error) {
-        console.error('Error seeding admin:', error);
-    } finally {
-        await pool.end();
-    }
 
-    try {
         await db.insert(users).values({
             name: 'Owner User',
             email: 'owner@example.com',
             password: hashedPassword,
             role: 'owner',
         }).onConflictDoNothing();
-
         console.log('Owner seeded successfully');
-    } catch (error) {
-        console.error('Error seeding owner:', error);
-    } finally {
-        await pool.end();
-    }
 
-    try {
         await db.insert(users).values({
             name: 'Staff User',
             email: 'staff@example.com',
             password: hashedPassword,
             role: 'staff',
         }).onConflictDoNothing();
-
         console.log('Staff seeded successfully');
+
     } catch (error) {
-        console.error('Error seeding staff:', error);
+        console.error('Error seeding database:', error);
     } finally {
         await pool.end();
     }

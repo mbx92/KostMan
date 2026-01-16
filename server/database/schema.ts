@@ -1,5 +1,5 @@
 
-import { pgTable, uuid, varchar, timestamp, pgEnum, decimal, boolean, unique, date } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, pgEnum, decimal, boolean, unique, date, integer } from 'drizzle-orm/pg-core';
 
 export const roleEnum = pgEnum('role', ['owner', 'admin', 'staff']);
 export const roomStatusEnum = pgEnum('room_status', ['available', 'occupied', 'maintenance']);
@@ -35,12 +35,14 @@ export const propertySettings = pgTable('property_settings', {
   trashFee: decimal('trash_fee', { precision: 12, scale: 2 }).notNull(),
 });
 
+export const tenantStatusEnum = pgEnum('tenant_status', ['active', 'inactive']);
+
 export const tenants = pgTable('tenants', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
   contact: varchar('contact', { length: 20 }).notNull(),
   idCardNumber: varchar('id_card_number', { length: 16 }).notNull(),
-  status: varchar('status').default('active'), // simpler than enum for now or add enum
+  status: tenantStatusEnum('status').default('active'),
 });
 
 export const rooms = pgTable('rooms', {
@@ -65,3 +67,18 @@ export const bills = pgTable('bills', {
   paidAt: timestamp('paid_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const meterReadings = pgTable('meter_readings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  roomId: uuid('room_id').references(() => rooms.id).notNull(),
+  period: varchar('period', { length: 7 }).notNull(),
+  meterStart: integer('meter_start').notNull(),
+  meterEnd: integer('meter_end').notNull(),
+  recordedAt: timestamp('recorded_at').notNull(),
+  recorderBy: uuid('recorder_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => ({
+  unq: unique().on(t.roomId, t.period),
+  // Note: check constraint (meterEnd >= meterStart) is complex in some ORMs, will handle in app code for now or use sql check if possible but staying simple.
+}));
