@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { useKosStore, type Tenant } from '~/stores/kos'
+import { useKosStore, type Tenant, type Room } from '~/stores/kos'
 
 const store = useKosStore()
-const { tenants } = storeToRefs(store)
+const { tenants, rooms, tenantsLoading } = storeToRefs(store)
+const toast = useToast()
 
 const isModalOpen = ref(false)
 const selectedTenant = ref(undefined)
+
+// Fetch data on mount
+onMounted(async () => {
+  await store.fetchTenants()
+  await store.fetchRooms()
+})
+
+// Find room for a tenant - rooms store tenantId, so we look up room by tenantId
+const getAssignedRoom = (tenantId: string): Room | null => {
+  return rooms.value.find(r => r.tenantId === tenantId && r.status === 'occupied') || null
+}
 
 const openAddModal = () => {
   selectedTenant.value = undefined
@@ -17,9 +29,18 @@ const openEditModal = (tenant: any) => {
   isModalOpen.value = true
 }
 
-const handleDelete = (id: string) => {
+const handleDelete = async (id: string) => {
   if (confirm('Are you sure you want to delete this tenant?')) {
-    store.deleteTenant(id)
+    try {
+      await store.deleteTenant(id)
+      toast.add({ title: 'Tenant Deleted', color: 'success' })
+    } catch (err: any) {
+      toast.add({ 
+        title: 'Error', 
+        description: err?.data?.message || 'Failed to delete tenant',
+        color: 'error' 
+      })
+    }
   }
 }
 </script>
@@ -38,8 +59,19 @@ const handleDelete = (id: string) => {
       <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Add Tenant</UButton>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="tenantsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <UCard v-for="i in 4" :key="i">
+        <div class="space-y-3">
+          <USkeleton class="h-10 w-10 rounded-full" />
+          <USkeleton class="h-4 w-32" />
+          <USkeleton class="h-3 w-24" />
+        </div>
+      </UCard>
+    </div>
+
     <!-- Tenants Grid -->
-    <div v-if="tenants.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div v-else-if="tenants.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       <UCard 
         v-for="tenant in tenants" 
         :key="tenant.id"
@@ -68,9 +100,9 @@ const handleDelete = (id: string) => {
                 <UIcon name="i-heroicons-identification" class="w-4 h-4" />
                 <span class="font-mono text-xs">{{ tenant.idCardNumber }}</span>
             </div>
-             <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="tenant.roomId">
+             <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="getAssignedRoom(tenant.id)">
                 <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                <span class="text-primary-600 dark:text-primary-400 font-medium">Room {{ store.rooms.find(r => r.id === tenant.roomId)?.name || 'Unknown' }}</span>
+                <span class="text-primary-600 dark:text-primary-400 font-medium">Room {{ getAssignedRoom(tenant.id)?.name }}</span>
             </div>
             <div class="flex items-center gap-2 text-gray-400 italic" v-else>
                 <UIcon name="i-heroicons-home" class="w-4 h-4" />
@@ -92,3 +124,4 @@ const handleDelete = (id: string) => {
     <TenantModal v-model="isModalOpen" :tenant="selectedTenant" />
   </div>
 </template>
+

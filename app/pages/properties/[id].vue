@@ -7,21 +7,35 @@ const store = useKosStore();
 const toast = useToast();
 
 const propertyId = computed(() => route.params.id as string);
-const property = computed(() => store.getPropertyById(propertyId.value));
+
+// Fetch property from API
+const property = ref<Property | null>(null);
+const isLoading = ref(true);
+const isSaving = ref(false);
+
 const rooms = computed(() => store.getRoomsByPropertyId(propertyId.value));
 
-// Redirect if property not found
-watch(
-  property,
-  (newProperty) => {
-    if (!newProperty && propertyId.value) {
+async function loadProperty() {
+  isLoading.value = true;
+  try {
+    const data = await store.fetchPropertyById(propertyId.value);
+    if (data) {
+      property.value = data;
+    } else {
       router.push("/properties");
     }
-  },
-  { immediate: true }
-);
+  } catch {
+    router.push("/properties");
+  } finally {
+    isLoading.value = false;
+  }
+}
 
-const isPreviewOpen = ref(false); // Added isPreviewOpen ref
+onMounted(() => {
+  loadProperty();
+});
+
+const isPreviewOpen = ref(false);
 
 // Form state - initialized from property but editable
 const form = reactive({
@@ -36,63 +50,104 @@ const form = reactive({
   waterFee: 0,
 });
 
-// Sync form with property data when loaded, but only if not dirty (simplified for now: just sync on load)
+// Sync form with property data when loaded
 watch(
   property,
   (p) => {
     if (p) {
-      // Only update if seemingly empty to avoid overwriting user typing (basic safeguard)
-      if (!form.name) {
-        form.name = p.name;
-        form.address = p.address;
-        form.description = p.description;
-        form.image = p.image;
-        form.mapUrl = (p as any).mapUrl || "";
-        form.useCustomSettings = !!p.settings;
-        form.costPerKwh = p.settings?.costPerKwh || store.settings.costPerKwh;
-        form.trashFee = p.settings?.trashFee || store.settings.trashFee;
-        form.waterFee = p.settings?.waterFee || store.settings.waterFee;
-      }
+      form.name = p.name || "";
+      form.address = p.address || "";
+      form.description = p.description || "";
+      form.image = p.image || "";
+      form.mapUrl = p.mapUrl || "";
+      form.useCustomSettings = !!p.settings;
+      form.costPerKwh = Number(p.settings?.costPerKwh) || store.settings.costPerKwh;
+      form.trashFee = Number(p.settings?.trashFee) || store.settings.trashFee;
+      form.waterFee = Number(p.settings?.waterFee) || store.settings.waterFee;
     }
   },
   { immediate: true }
 );
 
-const saveChanges = () => {
-  const updates: Partial<Property> & { mapUrl?: string } = {
-    name: form.name,
-    address: form.address,
-    description: form.description,
-    image: form.image,
-    mapUrl: form.mapUrl,
-  };
-
-  if (form.useCustomSettings) {
-    updates.settings = {
-      costPerKwh: form.costPerKwh,
-      trashFee: form.trashFee,
-      waterFee: form.waterFee,
-    };
-  } else {
-    updates.settings = undefined;
+const saveChanges = async () => {
+  // Validation - ensure required fields are filled
+  if (!form.name || form.name.trim().length < 1) {
+    toast.add({
+      title: "Validation Error",
+      description: "Property name is required.",
+      color: "error",
+    });
+    return;
+  }
+  
+  if (!form.address || form.address.trim().length < 1) {
+    toast.add({
+      title: "Validation Error",
+      description: "Property address is required.",
+      color: "error",
+    });
+    return;
   }
 
-  store.updateProperty(propertyId.value, updates);
-  toast.add({
-    title: "Changes Saved",
-    description: "Property details updated successfully.",
-    color: "success",
-  });
+  isSaving.value = true;
+  try {
+    // Ensure no null values are sent - convert to empty string or undefined
+    const updates: Partial<Property> & { mapUrl?: string; costPerKwh?: number; waterFee?: number; trashFee?: number } = {
+      name: form.name.trim(),
+      address: form.address.trim(),
+      description: form.description?.trim() || '',
+      image: form.image?.trim() || '',
+      mapUrl: form.mapUrl?.trim() || '',
+    };
+
+    if (form.useCustomSettings) {
+      updates.costPerKwh = form.costPerKwh;
+      updates.waterFee = form.waterFee;
+      updates.trashFee = form.trashFee;
+    }
+
+    await store.updateProperty(propertyId.value, updates);
+    
+    // Reload property to get updated data with settings
+    await loadProperty();
+    
+    toast.add({
+      title: "Changes Saved",
+      description: "Property details updated successfully.",
+      color: "success",
+    });
+  } catch (err: any) {
+    toast.add({
+      title: "Error",
+      description: err?.data?.message || err?.message || "Failed to save changes",
+      color: "error",
+    });
+  } finally {
+    isSaving.value = false;
+  }
 };
 
-const deleteProperty = () => {
+const deleteProperty = async () => {
   if (
     confirm(
       `Delete "${property.value?.name}"? This will also delete ${rooms.value.length} room(s).`
     )
   ) {
-    store.deleteProperty(propertyId.value);
-    router.push("/properties");
+    try {
+      await store.deleteProperty(propertyId.value);
+      toast.add({
+        title: "Property Deleted",
+        description: "Property has been deleted successfully.",
+        color: "success",
+      });
+      router.push("/properties");
+    } catch (err: any) {
+      toast.add({
+        title: "Error",
+        description: err?.data?.message || err?.message || "Failed to delete property",
+        color: "error",
+      });
+    }
   }
 };
 
@@ -442,6 +497,7 @@ const occupiedRooms = computed(
             size="lg"
             icon="i-heroicons-check"
             class="dark:bg-white dark:text-black"
+            :loading="isSaving"
             @click="saveChanges"
             >Save Changes</UButton
           >

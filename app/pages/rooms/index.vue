@@ -2,17 +2,42 @@
 import { useKosStore, type Room } from '~/stores/kos'
 
 const store = useKosStore()
-const { rooms, properties } = storeToRefs(store)
+const { rooms, properties, tenants, roomsLoading, roomsError } = storeToRefs(store)
 const toast = useToast()
 
 // Filter state
 const route = useRoute()
 const selectedPropertyId = ref<string>((route.query.propertyId as string) || '__all__')
+const searchQuery = ref('')
 
 // Room Modal State
 const isRoomModalOpen = ref(false)
 const selectedRoom = ref<Room | undefined>(undefined)
 const modalPropertyId = ref<string>('')
+
+// Fetch data on mount
+onMounted(async () => {
+  await store.fetchProperties()
+  await store.fetchTenants()
+  await loadRooms()
+})
+
+// Load rooms with current filter
+async function loadRooms() {
+  const params: { propertyId?: string; search?: string; pageSize?: number } = { pageSize: 100 }
+  if (selectedPropertyId.value !== '__all__') {
+    params.propertyId = selectedPropertyId.value
+  }
+  if (searchQuery.value) {
+    params.search = searchQuery.value
+  }
+  await store.fetchRooms(params)
+}
+
+// Watch filter changes
+watch([selectedPropertyId, searchQuery], () => {
+  loadRooms()
+}, { debounce: 300 } as any)
 
 // Property options for filter
 const propertyOptions = computed(() => [
@@ -20,17 +45,23 @@ const propertyOptions = computed(() => [
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
-// Computed to enrich and filter room data
+// Computed to enrich room data with property name and tenant name
 const enrichedRooms = computed(() => {
-    return rooms.value
-        .filter(room => selectedPropertyId.value === '__all__' || room.propertyId === selectedPropertyId.value)
-        .map(room => {
-            const property = properties.value.find(p => p.id === room.propertyId)
-            return {
-                ...room,
-                propertyName: property ? property.name : 'Unknown Property'
-            }
-        })
+    return rooms.value.map(room => {
+        const property = room.property || properties.value.find(p => p.id === room.propertyId)
+        // Look up tenant name from tenants list if not in room data
+        let tenantName = room.tenantName
+        if (!tenantName && room.tenantId) {
+            const tenant = tenants.value.find(t => t.id === room.tenantId)
+            tenantName = tenant?.name || ''
+        }
+        return {
+            ...room,
+            price: Number(room.price),
+            propertyName: property ? property.name : 'Unknown Property',
+            tenantName
+        }
+    })
 })
 
 const getStatusColor = (status: string) => {
@@ -62,11 +93,23 @@ const openEditRoomModal = (room: Room) => {
     isRoomModalOpen.value = true
 }
 
-const deleteRoom = (room: Room) => {
+const deleteRoom = async (room: Room) => {
     if (confirm(`Delete "${room.name}"? This will also delete its billing history.`)) {
-        store.deleteRoom(room.id)
-        toast.add({ title: 'Room Deleted', color: 'error' })
+        try {
+            await store.deleteRoom(room.id)
+            toast.add({ title: 'Room Deleted', color: 'success' })
+        } catch (err: any) {
+            toast.add({ 
+                title: 'Error', 
+                description: err?.data?.message || err?.message || 'Failed to delete room',
+                color: 'error' 
+            })
+        }
     }
+}
+
+const onModalClose = () => {
+  loadRooms()
 }
 </script>
 
@@ -102,8 +145,46 @@ const deleteRoom = (room: Room) => {
         </div>
     </div>
 
+    <!-- Error State -->
+    <div v-if="roomsError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+      <div class="flex items-center gap-3">
+        <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-500" />
+        <div>
+          <h3 class="font-medium text-red-800 dark:text-red-200">Error loading rooms</h3>
+          <p class="text-sm text-red-600 dark:text-red-400">{{ roomsError }}</p>
+        </div>
+        <UButton size="sm" color="error" variant="soft" class="ml-auto" @click="loadRooms()">
+          Retry
+        </UButton>
+      </div>
+    </div>
+
+    <!-- Loading Skeleton -->
+    <div v-else-if="roomsLoading && enrichedRooms.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div 
+        v-for="i in 4" 
+        :key="i"
+        class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm"
+      >
+        <div class="h-1 w-full bg-gray-200 dark:bg-gray-700"></div>
+        <div class="p-5 space-y-4">
+          <USkeleton class="h-5 w-20" />
+          <USkeleton class="h-3 w-32" />
+          <USkeleton class="h-8 w-28" />
+          <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
+            <USkeleton class="h-4 w-full" />
+          </div>
+        </div>
+        <div class="p-2 bg-gray-50 dark:bg-gray-800/50 flex gap-2">
+          <USkeleton class="h-9 flex-1" />
+          <USkeleton class="h-9 w-9" />
+          <USkeleton class="h-9 w-9" />
+        </div>
+      </div>
+    </div>
+
     <!-- No Properties Warning -->
-    <div v-if="properties.length === 0" class="text-center py-12 bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800">
+    <div v-else-if="properties.length === 0 && !roomsLoading" class="text-center py-12 bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800">
       <UIcon name="i-heroicons-exclamation-triangle" class="w-12 h-12 text-orange-500 mb-3" />
       <h3 class="text-lg font-medium text-gray-900 dark:text-white">No Properties Found</h3>
       <p class="text-gray-500 mt-1 mb-4">You need to create a property first before adding rooms.</p>
@@ -194,6 +275,7 @@ const deleteRoom = (room: Room) => {
     </div>
 
     <!-- Room Modal -->
-    <RoomModal v-model="isRoomModalOpen" :property-id="modalPropertyId" :room="selectedRoom" />
+    <RoomModal v-model="isRoomModalOpen" :property-id="modalPropertyId" :room="selectedRoom" @update:modelValue="onModalClose" />
   </div>
 </template>
+

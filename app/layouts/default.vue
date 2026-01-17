@@ -30,6 +30,13 @@ const toggleColorMode = () => {
 // Provide sidebar state to children
 provide('sidebarCollapsed', sidebarCollapsed)
 provide('toggleSidebar', toggleSidebar)
+
+// Fetch global settings
+import { useKosStore } from '~/stores/kos'
+const store = useKosStore()
+onMounted(() => {
+  store.fetchSettings()
+})
 </script>
 
 <template>

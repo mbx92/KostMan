@@ -91,5 +91,32 @@ export const meterReadings = pgTable('meter_readings', {
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => ({
   unq: unique().on(t.roomId, t.period),
-  // Note: check constraint (meterEnd >= meterStart) is complex in some ORMs, will handle in app code for now or use sql check if possible but staying simple.
 }));
+
+// Global application settings (singleton table - one row per user/owner)
+export const globalSettings = pgTable('global_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull().unique(), // One settings per user
+  appName: varchar('app_name', { length: 255 }).default('KostMan'),
+  costPerKwh: decimal('cost_per_kwh', { precision: 10, scale: 2 }).default('1500'),
+  waterFee: decimal('water_fee', { precision: 12, scale: 2 }).default('50000'),
+  trashFee: decimal('trash_fee', { precision: 12, scale: 2 }).default('25000'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+// Integration settings for payment gateways (e.g., Midtrans)
+export const integrationSettings = pgTable('integration_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  provider: varchar('provider', { length: 50 }).notNull(), // 'midtrans', 'xendit', etc.
+  isEnabled: boolean('is_enabled').default(false),
+  serverKey: varchar('server_key', { length: 255 }),
+  clientKey: varchar('client_key', { length: 255 }),
+  isProduction: boolean('is_production').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (t) => ({
+  unq: unique().on(t.userId, t.provider), // One config per provider per user
+}));
+

@@ -8,10 +8,13 @@ const props = defineProps<{
   property?: Property
 }>()
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'saved'])
 
 const store = useKosStore()
+const toast = useToast()
 const { settings: globalSettings } = storeToRefs(store)
+
+const isSaving = ref(false)
 
 const state = reactive({
   name: '',
@@ -51,9 +54,9 @@ watch(() => props.property, (newVal) => {
     // Load existing settings
     if (newVal.settings) {
         state.overrideSettings = true
-        state.costPerKwh = newVal.settings.costPerKwh
-        state.waterFee = newVal.settings.waterFee
-        state.trashFee = newVal.settings.trashFee
+        state.costPerKwh = Number(newVal.settings.costPerKwh)
+        state.waterFee = Number(newVal.settings.waterFee)
+        state.trashFee = Number(newVal.settings.trashFee)
     } else {
         state.overrideSettings = false
         state.costPerKwh = globalSettings.value.costPerKwh
@@ -81,30 +84,49 @@ const isOpen = computed({
 const onSubmit = async (event: FormSubmitEvent<Schema>) => {
   const data = event.data as any
   
-  const settings = state.overrideSettings ? {
-    costPerKwh: data.costPerKwh,
-    waterFee: data.waterFee,
-    trashFee: data.trashFee
-  } : undefined
+  isSaving.value = true
+  
+  try {
+    const payload: any = {
+      name: data.name,
+      address: data.address,
+      description: data.description || '',
+      image: data.image || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
+    }
+    
+    if (state.overrideSettings) {
+      payload.costPerKwh = data.costPerKwh
+      payload.waterFee = data.waterFee
+      payload.trashFee = data.trashFee
+    }
 
-  if (props.property) {
-    store.updateProperty(props.property.id, {
-        name: data.name,
-        address: data.address,
-        description: data.description || '',
-        image: data.image,
-        settings
+    if (props.property) {
+      await store.updateProperty(props.property.id, payload)
+      toast.add({
+        title: 'Property Updated',
+        description: 'Property has been updated successfully.',
+        color: 'success',
+      })
+    } else {
+      await store.addProperty(payload)
+      toast.add({
+        title: 'Property Created',
+        description: 'New property has been added successfully.',
+        color: 'success',
+      })
+    }
+    
+    emit('saved')
+    isOpen.value = false
+  } catch (err: any) {
+    toast.add({
+      title: 'Error',
+      description: err?.data?.message || err?.message || 'Failed to save property',
+      color: 'error',
     })
-  } else {
-    store.addProperty({
-        name: data.name,
-        address: data.address,
-        description: data.description || '',
-        image: data.image || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
-        settings
-    })
+  } finally {
+    isSaving.value = false
   }
-  isOpen.value = false
 }
 </script>
 
@@ -184,8 +206,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           </div>
 
           <div class="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <UButton label="Cancel" color="neutral" variant="ghost" @click="isOpen = false" />
-            <UButton type="submit" label="Save Property" color="primary" />
+            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
+            <UButton type="submit" label="Save Property" color="primary" :loading="isSaving" />
           </div>
         </UForm>
       </div>

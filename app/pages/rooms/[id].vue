@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useKosStore, type MeterReading } from '~/stores/kos'
+import { useKosStore, type MeterReading, type Room } from '~/stores/kos'
 
 const route = useRoute()
 const router = useRouter()
@@ -7,18 +7,36 @@ const store = useKosStore()
 const toast = useToast()
 
 const roomId = computed(() => route.params.id as string)
-const { rooms, bills, tenants, properties, settings } = storeToRefs(store)
-const room = computed(() => rooms.value.find(r => r.id === roomId.value))
+const { bills, tenants, properties, settings } = storeToRefs(store)
+
+// Fetch room from API
+const room = ref<Room | null>(null)
+const isLoading = ref(true)
+const isSaving = ref(false)
 
 const roomBills = computed(() => store.getBillsByRoomId(roomId.value).sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime()))
 const meterReadings = computed(() => store.getMeterReadingsByRoomId(roomId.value))
 
-// Redirect if room not found
-watch(room, (newRoom) => {
-  if (!newRoom && roomId.value) {
-    router.push('/properties')
+async function loadRoom() {
+  isLoading.value = true
+  try {
+    const data = await store.fetchRoomById(roomId.value)
+    if (data) {
+      room.value = data
+    } else {
+      router.push('/rooms')
+    }
+  } catch {
+    router.push('/rooms')
+  } finally {
+    isLoading.value = false
   }
-}, { immediate: true })
+}
+
+onMounted(async () => {
+  await store.fetchTenants() // Fetch tenants on mount
+  await loadRoom()
+})
 
 // ============ Room Status & Tenant Management ============
 const statusOptions = [
@@ -27,82 +45,128 @@ const statusOptions = [
   { label: 'Maintenance', value: 'maintenance' }
 ]
 
-const roomStatus = ref(room.value?.status || 'available')
-const useTrashService = ref(room.value?.useTrashService ?? true)
-const moveInDate = ref(room.value?.moveInDate || '')
+const roomStatus = ref<'available' | 'occupied' | 'maintenance'>('available')
+const useTrashService = ref(true)
+const moveInDate = ref('')
 const selectedTenantId = ref<string | null>(null)
 const isCreatingNewTenant = ref(false)
 const newTenantName = ref('')
 const newTenantContact = ref('')
 const newTenantIdCard = ref('')
+const isTenantModalOpen = ref(false)
 
-// Tenant options for select dropdown
-const tenantOptions = computed(() => {
-  return [
-    { label: '-- No Tenant --', value: '' },
-    ...tenants.value.map(t => ({ label: t.name, value: t.id })),
-    { label: '+ Create New Tenant', value: '__new__' }
-  ]
+// Get selected tenant name from tenants list
+const selectedTenantName = computed(() => {
+  if (!selectedTenantId.value) return ''
+  const tenant = tenants.value.find(t => t.id === selectedTenantId.value)
+  return tenant?.name || room.value?.tenantName || ''
 })
 
-// Initialize selected tenant
+// Handle tenant selection from modal
+const onTenantSelect = (tenant: any) => {
+  if (tenant === null) {
+    // User chose to create new tenant
+    isCreatingNewTenant.value = true
+    selectedTenantId.value = null
+  } else {
+    selectedTenantId.value = tenant.id
+    isCreatingNewTenant.value = false
+  }
+}
+
+// Sync room data when loaded
 watch(room, (r) => {
   if (r) {
     roomStatus.value = r.status
     useTrashService.value = r.useTrashService ?? true
     moveInDate.value = r.moveInDate || ''
-    const tenant = tenants.value.find(t => t.name === r.tenantName)
-    selectedTenantId.value = tenant?.id || null
+    // Set tenantId directly from room data
+    selectedTenantId.value = r.tenantId || null
   }
 }, { immediate: true })
 
-// Watch for "Create New" selection
+// Watch for "__new__" selection from legacy select (if used elsewhere)
 watch(selectedTenantId, (val) => {
   if (val === '__new__') {
     isCreatingNewTenant.value = true
-  } else {
-    isCreatingNewTenant.value = false
   }
+  // Don't reset isCreatingNewTenant to false here - let onTenantSelect handle it
 })
 
-const updateRoomStatus = () => {
+const updateRoomStatus = async () => {
   if (!room.value) return
   
-  let tenantName = ''
+  isSaving.value = true
   
-  if (roomStatus.value === 'occupied') {
-    if (isCreatingNewTenant.value && newTenantName.value) {
-      store.addTenant({
-        name: newTenantName.value,
-        contact: newTenantContact.value || '0000000000',
-        idCardNumber: newTenantIdCard.value || '0000000000000000',
-        status: 'active',
-        roomId: roomId.value
-      })
-      tenantName = newTenantName.value
-      newTenantName.value = ''
-      newTenantContact.value = ''
-      newTenantIdCard.value = ''
-      isCreatingNewTenant.value = false
-      selectedTenantId.value = null
-      toast.add({ title: 'Tenant Created', description: 'New tenant has been created and assigned.', color: 'success' })
-    } else if (selectedTenantId.value && selectedTenantId.value !== '__new__') {
-      const tenant = tenants.value.find(t => t.id === selectedTenantId.value)
-      tenantName = tenant?.name || ''
-      if (tenant) {
-        store.updateTenant(tenant.id, { roomId: roomId.value })
+  try {
+    let tenantId: string | null = null
+    let tenantName = ''
+    
+    if (roomStatus.value === 'occupied') {
+      if (isCreatingNewTenant.value && newTenantName.value) {
+        // Validation for new tenant
+        if (!newTenantContact.value || !newTenantIdCard.value) {
+          toast.add({ title: 'Validation Error', description: 'Please fill in contact and KTP number.', color: 'error' })
+          isSaving.value = false
+          return
+        }
+        if (newTenantIdCard.value.length !== 16) {
+          toast.add({ title: 'Validation Error', description: 'KTP number must be 16 digits.', color: 'error' })
+          isSaving.value = false
+          return
+        }
+        
+        // Create new tenant via API
+        const newTenant = await store.addTenant({
+          name: newTenantName.value,
+          contact: newTenantContact.value,
+          idCardNumber: newTenantIdCard.value,
+          status: 'active',
+        })
+        tenantId = newTenant.id
+        tenantName = newTenantName.value
+        
+        // Reset form
+        newTenantName.value = ''
+        newTenantContact.value = ''
+        newTenantIdCard.value = ''
+        isCreatingNewTenant.value = false
+        selectedTenantId.value = tenantId
+        
+        toast.add({ title: 'Tenant Created', description: 'New tenant has been created and assigned.', color: 'success' })
+      } else if (selectedTenantId.value && selectedTenantId.value !== '__new__') {
+        tenantId = selectedTenantId.value
+        const tenant = tenants.value.find(t => t.id === selectedTenantId.value)
+        tenantName = tenant?.name || ''
+      } else {
+        // No tenant selected for occupied - validation error
+        toast.add({ title: 'Validation Error', description: 'Please select or create a tenant for occupied room.', color: 'error' })
+        isSaving.value = false
+        return
       }
     }
+    
+    await store.updateRoom(roomId.value, {
+      status: roomStatus.value,
+      tenantId: roomStatus.value === 'occupied' ? tenantId : null,
+      tenantName: roomStatus.value === 'occupied' ? tenantName : undefined,
+      useTrashService: useTrashService.value,
+      moveInDate: roomStatus.value === 'occupied' ? moveInDate.value : null
+    })
+    
+    // Reload room to get updated data
+    await loadRoom()
+    
+    toast.add({ title: 'Room Updated', description: 'Room settings have been saved.', color: 'success' })
+  } catch (err: any) {
+    toast.add({
+      title: 'Error',
+      description: err?.data?.message || err?.message || 'Failed to update room',
+      color: 'error',
+    })
+  } finally {
+    isSaving.value = false
   }
-  
-  store.updateRoom(roomId.value, {
-    status: roomStatus.value as 'available' | 'occupied' | 'maintenance',
-    tenantName: roomStatus.value === 'occupied' ? tenantName : undefined,
-    useTrashService: useTrashService.value,
-    moveInDate: roomStatus.value === 'occupied' ? moveInDate.value : undefined
-  })
-  
-  toast.add({ title: 'Room Updated', description: 'Room settings have been saved.', color: 'success' })
 }
 
 // ============ Meter Reading Form ============
@@ -189,7 +253,7 @@ const goBack = () => {
         <div class="flex items-center gap-3">
              <div class="text-right hidden sm:block">
                 <div class="text-sm text-gray-500">Monthly Rent</div>
-                <div class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ formatCurrency(room.price) }}</div>
+                <div class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ formatCurrency(Number(room.price)) }}</div>
              </div>
              <UBadge :color="getStatusColor(room.status)" size="lg" variant="solid" class="capitalize px-3 py-1.5">
                 {{ room.status }}
@@ -344,25 +408,29 @@ const goBack = () => {
                          <div class="space-y-1">
                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tenant</label>
                             
-                            <!-- Current Tenant Display if assigned -->
-                            <div v-if="room.tenantName && !isCreatingNewTenant && !selectedTenantId" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md flex items-center justify-between group">
+                            <!-- Selected Tenant Display -->
+                            <div v-if="selectedTenantId && selectedTenantId !== '__new__'" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md flex items-center justify-between group">
                                 <div class="flex items-center gap-3">
-                                    <UAvatar :alt="room.tenantName" size="sm" class="bg-primary-100 text-primary-600" />
-                                    <div class="text-sm font-medium">{{ room.tenantName }}</div>
+                                    <UAvatar :alt="selectedTenantName" size="sm" class="bg-primary-100 text-primary-600" />
+                                    <div class="text-sm font-medium">{{ selectedTenantName }}</div>
                                 </div>
-                                <UButton variant="ghost" color="neutral" icon="i-heroicons-pencil-square" size="xs" class="opacity-0 group-hover:opacity-100" @click="selectedTenantId = ''" />
+                                <UButton variant="ghost" color="neutral" icon="i-heroicons-arrow-path" size="xs" @click="isTenantModalOpen = true">
+                                    Change
+                                </UButton>
                             </div>
 
-                            <!-- Selection Dropdown -->
-                            <div v-else>
-                                <USelectMenu 
-                                v-model="selectedTenantId" 
-                                :items="tenantOptions" 
-                                value-key="value" 
-                                label-key="label"
-                                class="w-full"
-                                placeholder="Select or create tenant..."
-                                />
+                            <!-- Select Tenant Button -->
+                            <div v-else-if="!isCreatingNewTenant">
+                                <UButton 
+                                    block 
+                                    variant="outline" 
+                                    color="neutral"
+                                    icon="i-heroicons-user-plus"
+                                    @click="isTenantModalOpen = true"
+                                >
+                                    Select Tenant
+                                </UButton>
+                                <p class="text-xs text-gray-500 mt-1">{{ tenants.filter(t => t.status === 'active').length }} active tenant(s) available</p>
                             </div>
                         </div>
 
@@ -397,13 +465,13 @@ const goBack = () => {
                         <div class="flex items-center justify-between">
                             <div>
                                 <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Trash Service</div>
-                                <div class="text-xs text-gray-500">Include trash fee ({{ formatCurrency(effectiveSettings.trashFee) }}/mo)</div>
+                                <div class="text-xs text-gray-500">Include trash fee ({{ formatCurrency(Number(effectiveSettings.trashFee)) }}/mo)</div>
                             </div>
                             <USwitch v-model="useTrashService" />
                         </div>
                     </div>
 
-                    <UButton @click="updateRoomStatus" block color="primary" class="mt-4" :loading="false">
+                    <UButton @click="updateRoomStatus" block color="primary" class="mt-4" :loading="isSaving">
                         Save Changes
                     </UButton>
                 </div>
@@ -411,4 +479,7 @@ const goBack = () => {
         </div>
     </div>
   </div>
+
+  <!-- Tenant Select Modal -->
+  <TenantSelectModal v-model="isTenantModalOpen" @select="onTenantSelect" />
 </template>

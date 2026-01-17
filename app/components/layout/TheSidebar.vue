@@ -11,6 +11,9 @@ const emit = defineEmits<{
   toggle: []
 }>()
 
+import { useKosStore } from '~/stores/kos'
+const store = useKosStore()
+const { settings } = storeToRefs(store)
 const appConfig = useAppConfig()
 const route = useRoute()
 
@@ -120,7 +123,7 @@ onMounted(() => {
         </div>
         <Transition name="slide-fade">
           <span v-if="!collapsed" class="font-bold text-lg text-gray-900 dark:text-white whitespace-nowrap">
-            {{ appConfig.app?.name || 'NuxtBase' }}
+            {{ settings?.appName || appConfig.app?.name || 'NuxtBase' }}
           </span>
         </Transition>
       </NuxtLink>
