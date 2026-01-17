@@ -1,6 +1,6 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { bills, rooms } from '../../database/schema';
+import { bills, rooms, tenants, properties } from '../../database/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -41,10 +41,19 @@ export default defineEventHandler(async (event) => {
         conditions.push(eq(bills.period, billPeriod));
     }
 
-    // Apply filters or return all bills
-    const allBills = conditions.length > 0
-        ? await db.select().from(bills).where(and(...conditions))
-        : await db.select().from(bills);
+    // Fetch bills with tenant and room properties using joins
+    const allBills = await db
+        .select({
+            bill: bills,
+            tenant: tenants,
+            room: rooms,
+            property: properties,
+        })
+        .from(bills)
+        .leftJoin(tenants, eq(bills.tenantId, tenants.id))
+        .leftJoin(rooms, eq(bills.roomId, rooms.id))
+        .leftJoin(properties, eq(rooms.propertyId, properties.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     return allBills;
 });
