@@ -46,7 +46,34 @@ export default defineEventHandler(async (event) => {
 
     // Calculate totals
     const monthsCovered = input.monthsCovered || 1;
-    const totalAmount = input.roomPrice * monthsCovered;
+
+    // Proration calculation (logic from Friend's version)
+    let prorationFactor = 1;
+    let isProrated = false;
+
+    if (roomData.moveInDate) {
+        const moveInDate = new Date(roomData.moveInDate);
+        const billPeriodDate = new Date(input.period + '-01');
+
+        // Check if this is the first billing period (same month as move-in)
+        const isSameMonth = moveInDate.getFullYear() === billPeriodDate.getFullYear() &&
+            moveInDate.getMonth() === billPeriodDate.getMonth();
+
+        // If move-in is after the 1st of the month
+        if (isSameMonth && moveInDate.getDate() > 1) {
+            const daysInMonth = new Date(billPeriodDate.getFullYear(), billPeriodDate.getMonth() + 1, 0).getDate();
+            const daysOccupied = daysInMonth - moveInDate.getDate() + 1; // +1 to include move-in day
+            prorationFactor = daysOccupied / daysInMonth;
+            isProrated = true;
+        }
+    }
+
+    const roomPrice = Number(input.roomPrice) * monthsCovered * prorationFactor;
+    const totalAmount = roomPrice; // For rent bills, currently only room price is calculated here. 
+    // Note: utility fees (water/trash) are typically in utility bills or fixed here? 
+    // User's current implementation only sums roomPrice. Friend's had water/trash here too.
+    // Sticking to User's base logic of ONLY room price for RentBill, but applying proration.
+
 
     // Calculate periodEnd for multi-month
     let periodEnd = input.periodEnd;
@@ -97,7 +124,7 @@ export default defineEventHandler(async (event) => {
         period: input.period,
         periodEnd: periodEnd || null,
         monthsCovered: monthsCovered,
-        roomPrice: input.roomPrice.toString(),
+        roomPrice: roomPrice.toString(),
         totalAmount: totalAmount.toString(),
         isPaid: false,
         generatedAt: new Date(),

@@ -36,27 +36,51 @@ watch(() => props.modelValue, (val) => {
 // Sync from CalendarDate to string prop
 watch(date, (val) => {
   if (val) {
-    if (props.granularity === 'month') {
-        // Emit YYYY-MM
-        emit('update:modelValue', `${val.year}-${String(val.month).padStart(2, '0')}`)
-    } else {
-        emit('update:modelValue', val.toString())
-    }
+    // Always emit full date string (YYYY-MM-DD) to preserve day selection
+    emit('update:modelValue', val.toString())
   } else {
     emit('update:modelValue', null)
+  }
+})
+
+const formattedDate = computed(() => {
+  if (!props.modelValue) return 'Semua Periode'
+  try {
+    const [year, month, day] = props.modelValue.split('-').map(Number)
+    // Handle YYYY-MM cases where day is undefined
+    const dateObj = new Date(year, month - 1, day || 1)
+    
+    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(dateObj)
+  } catch (e) {
+    return props.modelValue
   }
 })
 </script>
 
 <template>
-  <UInputDate v-model="date" :granularity="granularity">
-    <template #trailing>
-       <UPopover :ui="{ content: 'p-2' }">
-          <UButton color="neutral" variant="link" icon="i-heroicons-calendar" class="p-0" />
-          <template #content>
-             <UCalendar v-model="date" :granularity="granularity" />
-          </template>
-       </UPopover>
+  <UPopover :popper="{ placement: 'bottom-start' }">
+    <UButton 
+        icon="i-heroicons-calendar" 
+        color="neutral" 
+        variant="soft" 
+        :label="formattedDate" 
+        :ui="{ base: 'w-40 justify-start' }"
+    />
+    
+    <template #content="{ close }">
+      <div class="p-2 space-y-2">
+         <div class="flex justify-end">
+             <UButton 
+                v-if="date" 
+                size="xs" 
+                color="neutral" 
+                variant="ghost" 
+                label="Clear" 
+                @click="date = null; close()" 
+             />
+         </div>
+         <UCalendar v-model="date" @close="close" />
+      </div>
     </template>
-  </UInputDate>
+  </UPopover>
 </template>

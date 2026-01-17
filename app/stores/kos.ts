@@ -67,6 +67,9 @@ export interface RentBill {
     isPaid: boolean
     paidAt?: string | null
     generatedAt: string
+    tenant?: Tenant | null
+    room?: Room
+    property?: Property
 }
 
 export interface UtilityBill {
@@ -85,6 +88,9 @@ export interface UtilityBill {
     isPaid: boolean
     paidAt?: string | null
     generatedAt: string
+    tenant?: Tenant | null
+    room?: Room
+    property?: Property
 }
 
 
@@ -429,8 +435,13 @@ export const useKosStore = defineStore('kos', () => {
             if (params?.period) query.append('period', params.period)
 
             const queryString = query.toString()
-            const data = await $fetch<RentBill[]>(`/api/rent-bills${queryString ? '?' + queryString : ''}`)
-            rentBills.value = data
+            const data = await $fetch<any[]>(`/api/rent-bills${queryString ? '?' + queryString : ''}`)
+            rentBills.value = data.map((item: any) => ({
+                ...item.bill,
+                tenant: item.tenant,
+                room: item.room,
+                property: item.property
+            }))
         } catch (err: any) {
             rentBillsError.value = err?.data?.message || err?.message || 'Failed to fetch rent bills'
             console.error('fetchRentBills error:', err)
@@ -514,8 +525,13 @@ export const useKosStore = defineStore('kos', () => {
             if (params?.period) query.append('period', params.period)
 
             const queryString = query.toString()
-            const data = await $fetch<UtilityBill[]>(`/api/utility-bills${queryString ? '?' + queryString : ''}`)
-            utilityBills.value = data
+            const data = await $fetch<any[]>(`/api/utility-bills${queryString ? '?' + queryString : ''}`)
+            utilityBills.value = data.map((item: any) => ({
+                ...item.bill,
+                tenant: item.tenant,
+                room: item.room,
+                property: item.property
+            }))
         } catch (err: any) {
             utilityBillsError.value = err?.data?.message || err?.message || 'Failed to fetch utility bills'
             console.error('fetchUtilityBills error:', err)

@@ -1,6 +1,6 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { utilityBills, rooms } from '../../database/schema';
+import { utilityBills, rooms, tenants, properties } from '../../database/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -35,9 +35,18 @@ export default defineEventHandler(async (event) => {
         conditions.push(eq(utilityBills.period, period));
     }
 
-    const allBills = conditions.length > 0
-        ? await db.select().from(utilityBills).where(and(...conditions))
-        : await db.select().from(utilityBills);
+    const allBills = await db
+        .select({
+            bill: utilityBills,
+            tenant: tenants,
+            room: rooms,
+            property: properties,
+        })
+        .from(utilityBills)
+        .leftJoin(tenants, eq(utilityBills.tenantId, tenants.id))
+        .leftJoin(rooms, eq(utilityBills.roomId, rooms.id))
+        .leftJoin(properties, eq(rooms.propertyId, properties.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     return allBills;
 });

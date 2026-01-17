@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useKosStore, type MeterReading, type Room, type UtilityBill } from '~/stores/kos'
 import { usePdfReceipt } from '~/composables/usePdfReceipt'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -9,7 +10,7 @@ const toast = useToast()
 
 const roomId = computed(() => route.params.id as string)
 const { utilityBills, tenants, properties, settings } = storeToRefs(store)
-const { generateUtilityReceipt } = usePdfReceipt()
+const { generateUtilityReceipt, generateRentReceipt } = usePdfReceipt()
 
 // Confirm Dialog
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog> | null>(null)
@@ -19,8 +20,15 @@ const room = ref<Room | null>(null)
 const isLoading = ref(true)
 const isSaving = ref(false)
 
-const roomUtilityBills = computed(() => store.getUtilityBillsByRoomId(roomId.value).sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime()))
+const roomUtilityBills = computed(() => store.getUtilityBillsByRoomId(roomId.value))
+const roomRentBills = computed(() => store.getRentBillsByRoomId(roomId.value))
 const meterReadings = computed(() => store.getMeterReadingsByRoomId(roomId.value))
+
+const billingHistory = computed(() => {
+    const utils = roomUtilityBills.value.map(b => ({ ...b, type: 'utility' as const }))
+    const rents = roomRentBills.value.map(b => ({ ...b, type: 'rent' as const }))
+    return [...utils, ...rents].sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime())
+})
 
 async function loadRoom() {
   isLoading.value = true
@@ -45,6 +53,7 @@ onMounted(async () => {
   // Fetch meter readings and bills for this room
   await store.fetchMeterReadings(roomId.value)
   await store.fetchUtilityBills({ roomId: roomId.value })
+  await store.fetchRentBills({ roomId: roomId.value })
 })
 
 // ============ Room Status & Tenant Management ============
@@ -194,6 +203,10 @@ watch(meterReadings, (readings) => {
 const usage = computed(() => Math.max(0, meterEnd.value - meterStart.value))
 
 const addReading = async () => {
+  if (!newPeriod.value) {
+    toast.add({ title: 'Invalid Period', description: 'Please select a billing period.', color: 'error' })
+    return
+  }
   if (meterEnd.value < meterStart.value) {
     toast.add({ title: 'Invalid Reading', description: 'End reading cannot be less than start reading.', color: 'error' })
     return
@@ -201,7 +214,7 @@ const addReading = async () => {
   try {
     await store.addMeterReading({
       roomId: roomId.value,
-      period: newPeriod.value,
+      period: newPeriod.value.slice(0, 7),
       meterStart: meterStart.value,
       meterEnd: meterEnd.value
     })
@@ -230,38 +243,56 @@ const deleteReading = async (id: string) => {
 }
 
 // Bill actions
-const deleteUtilBill = async (id: string) => {
+// Bill actions
+const deleteBill = async (bill: any) => {
+  const isRent = bill.type === 'rent'
+  const title = isRent ? 'Hapus Rent Bill?' : 'Hapus Utility Bill?'
+  const message = `Data ${isRent ? 'rent' : 'utility'} bill ini akan dihapus permanen. Lanjutkan?`
+  
   const confirmed = await confirmDialog.value?.confirm({
-    title: 'Hapus Utility Bill?',
-    message: 'Data utility bill ini akan dihapus permanen. Lanjutkan?',
+    title,
+    message,
     confirmText: 'Hapus',
     confirmColor: 'error'
   })
+  
   if (confirmed) {
     try {
-      await store.deleteUtilityBill(id)
-      toast.add({ title: 'Bill Deleted', description: 'Utility bill has been deleted.', color: 'success' })
+      if (isRent) {
+         await store.deleteRentBill(bill.id)
+      } else {
+         await store.deleteUtilityBill(bill.id)
+      }
+      toast.add({ title: 'Bill Deleted', description: 'Bill has been deleted.', color: 'success' })
     } catch (e: any) {
       toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to delete bill', color: 'error' })
     }
   }
 }
 
-const markUtilPaid = async (id: string) => {
+const markPaid = async (bill: any) => {
   try {
-    await store.markUtilityBillAsPaid(id)
-    toast.add({ title: 'Bill Paid', description: 'Utility bill has been marked as paid.', color: 'success' })
+    if (bill.type === 'rent') {
+        await store.markRentBillAsPaid(bill.id)
+    } else {
+        await store.markUtilityBillAsPaid(bill.id)
+    }
+    toast.add({ title: 'Bill Paid', description: 'Bill has been marked as paid.', color: 'success' })
   } catch (e: any) {
     toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to mark as paid', color: 'error' })
   }
 }
 
 // Download receipt
-const downloadReceipt = (bill: UtilityBill) => {
+const downloadReceipt = (bill: any) => {
   if (!room.value || !property.value) return
-  // Try to find tenant associated with the room currently
   const tenant = tenants.value.find(t => t.id === room.value?.tenantId) || null
-  generateUtilityReceipt(bill, room.value, property.value, tenant)
+  
+  if (bill.type === 'rent') {
+      generateRentReceipt(bill, room.value, property.value, tenant)
+  } else {
+      generateUtilityReceipt(bill, room.value, property.value, tenant)
+  }
 }
 
 // Helpers
@@ -378,23 +409,34 @@ const goBack = () => {
                                 Go to Billing
                             </UButton>
                         </div>
-                        <div v-if="roomUtilityBills.length > 0">
+                        <div v-if="billingHistory.length > 0">
                             <table class="w-full text-sm text-left">
                                 <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
+                                        <th class="p-3 font-medium">Type</th>
                                         <th class="p-3 font-medium">Period</th>
-                                        <th class="p-3 font-medium">Usage</th>
+                                        <th class="p-3 font-medium">Details</th>
                                         <th class="p-3 font-medium">Total</th>
                                         <th class="p-3 font-medium">Status</th>
                                         <th class="p-3 font-medium text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                                    <tr v-for="bill in roomUtilityBills" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                                    <tr v-for="bill in billingHistory" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                                        <td class="p-3">
+                                            <UBadge :color="bill.type === 'rent' ? 'primary' : 'warning'" variant="subtle" size="xs">
+                                                {{ bill.type === 'rent' ? 'Rent' : 'Utility' }}
+                                            </UBadge>
+                                        </td>
                                         <td class="p-3 font-medium">{{ bill.period }}</td>
                                         <td class="p-3">
-                                            <div>{{ bill.meterEnd - bill.meterStart }} kWh</div>
-                                            <div class="text-xs text-gray-400 font-mono">{{ bill.meterStart }} -> {{ bill.meterEnd }}</div>
+                                            <div v-if="bill.type === 'utility'">
+                                                <div>{{ bill.meterEnd - bill.meterStart }} kWh</div>
+                                                <div class="text-xs text-gray-400 font-mono">{{ bill.meterStart }} -> {{ bill.meterEnd }}</div>
+                                            </div>
+                                            <div v-else>
+                                                <div>{{ bill.monthsCovered }} Month(s)</div>
+                                            </div>
                                         </td>
                                         <td class="p-3 font-bold text-gray-900 dark:text-white">{{ formatCurrency(Number(bill.totalAmount)) }}</td>
                                         <td class="p-3">
@@ -404,13 +446,13 @@ const goBack = () => {
                                         </td>
                                         <td class="p-3 text-right flex justify-end gap-1">
                                             <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
-                                                <UButton size="xs" color="success" variant="soft" icon="i-heroicons-check" @click="markUtilPaid(bill.id)" />
+                                                <UButton size="xs" color="success" variant="soft" icon="i-heroicons-check" @click="markPaid(bill)" />
                                             </UTooltip>
                                             <UTooltip text="Print">
                                                 <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-printer" @click="downloadReceipt(bill)" />
                                             </UTooltip>
                                             <UTooltip text="Delete">
-                                                <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteUtilBill(bill.id)" />
+                                                <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteBill(bill)" />
                                             </UTooltip>
                                         </td>
                                     </tr>

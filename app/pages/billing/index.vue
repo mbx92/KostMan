@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useKosStore, type RentBill, type UtilityBill } from '~/stores/kos'
 import { usePdfReceipt } from '~/composables/usePdfReceipt'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
+import DatePicker from '~/components/DatePicker.vue'
 
 const store = useKosStore()
 const toast = useToast()
@@ -47,6 +49,8 @@ const roomOptions = computed(() => {
 })
 
 // Filtered Bills
+const selectedPeriod = ref<string | null>(null)
+
 const filteredRentBills = computed(() => {
   let result = [...rentBills.value]
   if (selectedRoomId.value !== 'all') {
@@ -55,6 +59,12 @@ const filteredRentBills = computed(() => {
     const roomIds = rooms.value.filter(r => r.propertyId === selectedPropertyId.value).map(r => r.id)
     result = result.filter(b => roomIds.includes(b.roomId))
   }
+  
+  if (selectedPeriod.value) {
+    const filterPeriod = selectedPeriod.value.slice(0, 7)
+    result = result.filter(b => b.period.startsWith(filterPeriod))
+  }
+
   if (selectedStatus.value === 'paid') result = result.filter(b => b.isPaid)
   if (selectedStatus.value === 'unpaid') result = result.filter(b => !b.isPaid)
   return result.sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime())
@@ -68,6 +78,13 @@ const filteredUtilityBills = computed(() => {
     const roomIds = rooms.value.filter(r => r.propertyId === selectedPropertyId.value).map(r => r.id)
     result = result.filter(b => roomIds.includes(b.roomId))
   }
+
+  // Filter by period (YYYY-MM)
+  if (selectedPeriod.value) {
+     const filterPeriod = selectedPeriod.value.slice(0, 7)
+     result = result.filter(b => b.period.startsWith(filterPeriod))
+  }
+
   if (selectedStatus.value === 'paid') result = result.filter(b => b.isPaid)
   if (selectedStatus.value === 'unpaid') result = result.filter(b => !b.isPaid)
   return result.sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime())
@@ -110,10 +127,11 @@ const generateRentBill = async () => {
   try {
     await store.generateRentBill({
       roomId: genRoomId.value,
-      period: genPeriod.value,
+      period: genPeriod.value.slice(0, 7),
       monthsCovered: genMonthsCovered.value,
       roomPrice: Number(genRoom.value.price)
     })
+    await store.fetchRentBills() // Refresh list to get enriched data
     toast.add({ title: 'Success', description: 'Rent bill generated.', color: 'success' })
     isGenerating.value = false
     genRoomId.value = ''
@@ -201,11 +219,6 @@ const printCombined = (item: { rent?: RentBill, util?: UtilityBill, roomId: stri
 }
 
 // Helpers
-const getRoomName = (roomId: string) => rooms.value.find(r => r.id === roomId)?.name || 'Unknown'
-const getPropertyName = (roomId: string) => {
-  const room = rooms.value.find(r => r.id === roomId)
-  return properties.value.find(p => p.id === room?.propertyId)?.name || 'Unknown'
-}
 const formatCurrency = (val: number | string) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(val))
 </script>
 
@@ -245,6 +258,7 @@ const formatCurrency = (val: number | string) => new Intl.NumberFormat('id-ID', 
 
     <!-- Filters -->
     <div class="flex flex-wrap gap-4 items-center">
+      <DatePicker v-model="selectedPeriod" granularity="month" class="w-40" placeholder="Semua Periode" />
       <USelect v-model="selectedPropertyId" :items="propertyOptions" value-key="value" label-key="label" class="w-48" />
       <USelect v-model="selectedRoomId" :items="roomOptions" value-key="value" label-key="label" class="w-48" />
       <div class="flex gap-1">
@@ -285,8 +299,8 @@ const formatCurrency = (val: number | string) => new Intl.NumberFormat('id-ID', 
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
             <tr v-for="bill in filteredRentBills" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
               <td class="p-3 font-medium">{{ bill.period }}{{ bill.periodEnd ? ` - ${bill.periodEnd}` : '' }}</td>
-              <td class="p-3 text-gray-500">{{ getPropertyName(bill.roomId) }}</td>
-              <td class="p-3 font-medium">{{ getRoomName(bill.roomId) }}</td>
+              <td class="p-3 text-gray-500">{{ bill.property?.name || 'Unknown' }}</td>
+              <td class="p-3 font-medium">{{ bill.room?.name || 'Unknown' }}</td>
               <td class="p-3">{{ bill.monthsCovered || 1 }}</td>
               <td class="p-3 font-bold text-gray-900 dark:text-white">{{ formatCurrency(bill.totalAmount) }}</td>
               <td class="p-3">
@@ -334,8 +348,8 @@ const formatCurrency = (val: number | string) => new Intl.NumberFormat('id-ID', 
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
             <tr v-for="bill in filteredUtilityBills" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
               <td class="p-3 font-medium">{{ bill.period }}</td>
-              <td class="p-3 text-gray-500">{{ getPropertyName(bill.roomId) }}</td>
-              <td class="p-3 font-medium">{{ getRoomName(bill.roomId) }}</td>
+              <td class="p-3 text-gray-500">{{ bill.property?.name || 'Unknown' }}</td>
+              <td class="p-3 font-medium">{{ bill.room?.name || 'Unknown' }}</td>
               <td class="p-3">
                 <div>{{ bill.meterEnd - bill.meterStart }} kWh</div>
                 <div class="text-xs text-gray-400 font-mono">{{ bill.meterStart }} → {{ bill.meterEnd }}</div>
@@ -388,8 +402,8 @@ const formatCurrency = (val: number | string) => new Intl.NumberFormat('id-ID', 
             <tr v-for="item in combinedBills" :key="`${item.roomId}-${item.period}`" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
               <td class="p-3 font-medium">{{ item.period }}</td>
               <td class="p-3 font-medium">
-                 <div>{{ getRoomName(item.roomId) }}</div>
-                 <div class="text-xs text-gray-500">{{ getPropertyName(item.roomId) }}</div>
+                 <div>{{ item.rent?.room?.name || item.util?.room?.name || 'Unknown' }}</div>
+                 <div class="text-xs text-gray-500">{{ item.rent?.property?.name || item.util?.property?.name || 'Unknown' }}</div>
               </td>
               <td class="p-3 text-right">
                 <div v-if="item.rent">
