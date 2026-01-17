@@ -42,6 +42,9 @@ export interface MeterReading {
     meterStart: number
     meterEnd: number
     recordedAt: string
+    recordedBy?: string | null
+    createdAt?: string
+    updatedAt?: string
 }
 
 export interface GlobalSettings {
@@ -52,19 +55,38 @@ export interface GlobalSettings {
     waterFee: number | string
 }
 
-export interface Bill {
+export interface RentBill {
     id: string
     roomId: string
+    tenantId?: string | null
+    period: string // YYYY-MM
+    periodEnd?: string | null
+    monthsCovered?: number
+    roomPrice: number | string
+    totalAmount: number | string
+    isPaid: boolean
+    paidAt?: string | null
+    generatedAt: string
+}
+
+export interface UtilityBill {
+    id: string
+    roomId: string
+    tenantId?: string | null
     period: string // YYYY-MM
     meterStart: number
     meterEnd: number
-    costPerKwh: number
-    usageCost: number // calculated
-    additionalCost: number // water, wifi, etc.
-    totalAmount: number
+    costPerKwh: number | string
+    usageCost: number | string
+    waterFee: number | string
+    trashFee: number | string
+    additionalCost: number | string
+    totalAmount: number | string
     isPaid: boolean
+    paidAt?: string | null
     generatedAt: string
 }
+
 
 export interface Tenant {
     id: string
@@ -90,28 +112,20 @@ export const useKosStore = defineStore('kos', () => {
     const roomsError = ref<string | null>(null)
     const roomsMeta = ref<{ page: number; pageSize: number; total: number; totalPages: number } | null>(null)
 
-    const bills = useLocalStorage<Bill[]>('kos-man-bills', [
-        {
-            id: 'b1', roomId: '101', period: '2025-12', meterStart: 1200, meterEnd: 1350, costPerKwh: 1500,
-            usageCost: 225000, additionalCost: 75000, totalAmount: 1800000, isPaid: true, generatedAt: '2025-12-25T10:00:00Z'
-        },
-        {
-            id: 'b2', roomId: '201', period: '2025-12', meterStart: 800, meterEnd: 920, costPerKwh: 2000,
-            usageCost: 240000, additionalCost: 90000, totalAmount: 1530000, isPaid: true, generatedAt: '2025-12-26T09:00:00Z'
-        },
-        {
-            id: 'b3', roomId: '101', period: '2026-01', meterStart: 1350, meterEnd: 1480, costPerKwh: 1500,
-            usageCost: 195000, additionalCost: 75000, totalAmount: 1770000, isPaid: false, generatedAt: '2026-01-25T10:00:00Z'
-        }
-    ])
+    // Rent Bills - now fetched from API
+    const rentBills = ref<RentBill[]>([])
+    const rentBillsLoading = ref(false)
+    const rentBillsError = ref<string | null>(null)
 
-    const meterReadings = useLocalStorage<MeterReading[]>('kos-man-meter-readings', [
-        { id: 'mr1', roomId: '101', period: '2025-12', meterStart: 1200, meterEnd: 1350, recordedAt: '2025-12-25T10:00:00Z' },
-        { id: 'mr2', roomId: '201', period: '2025-12', meterStart: 800, meterEnd: 920, recordedAt: '2025-12-26T09:00:00Z' },
-        { id: 'mr3', roomId: '101', period: '2026-01', meterStart: 1350, meterEnd: 1480, recordedAt: '2026-01-25T10:00:00Z' },
-        // A partial reading for next month
-        { id: 'mr4', roomId: '101', period: '2026-02', meterStart: 1480, meterEnd: 1500, recordedAt: '2026-02-05T08:00:00Z' }
-    ])
+    // Utility Bills - now fetched from API
+    const utilityBills = ref<UtilityBill[]>([])
+    const utilityBillsLoading = ref(false)
+    const utilityBillsError = ref<string | null>(null)
+
+    // Meter Readings - now fetched from API
+    const meterReadings = ref<MeterReading[]>([])
+    const meterReadingsLoading = ref(false)
+    const meterReadingsError = ref<string | null>(null)
 
     // Tenants - now fetched from API
     const tenants = ref<Tenant[]>([])
@@ -403,51 +417,179 @@ export const useKosStore = defineStore('kos', () => {
         }
     }
 
-    // Billing
-    function generateBill(data: {
+    // ========== RENT BILLS - API Integration ==========
+    async function fetchRentBills(params?: { propertyId?: string; isPaid?: boolean; roomId?: string; period?: string }) {
+        rentBillsLoading.value = true
+        rentBillsError.value = null
+        try {
+            const query = new URLSearchParams()
+            if (params?.propertyId) query.append('propertyId', params.propertyId)
+            if (params?.isPaid !== undefined) query.append('isPaid', params.isPaid.toString())
+            if (params?.roomId) query.append('roomId', params.roomId)
+            if (params?.period) query.append('period', params.period)
+
+            const queryString = query.toString()
+            const data = await $fetch<RentBill[]>(`/api/rent-bills${queryString ? '?' + queryString : ''}`)
+            rentBills.value = data
+        } catch (err: any) {
+            rentBillsError.value = err?.data?.message || err?.message || 'Failed to fetch rent bills'
+            console.error('fetchRentBills error:', err)
+        } finally {
+            rentBillsLoading.value = false
+        }
+    }
+
+    async function generateRentBill(data: {
+        roomId: string,
+        period: string,
+        periodEnd?: string,
+        monthsCovered?: number,
+        roomPrice: number
+    }) {
+        rentBillsLoading.value = true
+        rentBillsError.value = null
+        try {
+            const newBill = await $fetch<RentBill>('/api/rent-bills/generate', {
+                method: 'POST',
+                body: data
+            })
+            rentBills.value.unshift(newBill)
+            return newBill
+        } catch (err: any) {
+            rentBillsError.value = err?.data?.message || err?.message || 'Failed to generate rent bill'
+            console.error('generateRentBill error:', err)
+            throw err
+        } finally {
+            rentBillsLoading.value = false
+        }
+    }
+
+    async function markRentBillAsPaid(id: string) {
+        rentBillsLoading.value = true
+        rentBillsError.value = null
+        try {
+            const updatedBill = await $fetch<RentBill>(`/api/rent-bills/${id}/pay`, {
+                method: 'PATCH'
+            })
+            const index = rentBills.value.findIndex(b => b.id === id)
+            if (index !== -1) {
+                rentBills.value[index] = updatedBill
+            }
+            return updatedBill
+        } catch (err: any) {
+            rentBillsError.value = err?.data?.message || err?.message || 'Failed to mark rent bill as paid'
+            console.error('markRentBillAsPaid error:', err)
+            throw err
+        } finally {
+            rentBillsLoading.value = false
+        }
+    }
+
+    async function deleteRentBill(id: string) {
+        rentBillsLoading.value = true
+        rentBillsError.value = null
+        try {
+            await $fetch(`/api/rent-bills/${id}`, {
+                method: 'DELETE'
+            })
+            rentBills.value = rentBills.value.filter(b => b.id !== id)
+        } catch (err: any) {
+            rentBillsError.value = err?.data?.message || err?.message || 'Failed to delete rent bill'
+            console.error('deleteRentBill error:', err)
+            throw err
+        } finally {
+            rentBillsLoading.value = false
+        }
+    }
+
+    // ========== UTILITY BILLS - API Integration ==========
+    async function fetchUtilityBills(params?: { propertyId?: string; isPaid?: boolean; roomId?: string; period?: string }) {
+        utilityBillsLoading.value = true
+        utilityBillsError.value = null
+        try {
+            const query = new URLSearchParams()
+            if (params?.propertyId) query.append('propertyId', params.propertyId)
+            if (params?.isPaid !== undefined) query.append('isPaid', params.isPaid.toString())
+            if (params?.roomId) query.append('roomId', params.roomId)
+            if (params?.period) query.append('period', params.period)
+
+            const queryString = query.toString()
+            const data = await $fetch<UtilityBill[]>(`/api/utility-bills${queryString ? '?' + queryString : ''}`)
+            utilityBills.value = data
+        } catch (err: any) {
+            utilityBillsError.value = err?.data?.message || err?.message || 'Failed to fetch utility bills'
+            console.error('fetchUtilityBills error:', err)
+        } finally {
+            utilityBillsLoading.value = false
+        }
+    }
+
+    async function createUtilityBill(data: {
         roomId: string,
         period: string,
         meterStart: number,
         meterEnd: number,
         costPerKwh: number,
-        additionalCost: number // water, wifi, etc.
+        waterFee: number,
+        trashFee: number,
+        additionalCost?: number
     }) {
-        const room = rooms.value.find(r => r.id === data.roomId)
-        if (!room) throw new Error('Room not found')
-
-        const usage = data.meterEnd - data.meterStart
-        const usageCost = usage * data.costPerKwh
-        // Total = Room Price + Electricity Usage + Additional
-        const totalAmount = Number(room.price) + usageCost + data.additionalCost
-
-        const newBill: Bill = {
-            id: Date.now().toString(),
-            roomId: data.roomId,
-            period: data.period,
-            meterStart: data.meterStart,
-            meterEnd: data.meterEnd,
-            costPerKwh: data.costPerKwh,
-            usageCost,
-            additionalCost: data.additionalCost,
-            totalAmount,
-            isPaid: false,
-            generatedAt: new Date().toISOString()
-        }
-
-        bills.value.unshift(newBill) // Add to top
-        return newBill
-    }
-
-    function markBillAsPaid(id: string) {
-        const bill = bills.value.find(b => b.id === id)
-        if (bill) {
-            bill.isPaid = true
+        utilityBillsLoading.value = true
+        utilityBillsError.value = null
+        try {
+            const newBill = await $fetch<UtilityBill>('/api/utility-bills', {
+                method: 'POST',
+                body: data
+            })
+            utilityBills.value.unshift(newBill)
+            return newBill
+        } catch (err: any) {
+            utilityBillsError.value = err?.data?.message || err?.message || 'Failed to create utility bill'
+            console.error('createUtilityBill error:', err)
+            throw err
+        } finally {
+            utilityBillsLoading.value = false
         }
     }
 
-    function deleteBill(id: string) {
-        bills.value = bills.value.filter(b => b.id !== id)
+    async function markUtilityBillAsPaid(id: string) {
+        utilityBillsLoading.value = true
+        utilityBillsError.value = null
+        try {
+            const updatedBill = await $fetch<UtilityBill>(`/api/utility-bills/${id}/pay`, {
+                method: 'PATCH'
+            })
+            const index = utilityBills.value.findIndex(b => b.id === id)
+            if (index !== -1) {
+                utilityBills.value[index] = updatedBill
+            }
+            return updatedBill
+        } catch (err: any) {
+            utilityBillsError.value = err?.data?.message || err?.message || 'Failed to mark utility bill as paid'
+            console.error('markUtilityBillAsPaid error:', err)
+            throw err
+        } finally {
+            utilityBillsLoading.value = false
+        }
     }
+
+    async function deleteUtilityBill(id: string) {
+        utilityBillsLoading.value = true
+        utilityBillsError.value = null
+        try {
+            await $fetch(`/api/utility-bills/${id}`, {
+                method: 'DELETE'
+            })
+            utilityBills.value = utilityBills.value.filter(b => b.id !== id)
+        } catch (err: any) {
+            utilityBillsError.value = err?.data?.message || err?.message || 'Failed to delete utility bill'
+            console.error('deleteUtilityBill error:', err)
+            throw err
+        } finally {
+            utilityBillsLoading.value = false
+        }
+    }
+
 
     // Tenants - API Integration
     async function fetchTenants(status?: 'active' | 'inactive') {
@@ -533,24 +675,137 @@ export const useKosStore = defineStore('kos', () => {
         }
     }
 
-    // Meter Readings
-    function addMeterReading(reading: Omit<MeterReading, 'id' | 'recordedAt'>) {
-        const id = Date.now().toString()
-        meterReadings.value.unshift({
-            ...reading,
-            id,
-            recordedAt: new Date().toISOString()
-        })
+    // Meter Readings - API Integration
+    async function fetchMeterReadings(roomId?: string) {
+        meterReadingsLoading.value = true
+        meterReadingsError.value = null
+        try {
+            const query = roomId ? `?roomId=${roomId}` : ''
+            const data = await $fetch<MeterReading[]>(`/api/meter-readings${query}`)
+            meterReadings.value = data
+        } catch (err: any) {
+            meterReadingsError.value = err?.data?.message || err?.message || 'Failed to fetch meter readings'
+            console.error('fetchMeterReadings error:', err)
+        } finally {
+            meterReadingsLoading.value = false
+        }
     }
 
-    function deleteMeterReading(id: string) {
-        meterReadings.value = meterReadings.value.filter(r => r.id !== id)
+    async function fetchMeterReadingById(id: string): Promise<MeterReading | null> {
+        try {
+            const data = await $fetch<MeterReading>(`/api/meter-readings/${id}`)
+            return data
+        } catch (err: any) {
+            console.error('fetchMeterReadingById error:', err)
+            return null
+        }
     }
+
+    async function addMeterReading(reading: Omit<MeterReading, 'id' | 'recordedAt' | 'recorderBy' | 'createdAt' | 'updatedAt'>) {
+        meterReadingsLoading.value = true
+        meterReadingsError.value = null
+        try {
+            const newReading = await $fetch<MeterReading>('/api/meter-readings', {
+                method: 'POST',
+                body: reading
+            })
+            meterReadings.value.unshift(newReading)
+
+            // Auto-Generate Bills
+            try {
+                const room = rooms.value.find(r => r.id === reading.roomId)
+                if (room) {
+                    const property = properties.value.find(p => p.id === room.propertyId)
+                    const effectiveSettings = property?.settings || settings.value
+                
+                    if (effectiveSettings) {
+                        // 1. Create utility bill for this meter reading
+                        await createUtilityBill({
+                            roomId: reading.roomId,
+                            period: reading.period,
+                            meterStart: reading.meterStart,
+                            meterEnd: reading.meterEnd,
+                            costPerKwh: Number(effectiveSettings.costPerKwh),
+                            waterFee: Number(effectiveSettings.waterFee),
+                            trashFee: room.useTrashService ? Number(effectiveSettings.trashFee) : 0,
+                            additionalCost: 0
+                        })
+
+                        // 2. Check if rent bill exists for this period, if not create one
+                        const existingRentBills = await $fetch<RentBill[]>('/api/rent-bills', {
+                            params: { roomId: reading.roomId, period: reading.period }
+                        })
+
+                        if (existingRentBills.length === 0) {
+                            // No rent bill for this period, create one
+                            await generateRentBill({
+                                roomId: reading.roomId,
+                                period: reading.period,
+                                monthsCovered: 1,
+                                roomPrice: Number(room.price)
+                            })
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Auto bill creation failed:', e)
+            }
+
+            return newReading
+        } catch (err: any) {
+            meterReadingsError.value = err?.data?.message || err?.message || 'Failed to add meter reading'
+            console.error('addMeterReading error:', err)
+            throw err
+        } finally {
+            meterReadingsLoading.value = false
+        }
+    }
+
+    async function updateMeterReading(id: string, updates: { meterStart?: number; meterEnd?: number }) {
+        meterReadingsLoading.value = true
+        meterReadingsError.value = null
+        try {
+            const updatedReading = await $fetch<MeterReading>(`/api/meter-readings/${id}`, {
+                method: 'PATCH',
+                body: updates
+            })
+            const index = meterReadings.value.findIndex(r => r.id === id)
+            if (index !== -1) {
+                meterReadings.value[index] = updatedReading
+            }
+            return updatedReading
+        } catch (err: any) {
+            meterReadingsError.value = err?.data?.message || err?.message || 'Failed to update meter reading'
+            console.error('updateMeterReading error:', err)
+            throw err
+        } finally {
+            meterReadingsLoading.value = false
+        }
+    }
+
+    async function deleteMeterReading(id: string) {
+        meterReadingsLoading.value = true
+        meterReadingsError.value = null
+        try {
+            await $fetch(`/api/meter-readings/${id}`, {
+                method: 'DELETE'
+            })
+            meterReadings.value = meterReadings.value.filter(r => r.id !== id)
+        } catch (err: any) {
+            meterReadingsError.value = err?.data?.message || err?.message || 'Failed to delete meter reading'
+            console.error('deleteMeterReading error:', err)
+            throw err
+        } finally {
+            meterReadingsLoading.value = false
+        }
+    }
+
 
     // --- Getters ---
     const getPropertyById = computed(() => (id: string) => properties.value.find(p => p.id === id))
     const getRoomsByPropertyId = computed(() => (propertyId: string) => rooms.value.filter(r => r.propertyId === propertyId))
-    const getBillsByRoomId = computed(() => (roomId: string) => bills.value.filter(b => b.roomId === roomId))
+    const getRentBillsByRoomId = computed(() => (roomId: string) => rentBills.value.filter(b => b.roomId === roomId))
+    const getUtilityBillsByRoomId = computed(() => (roomId: string) => utilityBills.value.filter(b => b.roomId === roomId))
     const getMeterReadingsByRoomId = computed(() => (roomId: string) =>
         meterReadings.value.filter(r => r.roomId === roomId).sort((a, b) =>
             new Date(b.period).getTime() - new Date(a.period).getTime()
@@ -567,8 +822,18 @@ export const useKosStore = defineStore('kos', () => {
         roomsLoading,
         roomsError,
         roomsMeta,
-        bills,
+        // Rent Bills
+        rentBills,
+        rentBillsLoading,
+        rentBillsError,
+        // Utility Bills
+        utilityBills,
+        utilityBillsLoading,
+        utilityBillsError,
+        // Meter Readings
         meterReadings,
+        meterReadingsLoading,
+        meterReadingsError,
         tenants,
         tenantsLoading,
         tenantsError,
@@ -592,10 +857,21 @@ export const useKosStore = defineStore('kos', () => {
         addRoom,
         updateRoom,
         deleteRoom,
-        generateBill,
-        markBillAsPaid,
-        deleteBill,
+        // Rent Bills Actions
+        fetchRentBills,
+        generateRentBill,
+        markRentBillAsPaid,
+        deleteRentBill,
+        // Utility Bills Actions
+        fetchUtilityBills,
+        createUtilityBill,
+        markUtilityBillAsPaid,
+        deleteUtilityBill,
+        // Meter Readings Actions
+        fetchMeterReadings,
+        fetchMeterReadingById,
         addMeterReading,
+        updateMeterReading,
         deleteMeterReading,
         fetchTenants,
         fetchTenantById,
@@ -605,9 +881,11 @@ export const useKosStore = defineStore('kos', () => {
         // Getters
         getPropertyById,
         getRoomsByPropertyId,
-        getBillsByRoomId,
+        getRentBillsByRoomId,
+        getUtilityBillsByRoomId,
         getMeterReadingsByRoomId
     }
+
 }, {
     // persist: true - Handled manually
 })

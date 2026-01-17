@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     // Let's assume Role.OWNER is always allowed.
     // And if not Owner role, then must be the recorder.
 
-    const isRecorder = reading.recorderBy === user.id;
+    const isRecorder = reading.recordedBy === user.id;
     const isOwner = user.role === Role.OWNER;
     const isAdmin = user.role === Role.ADMIN; // Admins usually can do everything
 

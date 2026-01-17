@@ -15,6 +15,20 @@
       "when": 1768618634435,
       "tag": "0001_smiling_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768632074017,
+      "tag": "0002_cool_charles_xavier",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768637579682,
+      "tag": "0003_old_sue_storm",
+      "breakpoints": true
     }
   ]
 }

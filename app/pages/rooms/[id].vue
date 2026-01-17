@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useKosStore, type MeterReading, type Room } from '~/stores/kos'
+import { useKosStore, type MeterReading, type Room, type UtilityBill } from '~/stores/kos'
+import { usePdfReceipt } from '~/composables/usePdfReceipt'
 
 const route = useRoute()
 const router = useRouter()
@@ -7,14 +8,18 @@ const store = useKosStore()
 const toast = useToast()
 
 const roomId = computed(() => route.params.id as string)
-const { bills, tenants, properties, settings } = storeToRefs(store)
+const { utilityBills, tenants, properties, settings } = storeToRefs(store)
+const { generateUtilityReceipt } = usePdfReceipt()
+
+// Confirm Dialog
+const confirmDialog = ref<InstanceType<typeof ConfirmDialog> | null>(null)
 
 // Fetch room from API
 const room = ref<Room | null>(null)
 const isLoading = ref(true)
 const isSaving = ref(false)
 
-const roomBills = computed(() => store.getBillsByRoomId(roomId.value).sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime()))
+const roomUtilityBills = computed(() => store.getUtilityBillsByRoomId(roomId.value).sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime()))
 const meterReadings = computed(() => store.getMeterReadingsByRoomId(roomId.value))
 
 async function loadRoom() {
@@ -35,7 +40,11 @@ async function loadRoom() {
 
 onMounted(async () => {
   await store.fetchTenants() // Fetch tenants on mount
+  await store.fetchProperties() // Fetch properties for settings
   await loadRoom()
+  // Fetch meter readings and bills for this room
+  await store.fetchMeterReadings(roomId.value)
+  await store.fetchUtilityBills({ roomId: roomId.value })
 })
 
 // ============ Room Status & Tenant Management ============
@@ -184,36 +193,75 @@ watch(meterReadings, (readings) => {
 
 const usage = computed(() => Math.max(0, meterEnd.value - meterStart.value))
 
-const addReading = () => {
+const addReading = async () => {
   if (meterEnd.value < meterStart.value) {
     toast.add({ title: 'Invalid Reading', description: 'End reading cannot be less than start reading.', color: 'error' })
     return
   }
-  store.addMeterReading({
-    roomId: roomId.value,
-    period: newPeriod.value,
-    meterStart: meterStart.value,
-    meterEnd: meterEnd.value
-  })
-  toast.add({ title: 'Reading Saved', description: `Meter reading for ${newPeriod.value} recorded.`, color: 'success' })
-  meterStart.value = meterEnd.value // Next period starts where this one ended
+  try {
+    await store.addMeterReading({
+      roomId: roomId.value,
+      period: newPeriod.value,
+      meterStart: meterStart.value,
+      meterEnd: meterEnd.value
+    })
+    toast.add({ title: 'Reading Saved', description: `Meter reading for ${newPeriod.value} recorded.`, color: 'success' })
+    meterStart.value = meterEnd.value // Next period starts where this one ended
+  } catch (e: any) {
+    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to add reading', color: 'error' })
+  }
 }
 
-const deleteReading = (id: string) => {
-  if (confirm('Delete this reading?')) {
-    store.deleteMeterReading(id)
+const deleteReading = async (id: string) => {
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Meter Reading?',
+    message: 'Data meter reading ini akan dihapus permanen. Utility bill terkait juga akan terhapus. Lanjutkan?',
+    confirmText: 'Hapus',
+    confirmColor: 'error'
+  })
+  if (confirmed) {
+    try {
+      await store.deleteMeterReading(id)
+      toast.add({ title: 'Reading Deleted', description: 'Meter reading has been deleted.', color: 'success' })
+    } catch (e: any) {
+      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to delete reading', color: 'error' })
+    }
   }
 }
 
 // Bill actions
-const deleteBill = (id: string) => {
-  if (confirm('Delete this bill?')) {
-    store.deleteBill(id)
+const deleteUtilBill = async (id: string) => {
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Utility Bill?',
+    message: 'Data utility bill ini akan dihapus permanen. Lanjutkan?',
+    confirmText: 'Hapus',
+    confirmColor: 'error'
+  })
+  if (confirmed) {
+    try {
+      await store.deleteUtilityBill(id)
+      toast.add({ title: 'Bill Deleted', description: 'Utility bill has been deleted.', color: 'success' })
+    } catch (e: any) {
+      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to delete bill', color: 'error' })
+    }
   }
 }
 
-const markPaid = (id: string) => {
-  store.markBillAsPaid(id)
+const markUtilPaid = async (id: string) => {
+  try {
+    await store.markUtilityBillAsPaid(id)
+    toast.add({ title: 'Bill Paid', description: 'Utility bill has been marked as paid.', color: 'success' })
+  } catch (e: any) {
+    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to mark as paid', color: 'error' })
+  }
+}
+
+// Download receipt
+const downloadReceipt = (bill: UtilityBill) => {
+  if (!room.value || !property.value) return
+  // Try to find tenant associated with the room currently
+  const tenant = tenants.value.find(t => t.id === room.value?.tenantId) || null
+  generateUtilityReceipt(bill, room.value, property.value, tenant)
 }
 
 // Helpers
@@ -330,7 +378,7 @@ const goBack = () => {
                                 Go to Billing
                             </UButton>
                         </div>
-                        <div v-if="roomBills.length > 0">
+                        <div v-if="roomUtilityBills.length > 0">
                             <table class="w-full text-sm text-left">
                                 <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
@@ -342,13 +390,13 @@ const goBack = () => {
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                                    <tr v-for="bill in roomBills" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                                    <tr v-for="bill in roomUtilityBills" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
                                         <td class="p-3 font-medium">{{ bill.period }}</td>
                                         <td class="p-3">
                                             <div>{{ bill.meterEnd - bill.meterStart }} kWh</div>
                                             <div class="text-xs text-gray-400 font-mono">{{ bill.meterStart }} -> {{ bill.meterEnd }}</div>
                                         </td>
-                                        <td class="p-3 font-bold text-gray-900 dark:text-white">{{ formatCurrency(bill.totalAmount) }}</td>
+                                        <td class="p-3 font-bold text-gray-900 dark:text-white">{{ formatCurrency(Number(bill.totalAmount)) }}</td>
                                         <td class="p-3">
                                             <UBadge :color="bill.isPaid ? 'success' : 'neutral'" variant="subtle" size="xs">
                                                 {{ bill.isPaid ? 'Paid' : 'Unpaid' }}
@@ -356,10 +404,13 @@ const goBack = () => {
                                         </td>
                                         <td class="p-3 text-right flex justify-end gap-1">
                                             <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
-                                                <UButton size="xs" color="success" variant="soft" icon="i-heroicons-check" @click="markPaid(bill.id)" />
+                                                <UButton size="xs" color="success" variant="soft" icon="i-heroicons-check" @click="markUtilPaid(bill.id)" />
+                                            </UTooltip>
+                                            <UTooltip text="Print">
+                                                <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-printer" @click="downloadReceipt(bill)" />
                                             </UTooltip>
                                             <UTooltip text="Delete">
-                                                <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteBill(bill.id)" />
+                                                <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteUtilBill(bill.id)" />
                                             </UTooltip>
                                         </td>
                                     </tr>
@@ -482,4 +533,7 @@ const goBack = () => {
 
   <!-- Tenant Select Modal -->
   <TenantSelectModal v-model="isTenantModalOpen" @select="onTenantSelect" />
+  
+  <!-- Confirm Dialog -->
+  <ConfirmDialog ref="confirmDialog" />
 </template>

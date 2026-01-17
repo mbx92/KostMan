@@ -58,17 +58,31 @@ export const rooms = pgTable('rooms', {
   unq: unique().on(t.propertyId, t.name),
 }));
 
-export const bills = pgTable('bills', {
+
+// Rent Bills - Fixed monthly rental charges
+export const rentBills = pgTable('rent_bills', {
   id: uuid('id').defaultRandom().primaryKey(),
   roomId: uuid('room_id').references(() => rooms.id).notNull(),
   tenantId: uuid('tenant_id').references(() => tenants.id),
-  period: varchar('period', { length: 7 }).notNull(), // YYYY-MM format
+  period: varchar('period', { length: 7 }).notNull(), // YYYY-MM (start period)
   periodEnd: varchar('period_end', { length: 7 }), // For multi-month payments
   monthsCovered: integer('months_covered').default(1),
+  roomPrice: decimal('room_price', { precision: 12, scale: 2 }).notNull(),
+  totalAmount: decimal('total_amount', { precision: 12, scale: 2 }).notNull(),
+  isPaid: boolean('is_paid').default(false),
+  paidAt: timestamp('paid_at'),
+  generatedAt: timestamp('generated_at').notNull(),
+});
+
+// Utility Bills - Variable charges based on meter readings
+export const utilityBills = pgTable('utility_bills', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  roomId: uuid('room_id').references(() => rooms.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  period: varchar('period', { length: 7 }).notNull(), // YYYY-MM
   meterStart: integer('meter_start').notNull(),
   meterEnd: integer('meter_end').notNull(),
   costPerKwh: decimal('cost_per_kwh', { precision: 10, scale: 2 }).notNull(),
-  roomPrice: decimal('room_price', { precision: 12, scale: 2 }).notNull(),
   usageCost: decimal('usage_cost', { precision: 12, scale: 2 }).notNull(),
   waterFee: decimal('water_fee', { precision: 12, scale: 2 }).notNull(),
   trashFee: decimal('trash_fee', { precision: 12, scale: 2 }).notNull(),
@@ -79,6 +93,7 @@ export const bills = pgTable('bills', {
   generatedAt: timestamp('generated_at').notNull(),
 });
 
+
 export const meterReadings = pgTable('meter_readings', {
   id: uuid('id').defaultRandom().primaryKey(),
   roomId: uuid('room_id').references(() => rooms.id).notNull(),
@@ -86,7 +101,7 @@ export const meterReadings = pgTable('meter_readings', {
   meterStart: integer('meter_start').notNull(),
   meterEnd: integer('meter_end').notNull(),
   recordedAt: timestamp('recorded_at').notNull(),
-  recorderBy: uuid('recorder_by').references(() => users.id),
+  recordedBy: uuid('recorded_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => ({
