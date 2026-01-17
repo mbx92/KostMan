@@ -61,11 +61,22 @@ export const rooms = pgTable('rooms', {
 export const bills = pgTable('bills', {
   id: uuid('id').defaultRandom().primaryKey(),
   roomId: uuid('room_id').references(() => rooms.id).notNull(),
-  period: varchar('period', { length: 7 }).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  period: varchar('period', { length: 7 }).notNull(), // YYYY-MM format
+  periodEnd: varchar('period_end', { length: 7 }), // For multi-month payments
+  monthsCovered: integer('months_covered').default(1),
+  meterStart: integer('meter_start').notNull(),
+  meterEnd: integer('meter_end').notNull(),
+  costPerKwh: decimal('cost_per_kwh', { precision: 10, scale: 2 }).notNull(),
+  roomPrice: decimal('room_price', { precision: 12, scale: 2 }).notNull(),
+  usageCost: decimal('usage_cost', { precision: 12, scale: 2 }).notNull(),
+  waterFee: decimal('water_fee', { precision: 12, scale: 2 }).notNull(),
+  trashFee: decimal('trash_fee', { precision: 12, scale: 2 }).notNull(),
+  additionalCost: decimal('additional_cost', { precision: 12, scale: 2 }).default('0'),
   totalAmount: decimal('total_amount', { precision: 12, scale: 2 }).notNull(),
   isPaid: boolean('is_paid').default(false),
   paidAt: timestamp('paid_at'),
-  createdAt: timestamp('created_at').defaultNow(),
+  generatedAt: timestamp('generated_at').notNull(),
 });
 
 export const meterReadings = pgTable('meter_readings', {

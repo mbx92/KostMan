@@ -318,17 +318,17 @@ Setting default per user.
 
 ### Phase 3: Core CRUD (3-4 days)
 
-- [ ] Property APIs
-- [ ] Room APIs
-- [ ] Tenant APIs
-- [ ] Settings APIs 
+- [x] Property APIs
+- [x] Room APIs
+- [x] Tenant APIs
+- [ ] Settings APIs (optional - can use property settings)
 
 ### Phase 4: Billing (2-3 days)
 
-- [ ] Meter reading APIs
-- [ ] Bill generation API
-- [ ] Bill payment API
-- [ ] Proration calculation
+- [x] Meter reading APIs
+- [x] Bill generation API
+- [x] Bill payment API
+- [ ] Proration calculation (enhancement)
 
 ### Phase 5: Frontend Integration (2-3 days)
 

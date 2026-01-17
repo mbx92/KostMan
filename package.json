@@ -13,7 +13,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx server/database/seed.ts"
+    "db:seed": "tsx server/database/seed.ts",
+    "test": "vitest",
+    "test:integration": "vitest run tests/integration",
+    "test:bills": "vitest run tests/integration/bills.test.ts"
   },
   "dependencies": {
     "@internationalized/date": "^3.10.1",
