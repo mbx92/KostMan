@@ -1,21 +1,28 @@
 {
     "info": {
         "_postman_id": "00000000-0000-0000-0000-000000000000",
-        "name": "KostMan API",
+        "name": "KostMan API - Complete Collection",
+        "description": "Complete API collection for KostMan (Kos Management System) including Authentication, Properties, Rooms, Tenants, Meter Readings, Bills, and Settings",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
         {
             "name": "Auth",
+            "description": "Authentication endpoints for user registration, login, logout, and profile",
             "item": [
                 {
                     "name": "Register",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"Password123!\",\n    \"name\": \"Test User\"\n}",
+                            "raw": "{\n    \"email\": \"owner@example.com\",\n    \"password\": \"Password123!\",\n    \"name\": \"John Doe\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -32,7 +39,8 @@
                                 "auth",
                                 "register"
                             ]
-                        }
+                        },
+                        "description": "Register a new user account"
                     },
                     "response": []
                 },
@@ -54,10 +62,15 @@
                     ],
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"Password123!\"\n}",
+                            "raw": "{\n    \"email\": \"owner@example.com\",\n    \"password\": \"Password123!\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -74,12 +87,13 @@
                                 "auth",
                                 "login"
                             ]
-                        }
+                        },
+                        "description": "Login with email and password. Returns auth token that is automatically saved to collection variables."
                     },
                     "response": []
                 },
                 {
-                    "name": "Me",
+                    "name": "Get Current User (Me)",
                     "request": {
                         "method": "GET",
                         "header": [
@@ -99,7 +113,8 @@
                                 "auth",
                                 "me"
                             ]
-                        }
+                        },
+                        "description": "Get current authenticated user information"
                     },
                     "response": []
                 },
@@ -107,7 +122,13 @@
                     "name": "Logout",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/api/auth/logout",
                             "host": [
@@ -118,7 +139,1115 @@
                                 "auth",
                                 "logout"
                             ]
-                        }
+                        },
+                        "description": "Logout current user and invalidate token"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Properties",
+            "description": "CRUD operations for property management",
+            "item": [
+                {
+                    "name": "List All Properties",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/properties",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "properties"
+                            ]
+                        },
+                        "description": "Get all properties owned by the authenticated user"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Property",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Kost Mawar\",\n    \"address\": \"Jl. Mawar No. 123, Jakarta Selatan\",\n    \"description\": \"Kost nyaman dengan fasilitas lengkap\",\n    \"image\": \"https://example.com/image.jpg\",\n    \"mapUrl\": \"https://maps.google.com/embed/...\",\n    \"costPerKwh\": 1500,\n    \"waterFee\": 50000,\n    \"trashFee\": 25000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/properties",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "properties"
+                            ]
+                        },
+                        "description": "Create a new property with optional settings (costPerKwh, waterFee, trashFee)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Property by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/properties/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "properties",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{property_id}}",
+                                    "description": "Property UUID"
+                                }
+                            ]
+                        },
+                        "description": "Get detailed information about a specific property"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Property",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Kost Mawar Updated\",\n    \"address\": \"Jl. Mawar No. 123, Jakarta Selatan\",\n    \"description\": \"Kost nyaman dengan fasilitas lengkap dan AC\",\n    \"image\": \"https://example.com/new-image.jpg\",\n    \"mapUrl\": \"https://maps.google.com/embed/...\",\n    \"costPerKwh\": 1600,\n    \"waterFee\": 55000,\n    \"trashFee\": 30000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/properties/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "properties",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{property_id}}",
+                                    "description": "Property UUID"
+                                }
+                            ]
+                        },
+                        "description": "Update an existing property"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Property",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/properties/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "properties",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{property_id}}",
+                                    "description": "Property UUID"
+                                }
+                            ]
+                        },
+                        "description": "Delete a property (only if no rooms exist)"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Rooms",
+            "description": "CRUD operations for room management",
+            "item": [
+                {
+                    "name": "List Rooms by Property",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/rooms?propertyId={{property_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "rooms"
+                            ],
+                            "query": [
+                                {
+                                    "key": "propertyId",
+                                    "value": "{{property_id}}",
+                                    "description": "Filter rooms by property ID"
+                                }
+                            ]
+                        },
+                        "description": "Get all rooms for a specific property"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Room",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"propertyId\": \"{{property_id}}\",\n    \"name\": \"Room 101\",\n    \"price\": 1500000,\n    \"status\": \"available\",\n    \"useTrashService\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/rooms",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "rooms"
+                            ]
+                        },
+                        "description": "Create a new room. Status can be: available, occupied, maintenance"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Room by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/rooms/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "rooms",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{room_id}}",
+                                    "description": "Room UUID"
+                                }
+                            ]
+                        },
+                        "description": "Get detailed information about a specific room"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Room",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Room 101A\",\n    \"price\": 1600000,\n    \"status\": \"occupied\",\n    \"tenantId\": \"{{tenant_id}}\",\n    \"useTrashService\": true,\n    \"moveInDate\": \"2026-01-15\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/rooms/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "rooms",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{room_id}}",
+                                    "description": "Room UUID"
+                                }
+                            ]
+                        },
+                        "description": "Update room details including tenant assignment and move-in date"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Room",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/rooms/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "rooms",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{room_id}}",
+                                    "description": "Room UUID"
+                                }
+                            ]
+                        },
+                        "description": "Delete a room"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Tenants",
+            "description": "CRUD operations for tenant management",
+            "item": [
+                {
+                    "name": "List All Tenants",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/tenants",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tenants"
+                            ]
+                        },
+                        "description": "Get all tenants"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Tenant",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Ahmad Rizki\",\n    \"contact\": \"081234567890\",\n    \"idCardNumber\": \"3201234567890123\",\n    \"status\": \"active\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/tenants",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tenants"
+                            ]
+                        },
+                        "description": "Create a new tenant. ID Card Number must be exactly 16 digits. Status can be: active, inactive"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Tenant by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/tenants/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tenants",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{tenant_id}}",
+                                    "description": "Tenant UUID"
+                                }
+                            ]
+                        },
+                        "description": "Get detailed information about a specific tenant"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Tenant",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Ahmad Rizki Updated\",\n    \"contact\": \"081234567899\",\n    \"idCardNumber\": \"3201234567890123\",\n    \"status\": \"active\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/tenants/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tenants",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{tenant_id}}",
+                                    "description": "Tenant UUID"
+                                }
+                            ]
+                        },
+                        "description": "Update tenant information"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Tenant",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/tenants/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tenants",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{tenant_id}}",
+                                    "description": "Tenant UUID"
+                                }
+                            ]
+                        },
+                        "description": "Delete a tenant"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Meter Readings",
+            "description": "CRUD operations for electricity meter readings",
+            "item": [
+                {
+                    "name": "List Meter Readings by Room",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/meter-readings?roomId={{room_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings"
+                            ],
+                            "query": [
+                                {
+                                    "key": "roomId",
+                                    "value": "{{room_id}}",
+                                    "description": "Filter meter readings by room ID"
+                                }
+                            ]
+                        },
+                        "description": "Get all meter readings for a specific room"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Meter Reading",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"roomId\": \"{{room_id}}\",\n    \"period\": \"2026-01\",\n    \"meterStart\": 1000,\n    \"meterEnd\": 1250\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/meter-readings",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings"
+                            ]
+                        },
+                        "description": "Record a new meter reading. Period format: YYYY-MM. MeterEnd must be >= MeterStart"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Meter Reading by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/meter-readings/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{meter_reading_id}}",
+                                    "description": "Meter Reading UUID"
+                                }
+                            ]
+                        },
+                        "description": "Get detailed information about a specific meter reading"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Meter Reading",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"meterStart\": 1000,\n    \"meterEnd\": 1300\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/meter-readings/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{meter_reading_id}}",
+                                    "description": "Meter Reading UUID"
+                                }
+                            ]
+                        },
+                        "description": "Update meter reading values (partial update)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Meter Reading",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/meter-readings/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{meter_reading_id}}",
+                                    "description": "Meter Reading UUID"
+                                }
+                            ]
+                        },
+                        "description": "Delete a meter reading (only owner and user who recorded it can delete)"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Bills",
+            "description": "Bill generation and payment management with multi-month support",
+            "item": [
+                {
+                    "name": "List All Bills",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/bills?roomId={{room_id}}&isPaid=false&period=2026-01",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills"
+                            ],
+                            "query": [
+                                {
+                                    "key": "roomId",
+                                    "value": "{{room_id}}",
+                                    "description": "Filter by room ID",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "isPaid",
+                                    "value": "false",
+                                    "description": "Filter by payment status (true/false)",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "period",
+                                    "value": "2026-01",
+                                    "description": "Filter by billing period (YYYY-MM)",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Get all bills with optional filters (roomId, isPaid, period)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Generate Bill (Single Month)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"roomId\": \"{{room_id}}\",\n    \"period\": \"2026-01\",\n    \"monthsCovered\": 1,\n    \"meterStart\": 1000,\n    \"meterEnd\": 1250,\n    \"costPerKwh\": 1500,\n    \"waterFee\": 50000,\n    \"trashFee\": 25000,\n    \"additionalCost\": 0\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bills/generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                "generate"
+                            ]
+                        },
+                        "description": "Generate a bill for a single month. Supports proration if moveInDate is mid-month."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Generate Bill (Multi-Month)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"roomId\": \"{{room_id}}\",\n    \"period\": \"2026-01\",\n    \"periodEnd\": \"2026-03\",\n    \"monthsCovered\": 3,\n    \"meterStart\": 1000,\n    \"meterEnd\": 1750,\n    \"costPerKwh\": 1500,\n    \"waterFee\": 50000,\n    \"trashFee\": 25000,\n    \"additionalCost\": 0\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bills/generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                "generate"
+                            ]
+                        },
+                        "description": "Generate a bill for multiple months (e.g., 3 months payment). Room price, water, and trash fees are multiplied by monthsCovered."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Mark Bill as Paid",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/bills/:id/pay",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                ":id",
+                                "pay"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{bill_id}}",
+                                    "description": "Bill UUID"
+                                }
+                            ]
+                        },
+                        "description": "Mark a bill as paid. Sets isPaid to true and records paidAt timestamp."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Bill",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/bills/:id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "{{bill_id}}",
+                                    "description": "Bill UUID"
+                                }
+                            ]
+                        },
+                        "description": "Delete a bill"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Settings",
+            "description": "Global settings and integration settings management",
+            "item": [
+                {
+                    "name": "Get Global Settings",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/settings",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "settings"
+                            ]
+                        },
+                        "description": "Get global settings for the current user (creates default if not exists)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Global Settings",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"appName\": \"My Kost Management\",\n    \"costPerKwh\": 1600,\n    \"waterFee\": 55000,\n    \"trashFee\": 30000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/settings",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "settings"
+                            ]
+                        },
+                        "description": "Update global settings (all fields are optional)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Integration Settings",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/settings/integrations",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "settings",
+                                "integrations"
+                            ]
+                        },
+                        "description": "Get all integration settings (server keys are hidden for security)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Integration Settings (Midtrans)",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"isEnabled\": true,\n    \"serverKey\": \"SB-Mid-server-xxxxxxxxxxxxx\",\n    \"clientKey\": \"SB-Mid-client-xxxxxxxxxxxxx\",\n    \"isProduction\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/settings/integrations/:provider",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "settings",
+                                "integrations",
+                                ":provider"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "provider",
+                                    "value": "midtrans",
+                                    "description": "Integration provider (e.g., midtrans, xendit)"
+                                }
+                            ]
+                        },
+                        "description": "Update or create integration settings for a specific provider. Server key is encrypted before storage."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Users",
+            "description": "User management endpoints",
+            "item": [
+                {
+                    "name": "List All Users",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users"
+                            ]
+                        },
+                        "description": "Get all users (admin only)"
                     },
                     "response": []
                 }
@@ -135,6 +1264,36 @@
             "key": "auth_token",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "property_id",
+            "value": "",
+            "type": "string",
+            "description": "UUID of a property (set after creating a property)"
+        },
+        {
+            "key": "room_id",
+            "value": "",
+            "type": "string",
+            "description": "UUID of a room (set after creating a room)"
+        },
+        {
+            "key": "tenant_id",
+            "value": "",
+            "type": "string",
+            "description": "UUID of a tenant (set after creating a tenant)"
+        },
+        {
+            "key": "meter_reading_id",
+            "value": "",
+            "type": "string",
+            "description": "UUID of a meter reading (set after creating a meter reading)"
+        },
+        {
+            "key": "bill_id",
+            "value": "",
+            "type": "string",
+            "description": "UUID of a bill (set after generating a bill)"
         }
     ]
 }

@@ -1,0 +1,506 @@
+{
+    "info": {
+        "name": "KostMan - Bill Testing",
+        "description": "Postman collection for testing KostMan billing APIs",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "roomId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "billId",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Login as Owner",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('token', response.token);",
+                                    "    pm.environment.set('token', response.token);",
+                                    "    console.log('Token saved:', response.token);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"password123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Current User",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "me"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Properties",
+            "item": [
+                {
+                    "name": "List Properties",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/properties",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "properties"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Rooms",
+            "item": [
+                {
+                    "name": "List Rooms",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const rooms = pm.response.json();",
+                                    "    if (rooms.length > 0) {",
+                                    "        pm.collectionVariables.set('roomId', rooms[0].id);",
+                                    "        console.log('First room ID saved:', rooms[0].id);",
+                                    "    }",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/rooms",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "rooms"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Tenants",
+            "item": [
+                {
+                    "name": "List Tenants",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/tenants",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "tenants"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Meter Readings",
+            "item": [
+                {
+                    "name": "List Meter Readings",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/meter-readings",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Meter Readings by Room",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/meter-readings?roomId={{roomId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "meter-readings"
+                            ],
+                            "query": [
+                                {
+                                    "key": "roomId",
+                                    "value": "{{roomId}}"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Bills",
+            "item": [
+                {
+                    "name": "Generate Bill - Single Month",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const bill = pm.response.json();",
+                                    "    pm.collectionVariables.set('billId', bill.id);",
+                                    "    console.log('Bill ID saved:', bill.id);",
+                                    "    console.log('Total Amount:', bill.totalAmount);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"roomId\": \"{{roomId}}\",\n  \"period\": \"2026-01\",\n  \"monthsCovered\": 1,\n  \"meterStart\": 1150,\n  \"meterEnd\": 1320,\n  \"costPerKwh\": 1500,\n  \"waterFee\": 50000,\n  \"trashFee\": 25000,\n  \"additionalCost\": 0\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills/generate",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                "generate"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Generate Bill - Multi Month (3 months)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"roomId\": \"{{roomId}}\",\n  \"period\": \"2026-02\",\n  \"monthsCovered\": 3,\n  \"meterStart\": 1320,\n  \"meterEnd\": 1620,\n  \"costPerKwh\": 1500,\n  \"waterFee\": 50000,\n  \"trashFee\": 25000,\n  \"additionalCost\": 0\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills/generate",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                "generate"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List All Bills",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Unpaid Bills",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills?isPaid=false",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills"
+                            ],
+                            "query": [
+                                {
+                                    "key": "isPaid",
+                                    "value": "false"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Paid Bills",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills?isPaid=true",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills"
+                            ],
+                            "query": [
+                                {
+                                    "key": "isPaid",
+                                    "value": "true"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Bills by Room",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills?roomId={{roomId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills"
+                            ],
+                            "query": [
+                                {
+                                    "key": "roomId",
+                                    "value": "{{roomId}}"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Mark Bill as Paid",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills/{{billId}}/pay",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                "{{billId}}",
+                                "pay"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Bill",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "auth_token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/bills/{{billId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bills",
+                                "{{billId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ]
+}
