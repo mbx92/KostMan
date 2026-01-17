@@ -66,12 +66,35 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    // 4. Calculate costs
+    // 4. Calculate costs with proration support
     const monthsCovered = input.monthsCovered || 1;
-    const roomPrice = parseFloat(roomData.price) * monthsCovered;
-    const usageCost = (input.meterEnd - input.meterStart) * input.costPerKwh;
-    const waterFee = input.waterFee * monthsCovered;
-    const trashFee = roomData.useTrashService ? input.trashFee * monthsCovered : 0;
+
+    // Proration calculation for first month if moveInDate is mid-month
+    let prorationFactor = 1; // Default: full month
+    let isProrated = false;
+
+    if (roomData.moveInDate) {
+        const moveInDate = new Date(roomData.moveInDate);
+        const billPeriodDate = new Date(input.period + '-01');
+
+        // Check if this is the first billing period (same month as move-in)
+        const isSameMonth = moveInDate.getFullYear() === billPeriodDate.getFullYear() &&
+            moveInDate.getMonth() === billPeriodDate.getMonth();
+
+        if (isSameMonth && moveInDate.getDate() > 1) {
+            // Calculate proration factor
+            const daysInMonth = new Date(billPeriodDate.getFullYear(), billPeriodDate.getMonth() + 1, 0).getDate();
+            const daysOccupied = daysInMonth - moveInDate.getDate() + 1; // +1 to include move-in day
+            prorationFactor = daysOccupied / daysInMonth;
+            isProrated = true;
+        }
+    }
+
+    // Apply proration to recurring charges (room price, water, trash)
+    const roomPrice = parseFloat(roomData.price) * monthsCovered * prorationFactor;
+    const usageCost = (input.meterEnd - input.meterStart) * input.costPerKwh; // Usage is not prorated
+    const waterFee = input.waterFee * monthsCovered * prorationFactor;
+    const trashFee = roomData.useTrashService ? input.trashFee * monthsCovered * prorationFactor : 0;
     const additionalCost = input.additionalCost || 0;
     const totalAmount = roomPrice + usageCost + waterFee + trashFee + additionalCost;
 
