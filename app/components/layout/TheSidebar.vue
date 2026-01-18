@@ -53,7 +53,18 @@ const defaultNavigation: NavItem[] = [
   {
     label: 'Billing',
     icon: 'i-heroicons-banknotes',
-    to: '/billing'
+    children: [
+      {
+        label: 'Consolidated Bills',
+        icon: 'i-heroicons-document-text',
+        to: '/billing/consolidated'
+      },
+      {
+        label: 'Legacy Billing',
+        icon: 'i-heroicons-archive-box',
+        to: '/billing'
+      }
+    ]
   },
   {
     label: 'Settings',
@@ -64,6 +75,11 @@ const defaultNavigation: NavItem[] = [
     label: 'Pricing',
     icon: 'i-heroicons-tag',
     to: '/pricing'
+  },
+  {
+    label: 'Documentation',
+    icon: 'i-heroicons-document-text',
+    to: '/docs'
   },
 ]
 

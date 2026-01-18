@@ -1,5 +1,5 @@
 
-import { pgTable, uuid, varchar, timestamp, pgEnum, decimal, boolean, unique, date, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, pgEnum, decimal, boolean, unique, date, integer, index } from 'drizzle-orm/pg-core';
 
 export const roleEnum = pgEnum('role', ['owner', 'admin', 'staff']);
 export const roomStatusEnum = pgEnum('room_status', ['available', 'occupied', 'maintenance']);
@@ -59,7 +59,77 @@ export const rooms = pgTable('rooms', {
 }));
 
 
-// Rent Bills - Fixed monthly rental charges
+// ============================================
+// NEW CONSOLIDATED BILLING SYSTEM
+// ============================================
+
+// Bill Status Enum
+export const billStatusEnum = pgEnum('bill_status', ['draft', 'unpaid', 'paid']);
+
+// Item Type Enum for billing details
+export const itemTypeEnum = pgEnum('item_type', ['rent', 'utility', 'others']);
+
+// Payment Method Enum
+export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'online']);
+
+// Billings - Main consolidated bill record
+export const billings = pgTable('billings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  roomId: uuid('room_id').references(() => rooms.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  billingCode: varchar('billing_code', { length: 50 }).notNull().unique(),
+  billStatus: billStatusEnum('bill_status').default('draft'),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  monthsCovered: decimal('months_covered', { precision: 5, scale: 2 }).notNull(),
+  notes: varchar('notes'),
+  totalChargedAmount: decimal('total_charged_amount', { precision: 12, scale: 2 }).notNull(),
+  generatedBy: uuid('generated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (table) => ({
+  roomIdIdx: index('billings_room_id_idx').on(table.roomId),
+  tenantIdIdx: index('billings_tenant_id_idx').on(table.tenantId),
+  billStatusIdx: index('billings_bill_status_idx').on(table.billStatus),
+  periodStartIdx: index('billings_period_start_idx').on(table.periodStart),
+  periodEndIdx: index('billings_period_end_idx').on(table.periodEnd),
+}));
+
+// Billing Details - Line items for each bill
+export const billingDetails = pgTable('billing_details', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  billId: uuid('bill_id').references(() => billings.id, { onDelete: 'cascade' }).notNull(),
+  itemType: itemTypeEnum('item_type').notNull(),
+  itemName: varchar('item_name', { length: 100 }).notNull(),
+  itemQty: decimal('item_qty', { precision: 10, scale: 2 }).notNull(),
+  itemUnitPrice: decimal('item_unit_price', { precision: 12, scale: 2 }).notNull(),
+  itemSubAmount: decimal('item_sub_amount', { precision: 12, scale: 2 }).notNull(),
+  itemDiscount: decimal('item_discount', { precision: 12, scale: 2 }).default('0'),
+  itemTotalAmount: decimal('item_total_amount', { precision: 12, scale: 2 }).notNull(),
+  notes: varchar('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+// Payments - Payment tracking for bills
+export const payments = pgTable('payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  billId: uuid('bill_id').references(() => billings.id).notNull(),
+  paymentMethod: paymentMethodEnum('payment_method').notNull(),
+  paymentAmount: decimal('payment_amount', { precision: 12, scale: 2 }).notNull(),
+  paymentDate: date('payment_date').notNull(),
+  paymentProof: varchar('payment_proof', { length: 255 }),
+  processedBy: uuid('processed_by').references(() => users.id),
+  notes: varchar('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+// ============================================
+// OLD BILLING TABLES (DEPRECATED - Keep for migration)
+// ============================================
+
+// Rent Bills - Fixed monthly rental charges (DEPRECATED)
 export const rentBills = pgTable('rent_bills', {
   id: uuid('id').defaultRandom().primaryKey(),
   roomId: uuid('room_id').references(() => rooms.id).notNull(),
@@ -74,7 +144,7 @@ export const rentBills = pgTable('rent_bills', {
   generatedAt: timestamp('generated_at').notNull(),
 });
 
-// Utility Bills - Variable charges based on meter readings
+// Utility Bills - Variable charges based on meter readings (DEPRECATED)
 export const utilityBills = pgTable('utility_bills', {
   id: uuid('id').defaultRandom().primaryKey(),
   roomId: uuid('room_id').references(() => rooms.id).notNull(),
