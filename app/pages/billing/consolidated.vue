@@ -679,11 +679,59 @@ watch(() => generateForm.value.roomId, (roomId) => {
   }
 })
 
+// Auto generate utility items based on settings and meter readings
+const autoGenerateUtilityItems = async () => {
+  if (!generateUtilityForm.value.roomId || !generateUtilityForm.value.periodStart || !generateUtilityForm.value.periodEnd) {
+    return
+  }
+
+  // Only auto-generate if list is empty to avoid overwriting user input
+  // Or if triggered explicitly (could allow force refresh later)
+  if (generateUtilityForm.value.utilityItems.length > 0) {
+    return 
+  }
+
+  try {
+    const response = await $fetch<{ success: boolean, data: any[] }>('/api/bills/calculate-utility', {
+      method: 'POST',
+      body: {
+        roomId: generateUtilityForm.value.roomId,
+        periodStart: generateUtilityForm.value.periodStart,
+        periodEnd: generateUtilityForm.value.periodEnd
+      }
+    })
+
+    if (response.success && response.data.length > 0) {
+      generateUtilityForm.value.utilityItems = response.data.map(item => ({
+        ...item,
+        itemDiscount: item.itemDiscount || 0,
+        notes: ''
+      }))
+      
+      toast.add({
+        title: 'Items Generated',
+        description: `Added ${response.data.length} utility items automatically`,
+        color: 'success',
+        timeout: 2000
+      })
+    }
+  } catch (error) {
+    console.error('Failed to auto-generate utility items', error)
+    // Silent fail is generally preferred for auto-actions, or just log
+  }
+}
+
 // Watch room selection in utility form
 watch(() => generateUtilityForm.value.roomId, (roomId) => {
   const room = rooms.value.find(r => r.id === roomId)
   if (room?.tenantId) {
     generateUtilityForm.value.tenantId = room.tenantId
+  }
+  
+  // Clear items when room changes to force regeneration for the new room
+  if (roomId) {
+    generateUtilityForm.value.utilityItems = []
+    autoGenerateUtilityItems()
   }
 })
 
@@ -1111,15 +1159,28 @@ const getItemTypeIcon = (type: string) => {
             <div class="border-t pt-4">
               <div class="flex items-center justify-between mb-3">
                 <label class="text-sm font-medium">Utility Items</label>
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="soft"
-                  icon="i-heroicons-plus"
-                  @click="addUtilityItem"
-                >
-                  Add Item
-                </UButton>
+                <div class="flex gap-2">
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    variant="ghost"
+                    icon="i-heroicons-arrow-path"
+                    @click="generateUtilityForm.utilityItems = []; autoGenerateUtilityItems()"
+                    :loading="loading"
+                    v-if="generateUtilityForm.roomId"
+                  >
+                    Auto Generate
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    variant="soft"
+                    icon="i-heroicons-plus"
+                    @click="addUtilityItem"
+                  >
+                    Add Item
+                  </UButton>
+                </div>
               </div>
 
               <div class="space-y-3">

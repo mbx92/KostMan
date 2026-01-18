@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
         }
 
         // Validate billing period (no overlaps)
-        await validateBillingPeriod(roomId, periodStart, periodEnd);
+        await validateBillingPeriod(roomId, periodStart, periodEnd, undefined, includeRent);
 
         // Calculate months covered
         const monthsCovered = calculateMonthsCovered(periodStart, periodEnd);

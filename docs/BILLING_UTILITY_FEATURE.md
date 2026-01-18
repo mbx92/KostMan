@@ -27,10 +27,13 @@ Fitur khusus untuk membuat tagihan utility (listrik, air, dll) secara manual, ta
 ### Flow
 1. **Click Button**: User clicks "Generate Utility Bill" (green button)
 2. **Fill Form**:
-   - Select Room & Tenant
+   - Select Room & Tenant (Tenant auto-selected!)
    - Set Period (Start - End)
-   - Add Utility Items manually (e.g., "Listrik Januari", 100 kwh, Rp 2000)
-3. **Generate**:
+3. **Generate Items (Two Ways)**:
+   - **Auto**: System automatically fetches settings (Cost per kWh, Water fee, Trash fee) and Meter Readings, then populates the items list.
+   - **Manual**: User can click "Add Item" to add custom charges manually.
+   - **Reset**: User can click "Auto Generate" button to refresh items based on current settings.
+4. **Generate**:
    - System sends request with `includeUtility: false`
    - Explicitly sets `itemType: 'utility'` for all added items
    - Creates bill WITHOUT rent charges

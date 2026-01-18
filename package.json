@@ -16,12 +16,7 @@
     "db:seed": "tsx server/database/seed.ts",
     "db:seed-bills": "tsx server/database/seed-bills.ts",
     "test": "vitest",
-    "test:integration": "vitest run tests/integration",
-    "test:bills": "vitest run tests/integration/bills.test.ts",
-    "test:bill-health": "tsx scripts/check-billing-api.ts",
-    "test:bill-quick": "tsx scripts/quick-bill-test.ts",
-    "test:bill-manual": "tsx scripts/test-billing-manual.ts",
-    "test:bill-cli": "tsx scripts/billing-cli.ts"
+    "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
     "@internationalized/date": "^3.10.1",

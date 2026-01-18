@@ -1,5 +1,5 @@
 import { db } from './drizzle';
-import { rooms, meterReadings, globalSettings, billings } from '../database/schema';
+import { rooms, meterReadings, globalSettings, billings, billingDetails } from '../database/schema';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 
 /**
@@ -195,14 +195,21 @@ export async function calculateUtilityCharges(
  * @param periodStart - Start date (YYYY-MM-DD)
  * @param periodEnd - End date (YYYY-MM-DD)
  * @param excludeBillId - Bill ID to exclude from check (for updates)
+ * @param isRentBill - Whether the new bill includes rent charges (default: true)
  * @returns True if valid, throws error if overlap found
  */
 export async function validateBillingPeriod(
     roomId: string,
     periodStart: string,
     periodEnd: string,
-    excludeBillId?: string
+    excludeBillId?: string,
+    isRentBill: boolean = true
 ): Promise<boolean> {
+    // If this is not a rent bill (e.g., utility only), we allow overlaps
+    if (!isRentBill) {
+        return true;
+    }
+
     const query = db
         .select()
         .from(billings)
@@ -222,10 +229,26 @@ export async function validateBillingPeriod(
         ? overlappingBills.filter(bill => bill.id !== excludeBillId)
         : overlappingBills;
 
-    if (conflicts.length > 0) {
-        throw new Error(
-            `Billing period overlaps with existing bill: ${conflicts[0].billingCode}`
-        );
+    // Check actual conflicts: Overlap is only invalid if BOTH are rent bills
+    for (const bill of conflicts) {
+        // Check if existing bill has rent items
+        const rentItems = await db
+            .select() // Select all fields to avoid "cannot select from..." error if specific fields problematic
+            .from(billingDetails)
+            .where(
+                and(
+                    eq(billingDetails.billId, bill.id),
+                    eq(billingDetails.itemType, 'rent')
+                )
+            )
+            .limit(1);
+
+        // If existing bill has rent item AND new bill is rent bill (checked at start), then it is a conflict
+        if (rentItems.length > 0) {
+            throw new Error(
+                `Billing period overlaps with existing rent bill: ${bill.billingCode}`
+            );
+        }
     }
 
     return true;
