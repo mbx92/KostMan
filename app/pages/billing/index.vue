@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DateValue } from '@internationalized/date'
 import { useKosStore, type RentBill, type UtilityBill } from "~/stores/kos";
 import { usePdfReceipt } from "~/composables/usePdfReceipt";
 import ConfirmDialog from "~/components/ConfirmDialog.vue";
@@ -225,49 +226,47 @@ const existingRentBillPeriods = computed(() => {
 });
 
 // Calculate disabled dates based on moveInDate and existing bills
-const disabledDates = computed(() => {
-  if (!genRoom.value || !genTenant.value?.moveInDate) return [];
-  
-  const disabled: Date[] = [];
-  const moveInDate = new Date(genTenant.value.moveInDate);
-  
-  // Calculate the date after 31 days from moveInDate
-  const minBillingDate = new Date(moveInDate);
-  minBillingDate.setDate(minBillingDate.getDate() + 31);
-  
-  // Disable the moveInDate month (can't bill for the month they just moved in)
-  const moveInYear = moveInDate.getFullYear();
-  const moveInMonth = moveInDate.getMonth();
-  const daysInMoveInMonth = new Date(moveInYear, moveInMonth + 1, 0).getDate();
-  
-  for (let day = 1; day <= daysInMoveInMonth; day++) {
-    disabled.push(new Date(moveInYear, moveInMonth, day));
-  }
-  
-  // Also disable all months that have existing rent bills (from moveInDate onwards)
-  existingRentBillPeriods.value.forEach(period => {
-    const [year, month] = period.split('-').map(Number);
-    const periodDate = new Date(year, month - 1, 1);
+const isDateUnavailable = computed(() => {
+  return (date: DateValue) => {
+    if (!genRoom.value?.moveInDate) return false;
     
-    // Only disable if period is on or after moveInDate
-    if (periodDate >= new Date(moveInDate.getFullYear(), moveInDate.getMonth(), 1)) {
-      const daysInMonth = new Date(year, month, 0).getDate();
-      for (let day = 1; day <= daysInMonth; day++) {
-        disabled.push(new Date(year, month - 1, day));
-      }
+    const moveInDate = new Date(genRoom.value.moveInDate);
+    
+    // Calculate minimum billing date (moveInDate + 31 days)
+    const minBillingDate = new Date(moveInDate);
+    minBillingDate.setDate(minBillingDate.getDate() + 31);
+    
+    // Disable any month before the month containing minBillingDate
+    const minYear = minBillingDate.getFullYear();
+    const minMonth = minBillingDate.getMonth() + 1; // Convert to 1-based
+    
+    // Create date from the picker's date value (first day of that month)
+    const checkDate = new Date(date.year, date.month - 1, 1);
+    const minMonthDate = new Date(minYear, minMonth - 1, 1);
+    
+    if (checkDate < minMonthDate) {
+      return true; // Disable if before minimum billing month
     }
-  });
-  
-  return disabled;
+    
+    // Check if this month has existing rent bill
+    const periodStr = `${date.year}-${String(date.month).padStart(2, '0')}`;
+    if (existingRentBillPeriods.value.includes(periodStr)) {
+      return true; // Disable if rent bill exists
+    }
+    
+    return false;
+  };
 });
 
 // Set default period to first available month after moveInDate
-watch([genRoomId, genTenant], () => {
-  if (genTenant.value?.moveInDate) {
-    const moveInDate = new Date(genTenant.value.moveInDate);
-    // Default to next month after moveInDate
-    const nextMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 1);
-    genPeriod.value = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+watch([genRoomId, genRoom], () => {
+  if (genRoom.value?.moveInDate) {
+    const moveInDate = new Date(genRoom.value.moveInDate);
+    // Calculate minimum billing date (moveInDate + 31 days)
+    const minBillingDate = new Date(moveInDate);
+    minBillingDate.setDate(minBillingDate.getDate() + 31);
+    // Default to the month containing minBillingDate
+    genPeriod.value = `${minBillingDate.getFullYear()}-${String(minBillingDate.getMonth() + 1).padStart(2, '0')}`;
   }
 });
 
@@ -1395,7 +1394,7 @@ const sendReminder = async (reminder: any) => {
               v-model="genPeriod"
               granularity="month"
               class="w-full"
-              :disabled-dates="disabledDates"
+              :is-date-unavailable="isDateUnavailable"
             />
             <!-- Show moveInDate info -->
             <div v-if="genTenant?.moveInDate" class="mt-2">

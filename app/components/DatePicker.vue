@@ -4,6 +4,7 @@ import { CalendarDate, getLocalTimeZone } from '@internationalized/date'
 const props = withDefaults(defineProps<{
   modelValue?: string | null
   granularity?: 'day' | 'month'
+  isDateUnavailable?: (date: CalendarDate) => boolean
 }>(), {
   granularity: 'day'
 })
@@ -79,7 +80,11 @@ const formattedDate = computed(() => {
                 @click="date = null; close()" 
              />
          </div>
-         <UCalendar v-model="date" @close="close" />
+         <UCalendar 
+           v-model="date" 
+           :is-date-unavailable="props.isDateUnavailable"
+           @close="close" 
+         />
       </div>
     </template>
   </UPopover>
