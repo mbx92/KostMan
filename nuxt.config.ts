@@ -38,6 +38,26 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap' }
       ],
+      script: [
+        // Midtrans Snap SDK - loads conditionally based on environment
+        {
+          src: process.env.MIDTRANS_IS_PRODUCTION === 'true'
+            ? 'https://app.midtrans.com/snap/snap.js'
+            : 'https://app.sandbox.midtrans.com/snap/snap.js',
+          'data-client-key': process.env.MIDTRANS_CLIENT_KEY || '',
+        }
+      ],
+    },
+  },
+
+  runtimeConfig: {
+    // Server-side only
+    midtransServerKey: process.env.MIDTRANS_SERVER_KEY,
+    // Public (client-side)
+    public: {
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      midtransClientKey: process.env.MIDTRANS_CLIENT_KEY,
+      midtransIsProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
     },
   },
 

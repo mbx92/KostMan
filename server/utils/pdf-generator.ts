@@ -119,13 +119,36 @@ export const generateCombinedPdf = (data: BillData): Buffer => {
         styles: { fontStyle: "bold", fillColor: [240, 240, 240] },
       },
     ]);
+    
+    // Room rent with period range
+    let periodDesc = `${rentBill.monthsCovered || 1} Month(s)`;
+    if (rentBill.periodEnd) {
+      periodDesc = `${rentBill.period} - ${rentBill.periodEnd}`;
+    }
+    
     tableBody.push([
       "Room Rent",
-      `${rentBill.monthsCovered || 1} Month(s)`,
-      formatCurrency(
-        Number(rentBill.roomPrice) * (rentBill.monthsCovered || 1)
-      ),
+      periodDesc,
+      formatCurrency(Number(rentBill.roomPrice)),
     ]);
+    
+    // Water fee (if included in multi-month rent)
+    if (Number(rentBill.waterFee || 0) > 0) {
+      tableBody.push([
+        "Water Fee",
+        `${rentBill.monthsCovered || 1} Month(s)`,
+        formatCurrency(Number(rentBill.waterFee)),
+      ]);
+    }
+    
+    // Trash fee (if included in multi-month rent)
+    if (Number(rentBill.trashFee || 0) > 0) {
+      tableBody.push([
+        "Trash Fee",
+        `${rentBill.monthsCovered || 1} Month(s)`,
+        formatCurrency(Number(rentBill.trashFee)),
+      ]);
+    }
   }
 
   // 2. Utility Section

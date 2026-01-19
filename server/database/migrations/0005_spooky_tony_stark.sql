@@ -1,0 +1,1 @@
+ALTER TABLE "integration_settings" ALTER COLUMN "server_key" SET DATA TYPE varchar(500);

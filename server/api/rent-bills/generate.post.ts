@@ -48,26 +48,21 @@ export default defineEventHandler(async (event) => {
     const monthsCovered = input.monthsCovered || 1;
     const roomPrice = Number(input.roomPrice) * monthsCovered;
 
-    // For multi-month billing: include water + trash (exclude electricity/kWh)
-    let waterFee = 0;
-    let trashFee = 0;
-    
-    if (monthsCovered > 1) {
-        // Get property settings for water/trash fees
-        const propSettings = await db.select()
-            .from(propertySettings)
-            .where(eq(propertySettings.propertyId, roomData.propertyId))
-            .limit(1);
+    // Include water + trash fees for all rent bills (single or multi-month)
+    // Get property settings for water/trash fees
+    const propSettings = await db.select()
+        .from(propertySettings)
+        .where(eq(propertySettings.propertyId, roomData.propertyId))
+        .limit(1);
 
-        const occupantCount = roomData.occupantCount || 1;
-        const baseWaterFee = propSettings.length > 0 ? Number(propSettings[0].waterFee) : 0;
-        const baseTrashFee = propSettings.length > 0 ? Number(propSettings[0].trashFee) : 0;
-        
-        // Water fee multiplied by occupant count and months
-        waterFee = baseWaterFee * occupantCount * monthsCovered;
-        // Trash fee only if room uses trash service
-        trashFee = roomData.useTrashService ? baseTrashFee * monthsCovered : 0;
-    }
+    const occupantCount = roomData.occupantCount || 1;
+    const baseWaterFee = propSettings.length > 0 ? Number(propSettings[0].waterFee) : 0;
+    const baseTrashFee = propSettings.length > 0 ? Number(propSettings[0].trashFee) : 0;
+    
+    // Water fee multiplied by occupant count and months
+    const waterFee = baseWaterFee * occupantCount * monthsCovered;
+    // Trash fee only if room uses trash service
+    const trashFee = roomData.useTrashService ? baseTrashFee * monthsCovered : 0;
 
     const totalAmount = roomPrice + waterFee + trashFee;
 

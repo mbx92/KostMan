@@ -181,7 +181,7 @@ export const integrationSettings = pgTable(
       .notNull(),
     provider: varchar("provider", { length: 50 }).notNull(), // 'midtrans', 'xendit', etc.
     isEnabled: boolean("is_enabled").default(false),
-    serverKey: varchar("server_key", { length: 255 }),
+    serverKey: varchar("server_key", { length: 500 }), // Increased for encrypted data (salt:iv:tag:encrypted)
     clientKey: varchar("client_key", { length: 255 }),
     isProduction: boolean("is_production").default(false),
     createdAt: timestamp("created_at").defaultNow(),

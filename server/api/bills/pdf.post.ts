@@ -1,5 +1,3 @@
-import { promises as fs } from 'fs'
-import { join } from 'path'
 import { generateCombinedPdf, type BillData } from '../../utils/pdf-generator'
 import { db } from '../../utils/drizzle'
 import { rentBills, utilityBills, rooms, properties, tenants } from '../../database/schema'
@@ -100,33 +98,17 @@ export default defineEventHandler(async (event) => {
   // Generate PDF
   const pdfBuffer = generateCombinedPdf(billData)
 
-  // Create bills directory in public folder if not exists
-  const publicDir = join(process.cwd(), 'public', 'bills')
-  try {
-    await fs.access(publicDir)
-  } catch {
-    await fs.mkdir(publicDir, { recursive: true })
-  }
-
-  // Generate unique filename
-  const timestamp = Date.now()
+  // Generate filename for download
   const safeRoomName = room.name.replace(/[^a-zA-Z0-9]/g, '-')
-  const filename = `statement-${safeRoomName}-${body.period}-${timestamp}.pdf`
-  const filePath = join(publicDir, filename)
+  const filename = `statement-${safeRoomName}-${body.period}.pdf`
 
-  // Save PDF file
-  await fs.writeFile(filePath, pdfBuffer)
+  // Set headers for PDF download
+  setResponseHeaders(event, {
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${filename}"`,
+    'Content-Length': pdfBuffer.length.toString(),
+  })
 
-  // Return the public URL path
-  const pdfUrl = `/bills/${filename}`
-
-  return {
-    success: true,
-    pdfUrl,
-    filename,
-    tenant: tenant ? {
-      name: tenant.name,
-      contact: tenant.contact
-    } : null
-  }
+  // Return PDF buffer directly
+  return pdfBuffer
 })

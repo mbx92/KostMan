@@ -194,8 +194,114 @@ const genRoom = computed(() =>
   rooms.value.find((r) => r.id === genRoomId.value)
 );
 
+// Get tenant for selected room
+const genTenant = computed(() => {
+  if (!genRoom.value?.tenantId) return null;
+  return tenants.value.find(t => t.id === genRoom.value?.tenantId);
+});
+
+// Get existing rent bills for selected room to check period conflicts
+const existingRentBillPeriods = computed(() => {
+  if (!genRoomId.value) return [];
+  
+  const roomBills = rentBills.value.filter(b => b.roomId === genRoomId.value);
+  const periods: string[] = [];
+  
+  roomBills.forEach(bill => {
+    const monthsCovered = bill.monthsCovered || 1;
+    const startDate = new Date(bill.period + '-01');
+    
+    for (let i = 0; i < monthsCovered; i++) {
+      const date = new Date(startDate);
+      date.setMonth(date.getMonth() + i);
+      const periodStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!periods.includes(periodStr)) {
+        periods.push(periodStr);
+      }
+    }
+  });
+  
+  return periods;
+});
+
+// Calculate disabled dates based on moveInDate and existing bills
+const disabledDates = computed(() => {
+  if (!genRoom.value || !genTenant.value?.moveInDate) return [];
+  
+  const disabled: Date[] = [];
+  const moveInDate = new Date(genTenant.value.moveInDate);
+  
+  // Calculate the date after 31 days from moveInDate
+  const minBillingDate = new Date(moveInDate);
+  minBillingDate.setDate(minBillingDate.getDate() + 31);
+  
+  // Disable the moveInDate month (can't bill for the month they just moved in)
+  const moveInYear = moveInDate.getFullYear();
+  const moveInMonth = moveInDate.getMonth();
+  const daysInMoveInMonth = new Date(moveInYear, moveInMonth + 1, 0).getDate();
+  
+  for (let day = 1; day <= daysInMoveInMonth; day++) {
+    disabled.push(new Date(moveInYear, moveInMonth, day));
+  }
+  
+  // Also disable all months that have existing rent bills (from moveInDate onwards)
+  existingRentBillPeriods.value.forEach(period => {
+    const [year, month] = period.split('-').map(Number);
+    const periodDate = new Date(year, month - 1, 1);
+    
+    // Only disable if period is on or after moveInDate
+    if (periodDate >= new Date(moveInDate.getFullYear(), moveInDate.getMonth(), 1)) {
+      const daysInMonth = new Date(year, month, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        disabled.push(new Date(year, month - 1, day));
+      }
+    }
+  });
+  
+  return disabled;
+});
+
+// Set default period to first available month after moveInDate
+watch([genRoomId, genTenant], () => {
+  if (genTenant.value?.moveInDate) {
+    const moveInDate = new Date(genTenant.value.moveInDate);
+    // Default to next month after moveInDate
+    const nextMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 1);
+    genPeriod.value = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+  }
+});
+
+// Check if selected period conflicts with existing bills
+const periodConflict = computed(() => {
+  if (!genPeriod.value || !genMonthsCovered.value) return null;
+  
+  const selectedPeriods: string[] = [];
+  const startDate = new Date(genPeriod.value + '-01');
+  
+  for (let i = 0; i < genMonthsCovered.value; i++) {
+    const date = new Date(startDate);
+    date.setMonth(date.getMonth() + i);
+    const periodStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    selectedPeriods.push(periodStr);
+  }
+  
+  const conflicts = selectedPeriods.filter(p => existingRentBillPeriods.value.includes(p));
+  return conflicts.length > 0 ? conflicts : null;
+});
+
 const generateRentBill = async () => {
   if (!genRoomId.value || !genRoom.value) return;
+  
+  // Check for period conflicts
+  if (periodConflict.value) {
+    toast.add({
+      title: "Conflict",
+      description: `Periode ${periodConflict.value.join(', ')} sudah memiliki rent bill. Pilih periode lain atau hapus rent bill yang lama terlebih dahulu.`,
+      color: "error",
+    });
+    return;
+  }
+  
   try {
     await store.generateRentBill({
       roomId: genRoomId.value,
@@ -235,6 +341,94 @@ const markRentPaid = async (id: string) => {
       description: e?.data?.message || e?.message,
       color: "error",
     });
+  }
+};
+
+// Midtrans Payment
+declare global {
+  interface Window {
+    snap: {
+      pay: (token: string, options: {
+        onSuccess?: (result: any) => void;
+        onPending?: (result: any) => void;
+        onError?: (result: any) => void;
+        onClose?: () => void;
+      }) => void;
+    };
+  }
+}
+
+const payingBillId = ref<string | null>(null);
+
+const payOnline = async (billId: string, billType: 'rent' | 'utility') => {
+  if (!window.snap) {
+    toast.add({
+      title: "Error",
+      description: "Payment gateway not loaded. Please refresh the page.",
+      color: "error",
+    });
+    return;
+  }
+
+  payingBillId.value = billId;
+  
+  try {
+    const response = await $fetch<{
+      success: boolean;
+      snapToken: string;
+      redirectUrl: string;
+      orderId: string;
+    }>('/api/payments/midtrans/create', {
+      method: 'POST',
+      body: { billId, billType },
+    });
+
+    if (response.success && response.snapToken) {
+      window.snap.pay(response.snapToken, {
+        onSuccess: async (result: any) => {
+          console.log('Payment success:', result);
+          toast.add({
+            title: "Pembayaran Berhasil",
+            description: "Tagihan sudah dibayar.",
+            color: "success",
+          });
+          // Refresh bills
+          await store.fetchRentBills();
+          await store.fetchUtilityBills();
+          payingBillId.value = null;
+        },
+        onPending: (result: any) => {
+          console.log('Payment pending:', result);
+          toast.add({
+            title: "Pembayaran Pending",
+            description: "Silakan selesaikan pembayaran Anda.",
+            color: "warning",
+          });
+          payingBillId.value = null;
+        },
+        onError: (result: any) => {
+          console.error('Payment error:', result);
+          toast.add({
+            title: "Pembayaran Gagal",
+            description: "Terjadi kesalahan saat memproses pembayaran.",
+            color: "error",
+          });
+          payingBillId.value = null;
+        },
+        onClose: () => {
+          console.log('Payment popup closed');
+          payingBillId.value = null;
+        },
+      });
+    }
+  } catch (e: any) {
+    console.error('Create payment error:', e);
+    toast.add({
+      title: "Error",
+      description: e?.data?.message || e?.message || "Gagal membuat transaksi",
+      color: "error",
+    });
+    payingBillId.value = null;
   }
 };
 
@@ -378,26 +572,27 @@ const sendToWhatsApp = async (item: {
     phoneNumber = "62" + phoneNumber;
   }
 
-  // Generate PDF and get URL
+  // Generate PDF and get URL + Generate public invoice link
   sendingWa.value = true;
-  let pdfUrl = "";
+  let invoiceUrl = "";
+  
   try {
-    const response = await $fetch<{ success: boolean; pdfUrl: string }>("/api/bills/pdf", {
-      method: "POST",
-      body: {
-        roomId: item.roomId,
-        period: item.period,
-      },
-    });
-    if (response.success && response.pdfUrl) {
-      // Get the full URL (works for both dev and production)
-      const baseUrl = window.location.origin;
-      pdfUrl = `${baseUrl}${response.pdfUrl}`;
-    }
+    // Generate public link for combined view (using roomId + period)
+    const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+      `/api/bills/public-link/combined`,
+      {
+        method: 'POST',
+        body: { 
+          roomId: item.roomId,
+          period: item.period 
+        },
+      }
+    );
+    invoiceUrl = linkResponse.publicUrl;
   } catch (e: any) {
     toast.add({
       title: "Error",
-      description: e?.data?.message || "Gagal generate PDF",
+      description: e?.data?.message || "Gagal generate link",
       color: "error",
     });
     sendingWa.value = false;
@@ -408,39 +603,69 @@ const sendToWhatsApp = async (item: {
   const totalRent = item.rent ? Number(item.rent.totalAmount) : 0;
   const totalUtil = item.util ? Number(item.util.totalAmount) : 0;
   const grandTotal = totalRent + totalUtil;
+  const occupants = room.occupantCount || 1;
 
-  let message = `*TAGIHAN KOST - ${prop.name}*\n`;
-  message += `Periode: ${item.period}\n`;
-  message += `Kamar: ${room.name}\n`;
-  message += `Penghuni: ${tenant.name}\n\n`;
+  let message = `*TAGIHAN KOST*\n`;
+  message += `${prop.name}\n`;
+  message += `================================\n\n`;
+  message += `Periode: *${item.period}*\n`;
+  message += `Kamar: *${room.name}*\n`;
+  message += `Penghuni: ${tenant.name}\n`;
+  if (occupants > 1) {
+    message += `Jumlah Penghuni: ${occupants} orang\n`;
+  }
+  message += `\n================================\n`;
 
   if (item.rent) {
-    message += `*Sewa Kamar*\n`;
+    message += `\n*SEWA KAMAR*\n`;
     message += `${item.rent.monthsCovered || 1} bulan x ${formatCurrency(item.rent.roomPrice)}\n`;
-    message += `Subtotal: ${formatCurrency(item.rent.totalAmount)}`;
-    message += item.rent.isPaid ? " ✅\n" : " ⏳\n";
+    message += `Total: ${formatCurrency(item.rent.totalAmount)}`;
+    message += item.rent.isPaid ? " [LUNAS]\n" : "\n";
   }
 
   if (item.util) {
-    message += `\n*Listrik & Air*\n`;
-    message += `Listrik: ${item.util.meterStart} → ${item.util.meterEnd} (${item.util.meterEnd - item.util.meterStart} kWh)\n`;
-    message += `Biaya Listrik: ${formatCurrency(item.util.usageCost)}\n`;
-    message += `Air: ${formatCurrency(item.util.waterFee)}\n`;
-    if (Number(item.util.trashFee) > 0) {
-      message += `Sampah: ${formatCurrency(item.util.trashFee)}\n`;
+    message += `\n*UTILITAS*\n\n`;
+    
+    // Listrik
+    const kwhUsage = item.util.meterEnd - item.util.meterStart;
+    message += `Listrik:\n`;
+    message += `  ${item.util.meterStart} -> ${item.util.meterEnd} = ${kwhUsage} kWh\n`;
+    message += `  ${formatCurrency(item.util.usageCost)}\n\n`;
+    
+    // Air
+    const waterPerPerson = Number(item.util.waterFee) / occupants;
+    message += `Air:\n`;
+    if (occupants > 1) {
+      message += `  ${formatCurrency(waterPerPerson)} x ${occupants} orang\n`;
     }
-    message += `Subtotal: ${formatCurrency(item.util.totalAmount)}`;
-    message += item.util.isPaid ? " ✅\n" : " ⏳\n";
+    message += `  ${formatCurrency(item.util.waterFee)}\n`;
+    
+    // Sampah
+    if (Number(item.util.trashFee) > 0) {
+      message += `\nSampah:\n`;
+      message += `  ${formatCurrency(item.util.trashFee)}\n`;
+    }
+    
+    message += `\nTotal Utilitas: ${formatCurrency(item.util.totalAmount)}`;
+    message += item.util.isPaid ? " [LUNAS]\n" : "\n";
   }
 
-  message += `\n*TOTAL: ${formatCurrency(grandTotal)}*\n`;
+  message += `\n================================\n`;
+  message += `*TOTAL TAGIHAN: ${formatCurrency(grandTotal)}*\n`;
   
-  // Add PDF link
-  if (pdfUrl) {
-    message += `\n📄 *Download Invoice:*\n${pdfUrl}\n`;
+  if (!item.rent?.isPaid || !item.util?.isPaid) {
+    message += `Status: *BELUM LUNAS*\n`;
   }
   
-  message += `\nTerima kasih 🙏`;
+  message += `================================\n`;
+  
+  // Add invoice link
+  if (invoiceUrl) {
+    message += `\nLihat & Bayar Invoice:\n${invoiceUrl}\n`;
+    message += `\n(Klik link di atas untuk melihat detail tagihan dan melakukan pembayaran online)\n`;
+  }
+  
+  message += `\nMohon segera melakukan pembayaran.\nTerima kasih.`;
 
   sendingWa.value = false;
 
@@ -458,7 +683,7 @@ const formatCurrency = (val: number | string) =>
   }).format(Number(val));
 
 // Send reminder to WhatsApp
-const sendReminder = (reminder: any) => {
+const sendReminder = async (reminder: any) => {
   if (!reminder.tenant?.contact) {
     toast.add({ title: 'Error', description: 'Nomor kontak tidak tersedia', color: 'error' });
     return;
@@ -471,28 +696,100 @@ const sendReminder = (reminder: any) => {
     phoneNumber = '62' + phoneNumber;
   }
 
+  // Generate public invoice link
+  let invoiceUrl = '';
+  try {
+    // Use combined format if both rent and utility exist for the same period
+    if (reminder.unpaidRentBills?.length > 0 && reminder.unpaidUtilityBills?.length > 0) {
+      // Check if they have same period
+      const rentPeriod = reminder.unpaidRentBills[0].period;
+      const utilPeriod = reminder.unpaidUtilityBills[0].period;
+      
+      if (rentPeriod === utilPeriod) {
+        // Generate combined link
+        const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+          `/api/bills/public-link/combined`,
+          {
+            method: 'POST',
+            body: { 
+              roomId: reminder.room.id,
+              period: rentPeriod 
+            },
+          }
+        );
+        invoiceUrl = linkResponse.publicUrl;
+      } else {
+        // Different periods, use first rent bill
+        const billId = reminder.unpaidRentBills[0].id;
+        const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+          `/api/bills/public-link/${billId}`,
+          {
+            method: 'POST',
+            body: { billType: 'rent' },
+          }
+        );
+        invoiceUrl = linkResponse.publicUrl;
+      }
+    } else {
+      // Only one type of bill
+      const billId = reminder.unpaidRentBills?.[0]?.id || reminder.unpaidUtilityBills?.[0]?.id;
+      const billType = reminder.unpaidRentBills?.[0] ? 'rent' : 'utility';
+      
+      if (billId) {
+        const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+          `/api/bills/public-link/${billId}`,
+          {
+            method: 'POST',
+            body: { billType },
+          }
+        );
+        invoiceUrl = linkResponse.publicUrl;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to generate invoice link:', e);
+  }
+
   let message = `*PENGINGAT TAGIHAN KOST*\n`;
-  message += `\nHalo ${reminder.tenant.name},\n`;
+  message += `================================\n\n`;
+  message += `Halo *${reminder.tenant.name}*,\n\n`;
   
   // Different message based on reminder type
   if (reminder.reminderType === 'overdue') {
-    message += `\n⚠️ *Tagihan Anda sudah LEWAT JATUH TEMPO* (${Math.abs(reminder.daysUntilDue)} hari).\n`;
+    message += `Tagihan Anda sudah *LEWAT JATUH TEMPO*\n`;
+    message += `(${Math.abs(reminder.daysUntilDue)} hari yang lalu)\n\n`;
   } else if (reminder.reminderType === 'due_soon') {
-    message += `\nIni adalah pengingat bahwa tagihan Anda akan jatuh tempo dalam *${reminder.daysUntilDue} hari* (tanggal ${reminder.dueDay}).\n`;
+    message += `Tagihan akan jatuh tempo dalam:\n`;
+    message += `*${reminder.daysUntilDue} hari* (${reminder.dueDay})\n\n`;
   } else {
-    message += `\nAnda memiliki tagihan yang belum dibayar.\n`;
+    message += `Anda memiliki tagihan yang belum dibayar.\n\n`;
   }
   
-  message += `\n📍 ${reminder.property?.name || 'Kost'}\n`;
-  message += `🏠 Kamar: ${reminder.room.name}\n`;
-  message += `\n💰 *Total Tagihan: ${formatCurrency(reminder.totalUnpaid)}*\n`;
+  message += `Kos: ${reminder.property?.name || 'Kost'}\n`;
+  message += `Kamar: ${reminder.room.name}\n`;
+  message += `\n================================\n\n`;
+  message += `*RINCIAN TAGIHAN:*\n\n`;
+  
   if (reminder.totalUnpaidRent > 0) {
-    message += `   - Sewa: ${formatCurrency(reminder.totalUnpaidRent)}\n`;
+    message += `Sewa Kamar:\n`;
+    message += `  ${formatCurrency(reminder.totalUnpaidRent)}\n\n`;
   }
   if (reminder.totalUnpaidUtility > 0) {
-    message += `   - Utilitas: ${formatCurrency(reminder.totalUnpaidUtility)}\n`;
+    message += `Utilitas (Listrik/Air):\n`;
+    message += `  ${formatCurrency(reminder.totalUnpaidUtility)}\n\n`;
   }
-  message += `\nMohon segera melakukan pembayaran. Terima kasih 🙏`;
+  
+  message += `================================\n`;
+  message += `*TOTAL: ${formatCurrency(reminder.totalUnpaid)}*\n`;
+  message += `================================\n\n`;
+  
+  // Add invoice link
+  if (invoiceUrl) {
+    message += `Lihat & Bayar Invoice:\n${invoiceUrl}\n\n`;
+    message += `(Klik link untuk melihat detail & bayar online)\n\n`;
+  }
+  
+  message += `Mohon segera melakukan pembayaran.\nTerima kasih.`;
 
   const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
   window.open(waUrl, '_blank');
@@ -740,8 +1037,11 @@ const sendReminder = (reminder: any) => {
               <td class="p-3 text-gray-500">
                 {{ bill.property?.name || "Unknown" }}
               </td>
-              <td class="p-3 font-medium">
-                {{ bill.room?.name || "Unknown" }}
+              <td class="p-3">
+                <div class="font-medium">{{ bill.room?.name || "Unknown" }}</div>
+                <div class="text-xs text-gray-500" v-if="bill.tenant?.name">
+                  {{ bill.tenant.name }}
+                </div>
               </td>
               <td class="p-3">{{ bill.monthsCovered || 1 }}</td>
               <td class="p-3 font-bold text-gray-900 dark:text-white">
@@ -758,6 +1058,16 @@ const sendReminder = (reminder: any) => {
               </td>
               <td class="p-3 text-right">
                 <div class="flex justify-end gap-1">
+                  <UTooltip text="Bayar Online" v-if="!bill.isPaid">
+                    <UButton
+                      size="xs"
+                      color="primary"
+                      variant="soft"
+                      icon="i-heroicons-credit-card"
+                      :loading="payingBillId === bill.id"
+                      @click="payOnline(bill.id, 'rent')"
+                    />
+                  </UTooltip>
                   <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
                     <UButton
                       size="xs"
@@ -823,8 +1133,11 @@ const sendReminder = (reminder: any) => {
               <td class="p-3 text-gray-500">
                 {{ bill.property?.name || "Unknown" }}
               </td>
-              <td class="p-3 font-medium">
-                {{ bill.room?.name || "Unknown" }}
+              <td class="p-3">
+                <div class="font-medium">{{ bill.room?.name || "Unknown" }}</div>
+                <div class="text-xs text-gray-500" v-if="bill.tenant?.name">
+                  {{ bill.tenant.name }}
+                </div>
               </td>
               <td class="p-3">
                 <div>{{ bill.meterEnd - bill.meterStart }} kWh</div>
@@ -846,6 +1159,16 @@ const sendReminder = (reminder: any) => {
               </td>
               <td class="p-3 text-right">
                 <div class="flex justify-end gap-1">
+                  <UTooltip text="Bayar Online" v-if="!bill.isPaid">
+                    <UButton
+                      size="xs"
+                      color="primary"
+                      variant="soft"
+                      icon="i-heroicons-credit-card"
+                      :loading="payingBillId === bill.id"
+                      @click="payOnline(bill.id, 'utility')"
+                    />
+                  </UTooltip>
                   <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
                     <UButton
                       size="xs"
@@ -911,8 +1234,8 @@ const sendReminder = (reminder: any) => {
               class="hover:bg-gray-50 dark:hover:bg-gray-800/30"
             >
               <td class="p-3 font-medium">{{ item.period }}</td>
-              <td class="p-3 font-medium">
-                <div>
+              <td class="p-3">
+                <div class="font-medium">
                   {{
                     item.rent?.room?.name || item.util?.room?.name || "Unknown"
                   }}
@@ -923,6 +1246,9 @@ const sendReminder = (reminder: any) => {
                     item.util?.property?.name ||
                     "Unknown"
                   }}
+                </div>
+                <div class="text-xs text-gray-500" v-if="item.rent?.tenant?.name || item.util?.tenant?.name">
+                  {{ item.rent?.tenant?.name || item.util?.tenant?.name }}
                 </div>
               </td>
               <td class="p-3 text-right">
@@ -1069,7 +1395,32 @@ const sendReminder = (reminder: any) => {
               v-model="genPeriod"
               granularity="month"
               class="w-full"
+              :disabled-dates="disabledDates"
             />
+            <!-- Show moveInDate info -->
+            <div v-if="genTenant?.moveInDate" class="mt-2">
+              <p class="text-xs text-blue-600 dark:text-blue-400">
+                <UIcon name="i-heroicons-calendar" class="w-3 h-3 inline" />
+                Tanggal masuk: {{ new Date(genTenant.moveInDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Billing dapat di-generate mulai bulan {{ new Date(new Date(genTenant.moveInDate).setMonth(new Date(genTenant.moveInDate).getMonth() + 1)).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' }) }} (31 hari setelah masuk)
+              </p>
+            </div>
+            <!-- Show existing periods info -->
+            <div v-if="genRoomId && existingRentBillPeriods.length > 0" class="mt-2">
+              <p class="text-xs text-gray-600 dark:text-gray-400">
+                Periode sudah dibayar (disabled): 
+                <span class="font-mono font-semibold">{{ existingRentBillPeriods.join(', ') }}</span>
+              </p>
+            </div>
+            <!-- Show conflict warning -->
+            <div v-if="periodConflict" class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+              <p class="text-xs text-red-700 dark:text-red-400 flex items-center gap-1">
+                <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4" />
+                <span>Konflik: Periode {{ periodConflict.join(', ') }} sudah memiliki rent bill!</span>
+              </p>
+            </div>
           </UFormField>
 
           <UFormField label="Jumlah Bulan">
@@ -1133,7 +1484,7 @@ const sendReminder = (reminder: any) => {
             <UButton
               @click="generateRentBill"
               color="primary"
-              :disabled="!genRoomId"
+              :disabled="!genRoomId || !!periodConflict"
               :loading="rentBillsLoading"
               icon="i-heroicons-plus"
             >

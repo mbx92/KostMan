@@ -15,6 +15,7 @@ node_modules
 .fleet
 .idea
 *.local
+*.pdf
 
 # Environment
 .env
