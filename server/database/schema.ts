@@ -65,6 +65,9 @@ export const tenants = pgTable("tenants", {
   contact: varchar("contact", { length: 20 }).notNull(),
   idCardNumber: varchar("id_card_number", { length: 16 }).notNull(),
   status: tenantStatusEnum("status").default("active"),
+  pin: varchar("pin", { length: 255 }), // Hashed PIN
+  isDefaultPin: boolean("is_default_pin").default(true),
+  pinChangedAt: timestamp("pin_changed_at"),
 });
 
 export const rooms = pgTable(

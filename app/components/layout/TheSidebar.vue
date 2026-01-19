@@ -228,33 +228,6 @@ onMounted(() => {
       </ul>
     </nav>
 
-    <!-- Bottom section -->
-    <div class="border-t border-gray-200 dark:border-gray-800 p-3 shrink-0">
-      <div class="flex items-center gap-3 px-3 py-2 overflow-hidden">
-        <UAvatar
-          :alt="currentUser?.name"
-          size="sm"
-          class="shrink-0 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200"
-        >
-          <template v-if="currentUser?.name">
-            {{ currentUser.name.charAt(0).toUpperCase() }}
-          </template>
-          <template v-else>
-            <UIcon name="i-heroicons-user" />
-          </template>
-        </UAvatar>
-        <Transition name="slide-fade">
-          <div v-if="!collapsed" class="flex-1 min-w-0 overflow-hidden">
-            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {{ currentUser?.name || 'User' }}
-            </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {{ currentUser?.email || '' }}
-            </p>
-          </div>
-        </Transition>
-      </div>
-    </div>
   </div>
 </template>
 

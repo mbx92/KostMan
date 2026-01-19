@@ -246,6 +246,19 @@ declare global {
     <div v-else-if="billData" class="min-h-screen bg-gray-50 dark:bg-gray-900">
       <!-- Content -->
       <div class="max-w-3xl mx-auto p-6 space-y-6">
+        <!-- App Logo & Name -->
+        <div class="text-center">
+          <div class="flex justify-center mb-3">
+            <UIcon 
+              name="i-heroicons-building-office-2" 
+              class="w-16 h-16 text-primary-600 dark:text-primary-400"
+            />
+          </div>
+          <h1 class="text-3xl font-bold text-primary-600 dark:text-primary-400">
+            {{ settings?.appName || 'KostMan' }}
+          </h1>
+        </div>
+        
         <!-- Header -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <div class="flex items-center justify-between mb-4">
