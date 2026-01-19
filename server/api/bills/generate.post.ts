@@ -108,6 +108,7 @@ export default defineEventHandler(async (event) => {
                     roomId,
                     tenantId,
                     billingCode,
+                    billType: includeRent ? 'rent' : 'utility',
                     billStatus: 'draft',
                     periodStart,
                     periodEnd,

@@ -1,5 +1,5 @@
 import { db } from './drizzle';
-import { rooms, meterReadings, globalSettings, billings, billingDetails } from '../database/schema';
+import { rooms, meterReadings, globalSettings, billings } from '../database/schema';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 
 /**
@@ -231,20 +231,8 @@ export async function validateBillingPeriod(
 
     // Check actual conflicts: Overlap is only invalid if BOTH are rent bills
     for (const bill of conflicts) {
-        // Check if existing bill has rent items
-        const rentItems = await db
-            .select() // Select all fields to avoid "cannot select from..." error if specific fields problematic
-            .from(billingDetails)
-            .where(
-                and(
-                    eq(billingDetails.billId, bill.id),
-                    eq(billingDetails.itemType, 'rent')
-                )
-            )
-            .limit(1);
-
-        // If existing bill has rent item AND new bill is rent bill (checked at start), then it is a conflict
-        if (rentItems.length > 0) {
+        // If existing bill is a rent bill AND new bill is a rent bill (checked at start), conflict!
+        if (bill.billType === 'rent') {
             throw new Error(
                 `Billing period overlaps with existing rent bill: ${bill.billingCode}`
             );

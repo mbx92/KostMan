@@ -7,6 +7,7 @@ import DatePicker from '~/components/DatePicker.vue'
 interface Bill {
   id: string
   billingCode: string
+  billType: 'rent' | 'utility'
   roomId: string
   tenantId: string
   billStatus: 'draft' | 'unpaid' | 'paid'
@@ -903,6 +904,7 @@ const getItemTypeIcon = (type: string) => {
           <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700">
             <tr>
               <th class="p-3 font-medium">Bill Code</th>
+              <th class="p-3 font-medium">Type</th>
               <th class="p-3 font-medium">Room</th>
               <th class="p-3 font-medium">Tenant</th>
               <th class="p-3 font-medium">Period</th>
@@ -919,6 +921,11 @@ const getItemTypeIcon = (type: string) => {
               class="hover:bg-gray-50 dark:hover:bg-gray-800/30"
             >
               <td class="p-3 font-mono text-xs font-medium">{{ bill.billingCode }}</td>
+              <td class="p-3">
+                <UBadge :color="bill.billType === 'rent' ? 'primary' : 'orange'" variant="subtle" size="xs">
+                  {{ bill.billType ? bill.billType.toUpperCase() : 'RENT' }}
+                </UBadge>
+              </td>
               <td class="p-3">{{ bill.room?.name || 'Unknown' }}</td>
               <td class="p-3">{{ bill.tenant?.name || 'Unknown' }}</td>
               <td class="p-3 text-xs">

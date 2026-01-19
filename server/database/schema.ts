@@ -66,6 +66,9 @@ export const rooms = pgTable('rooms', {
 // Bill Status Enum
 export const billStatusEnum = pgEnum('bill_status', ['draft', 'unpaid', 'paid']);
 
+// Bill Type Enum
+export const billTypeEnum = pgEnum('bill_type', ['rent', 'utility']); // rent = regular bill with rent charges, utility = utility only
+
 // Item Type Enum for billing details
 export const itemTypeEnum = pgEnum('item_type', ['rent', 'utility', 'others']);
 
@@ -78,6 +81,7 @@ export const billings = pgTable('billings', {
   roomId: uuid('room_id').references(() => rooms.id).notNull(),
   tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   billingCode: varchar('billing_code', { length: 50 }).notNull().unique(),
+  billType: billTypeEnum('bill_type').default('rent').notNull(),
   billStatus: billStatusEnum('bill_status').default('draft'),
   periodStart: date('period_start').notNull(),
   periodEnd: date('period_end').notNull(),
