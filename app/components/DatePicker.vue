@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits(['update:modelValue'])
 
 const date = ref<CalendarDate | null>(null)
+const popoverOpen = ref(false)
 
 // Sync from string prop to CalendarDate
 watch(() => props.modelValue, (val) => {
@@ -56,10 +57,37 @@ const formattedDate = computed(() => {
     return props.modelValue
   }
 })
+
+// Handle date selection - auto close after selection
+const handleDateSelect = (val: any, close: () => void) => {
+  // Prevent deselection - if same date is clicked or null is emitted, keep current value
+  if (val === null || val === undefined) {
+    // Just close the popover without changing the date
+    if (props.granularity === 'day') {
+      close()
+    }
+    return
+  }
+  
+  // Check if the new value is the same as current (comparing toString to handle object equality)
+  if (date.value && val.toString() === date.value.toString()) {
+    // Same date clicked - just close, don't update
+    if (props.granularity === 'day') {
+      close()
+    }
+    return
+  }
+  
+  date.value = val as CalendarDate | null
+  // Auto-close popover after day selection
+  if (val && props.granularity === 'day') {
+    close()
+  }
+}
 </script>
 
 <template>
-  <UPopover :popper="{ placement: 'bottom-start' }">
+  <UPopover v-model:open="popoverOpen" :popper="{ placement: 'bottom-start' }">
     <UButton 
         icon="i-heroicons-calendar" 
         color="neutral" 
@@ -81,9 +109,9 @@ const formattedDate = computed(() => {
              />
          </div>
          <UCalendar 
-           v-model="date" 
+           :model-value="date as any" 
+           @update:model-value="(val) => handleDateSelect(val, close)"
            :is-date-unavailable="props.isDateUnavailable"
-           @close="close" 
          />
       </div>
     </template>

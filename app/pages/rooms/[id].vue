@@ -190,6 +190,49 @@ const updateRoomStatus = async () => {
   }
 }
 
+// Remove tenant (check-out)
+const removeTenant = async () => {
+  if (!room.value) return
+  
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Checkout Penghuni?',
+    message: `Apakah Anda yakin ingin checkout ${selectedTenantName.value}? Kamar akan diubah ke status "Available".`,
+    confirmText: 'Ya, Checkout',
+    confirmColor: 'warning'
+  })
+  
+  if (!confirmed) return
+  
+  isSaving.value = true
+  try {
+    await store.updateRoom(roomId.value, {
+      status: 'available',
+      tenantId: null,
+      tenantName: undefined,
+      moveInDate: null,
+      occupantCount: 1
+    })
+    
+    // Update local state
+    selectedTenantId.value = null
+    roomStatus.value = 'available'
+    moveInDate.value = ''
+    occupantCount.value = 1
+    
+    await loadRoom()
+    
+    toast.add({ title: 'Checkout Berhasil', description: 'Penghuni telah di-checkout dan kamar tersedia.', color: 'success' })
+  } catch (err: any) {
+    toast.add({
+      title: 'Error',
+      description: err?.data?.message || err?.message || 'Failed to checkout tenant',
+      color: 'error',
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
 // ============ Meter Reading Form ============
 const meterStart = ref(0)
 const meterEnd = ref(0)
@@ -505,14 +548,26 @@ const goBack = () => {
                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tenant</label>
                             
                             <!-- Selected Tenant Display -->
-                            <div v-if="selectedTenantId && selectedTenantId !== '__new__'" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md flex items-center justify-between group">
-                                <div class="flex items-center gap-3">
-                                    <UAvatar :alt="selectedTenantName" size="sm" class="bg-primary-100 text-primary-600" />
-                                    <div class="text-sm font-medium">{{ selectedTenantName }}</div>
+                            <div v-if="selectedTenantId && selectedTenantId !== '__new__'" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <UAvatar :alt="selectedTenantName" size="sm" class="bg-primary-100 text-primary-600" />
+                                        <div>
+                                            <div class="text-sm font-medium">{{ selectedTenantName }}</div>
+                                            <div v-if="moveInDate" class="text-xs text-gray-500">
+                                                Move-in: {{ new Date(moveInDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <UButton variant="ghost" color="neutral" icon="i-heroicons-arrow-path" size="xs" @click="isTenantModalOpen = true">
-                                    Change
-                                </UButton>
+                                <div class="flex gap-2">
+                                    <UButton variant="soft" color="neutral" icon="i-heroicons-arrow-path" size="xs" @click="isTenantModalOpen = true" class="flex-1">
+                                        Ganti Tenant
+                                    </UButton>
+                                    <UButton variant="soft" color="warning" icon="i-heroicons-arrow-right-start-on-rectangle" size="xs" @click="removeTenant" class="flex-1">
+                                        Checkout
+                                    </UButton>
+                                </div>
                             </div>
 
                             <!-- Select Tenant Button -->

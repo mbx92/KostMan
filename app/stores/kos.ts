@@ -60,12 +60,21 @@ export interface RentBill {
     id: string
     roomId: string
     tenantId?: string | null
-    period: string // YYYY-MM
+    
+    // Date-based billing (primary)
+    periodStartDate: string // YYYY-MM-DD
+    periodEndDate: string // YYYY-MM-DD
+    dueDate: string // YYYY-MM-DD
+    billingCycleDay?: number | null
+    
+    // Legacy fields (for backward compatibility)
+    period?: string | null // YYYY-MM
     periodEnd?: string | null
+    
     monthsCovered?: number
     roomPrice: number | string
-    waterFee?: number | string // For multi-month billing
-    trashFee?: number | string // For multi-month billing
+    waterFee?: number | string
+    trashFee?: number | string
     totalAmount: number | string
     isPaid: boolean
     paidAt?: string | null
@@ -455,8 +464,9 @@ export const useKosStore = defineStore('kos', () => {
 
     async function generateRentBill(data: {
         roomId: string,
-        period: string,
-        periodEnd?: string,
+        periodStartDate: string, // YYYY-MM-DD
+        periodEndDate?: string,
+        dueDate?: string,
         monthsCovered?: number,
         roomPrice: number
     }) {
@@ -757,9 +767,11 @@ export const useKosStore = defineStore('kos', () => {
 
                         if (existingRentBills.length === 0) {
                             // No rent bill for this period, create one
+                            // Convert period (YYYY-MM) to periodStartDate (YYYY-MM-DD)
+                            const periodStartDate = reading.period + '-01'
                             await generateRentBill({
                                 roomId: reading.roomId,
-                                period: reading.period,
+                                periodStartDate: periodStartDate,
                                 monthsCovered: 1,
                                 roomPrice: Number(room.price)
                             })

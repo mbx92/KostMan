@@ -171,8 +171,71 @@ const totalUnpaid = computed(
 const isGenerating = ref(false);
 const genPropertyId = ref("");
 const genRoomId = ref("");
-const genPeriod = ref(new Date().toISOString().slice(0, 7));
+const genPeriodStartDate = ref(new Date().toISOString().slice(0, 10)); // YYYY-MM-DD
 const genMonthsCovered = ref(1);
+
+// Calculate period end date (start + 1 month - 1 day)
+const genPeriodEndDate = computed(() => {
+  if (!genPeriodStartDate.value) return '';
+  const start = new Date(genPeriodStartDate.value);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + genMonthsCovered.value);
+  end.setDate(end.getDate() - 1);
+  return end.toISOString().slice(0, 10);
+});
+
+// Due date = period end date
+const genDueDate = computed(() => genPeriodEndDate.value);
+
+// Auto-set to next billing cycle based on moveInDate
+const setNextBillingCycle = () => {
+  if (!genRoom.value?.moveInDate) return;
+  
+  // Parse moveInDate correctly (avoid timezone issues)
+  // moveInDate is in format "YYYY-MM-DD"
+  const [year, month, day] = genRoom.value.moveInDate.split('-').map(Number);
+  const cycleDay = day; // Day of month from moveInDate (e.g., 18)
+  
+  // Find next available start date
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const todayDay = today.getDate();
+  
+  // Start with current month's cycle day
+  let nextStartYear = todayYear;
+  let nextStartMonth = todayMonth;
+  
+  // If cycle day has already passed this month, move to next month
+  if (todayDay > cycleDay) {
+    nextStartMonth++;
+    if (nextStartMonth > 11) {
+      nextStartMonth = 0;
+      nextStartYear++;
+    }
+  }
+  
+  // Format as YYYY-MM-DD
+  let nextStartDate = `${nextStartYear}-${String(nextStartMonth + 1).padStart(2, '0')}-${String(cycleDay).padStart(2, '0')}`;
+  
+  // Check if this period already has a bill, skip if overlapped
+  const existingBills = rentBills.value.filter(b => b.roomId === genRoomId.value);
+  
+  for (const bill of existingBills) {
+    const billStart = new Date(bill.periodStartDate + 'T00:00:00');
+    const billEnd = new Date(bill.periodEndDate + 'T00:00:00');
+    const checkDate = new Date(nextStartDate + 'T00:00:00');
+    
+    // If nextStart falls within existing bill period, move to after that bill
+    if (checkDate >= billStart && checkDate <= billEnd) {
+      const afterBillEnd = new Date(billEnd);
+      afterBillEnd.setDate(afterBillEnd.getDate() + 1);
+      nextStartDate = afterBillEnd.toISOString().slice(0, 10);
+    }
+  }
+  
+  genPeriodStartDate.value = nextStartDate;
+};
 
 // Filtered room options for generate modal based on selected property
 const genRoomOptions = computed(() => {
@@ -201,101 +264,88 @@ const genTenant = computed(() => {
   return tenants.value.find(t => t.id === genRoom.value?.tenantId);
 });
 
-// Get existing rent bills for selected room to check period conflicts
-const existingRentBillPeriods = computed(() => {
+// Get existing rent bills for selected room (for date range display)
+const existingRentBillRanges = computed(() => {
   if (!genRoomId.value) return [];
-  
-  const roomBills = rentBills.value.filter(b => b.roomId === genRoomId.value);
-  const periods: string[] = [];
-  
-  roomBills.forEach(bill => {
-    const monthsCovered = bill.monthsCovered || 1;
-    const startDate = new Date(bill.period + '-01');
-    
-    for (let i = 0; i < monthsCovered; i++) {
-      const date = new Date(startDate);
-      date.setMonth(date.getMonth() + i);
-      const periodStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!periods.includes(periodStr)) {
-        periods.push(periodStr);
-      }
-    }
-  });
-  
-  return periods;
+  return rentBills.value
+    .filter(b => b.roomId === genRoomId.value)
+    .map(b => ({
+      start: b.periodStartDate,
+      end: b.periodEndDate,
+      formatted: formatDateRange(b.periodStartDate, b.periodEndDate)
+    }));
 });
 
-// Calculate disabled dates based on moveInDate and existing bills
+// Helper to format date range
+const formatDateRange = (start: string, end: string) => {
+  const s = new Date(start);
+  const e = new Date(end);
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+  return `${s.toLocaleDateString('id-ID', opts)} - ${e.toLocaleDateString('id-ID', opts)}`;
+};
+
+// Calculate disabled dates based on moveInDate and existing bills (date-based)
 const isDateUnavailable = computed(() => {
   return (date: DateValue) => {
-    if (!genRoom.value?.moveInDate) return false;
+    const checkDate = new Date(date.year, date.month - 1, date.day);
     
-    const moveInDate = new Date(genRoom.value.moveInDate);
-    
-    // Calculate minimum billing date (moveInDate + 31 days)
-    const minBillingDate = new Date(moveInDate);
-    minBillingDate.setDate(minBillingDate.getDate() + 31);
-    
-    // Disable any month before the month containing minBillingDate
-    const minYear = minBillingDate.getFullYear();
-    const minMonth = minBillingDate.getMonth() + 1; // Convert to 1-based
-    
-    // Create date from the picker's date value (first day of that month)
-    const checkDate = new Date(date.year, date.month - 1, 1);
-    const minMonthDate = new Date(minYear, minMonth - 1, 1);
-    
-    if (checkDate < minMonthDate) {
-      return true; // Disable if before minimum billing month
+    // If room has moveInDate, don't allow dates before moveInDate
+    if (genRoom.value?.moveInDate) {
+      const moveInDate = new Date(genRoom.value.moveInDate);
+      if (checkDate < moveInDate) {
+        return true;
+      }
     }
     
-    // Check if this month has existing rent bill
-    const periodStr = `${date.year}-${String(date.month).padStart(2, '0')}`;
-    if (existingRentBillPeriods.value.includes(periodStr)) {
-      return true; // Disable if rent bill exists
+    // Check if date falls within any existing billing period
+    for (const bill of rentBills.value.filter(b => b.roomId === genRoomId.value)) {
+      const start = new Date(bill.periodStartDate);
+      const end = new Date(bill.periodEndDate);
+      if (checkDate >= start && checkDate <= end) {
+        return true;
+      }
     }
     
     return false;
   };
 });
 
-// Set default period to first available month after moveInDate
+// Set default start date based on moveInDate when room changes
 watch([genRoomId, genRoom], () => {
   if (genRoom.value?.moveInDate) {
-    const moveInDate = new Date(genRoom.value.moveInDate);
-    // Calculate minimum billing date (moveInDate + 31 days)
-    const minBillingDate = new Date(moveInDate);
-    minBillingDate.setDate(minBillingDate.getDate() + 31);
-    // Default to the month containing minBillingDate
-    genPeriod.value = `${minBillingDate.getFullYear()}-${String(minBillingDate.getMonth() + 1).padStart(2, '0')}`;
+    // Auto-set to next billing cycle
+    setNextBillingCycle();
   }
 });
 
-// Check if selected period conflicts with existing bills
-const periodConflict = computed(() => {
-  if (!genPeriod.value || !genMonthsCovered.value) return null;
+// Check if selected date range conflicts with existing bills
+const dateRangeConflict = computed(() => {
+  if (!genPeriodStartDate.value || !genPeriodEndDate.value || !genRoomId.value) return null;
   
-  const selectedPeriods: string[] = [];
-  const startDate = new Date(genPeriod.value + '-01');
+  const newStart = new Date(genPeriodStartDate.value);
+  const newEnd = new Date(genPeriodEndDate.value);
   
-  for (let i = 0; i < genMonthsCovered.value; i++) {
-    const date = new Date(startDate);
-    date.setMonth(date.getMonth() + i);
-    const periodStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    selectedPeriods.push(periodStr);
+  for (const bill of rentBills.value.filter(b => b.roomId === genRoomId.value)) {
+    const existStart = new Date(bill.periodStartDate);
+    const existEnd = new Date(bill.periodEndDate);
+    
+    // Check overlap: ranges overlap if start1 <= end2 AND end1 >= start2
+    if (newStart <= existEnd && newEnd >= existStart) {
+      return formatDateRange(bill.periodStartDate, bill.periodEndDate);
+    }
   }
   
-  const conflicts = selectedPeriods.filter(p => existingRentBillPeriods.value.includes(p));
-  return conflicts.length > 0 ? conflicts : null;
+  return null;
 });
 
 const generateRentBill = async () => {
   if (!genRoomId.value || !genRoom.value) return;
   
-  // Check for period conflicts
-  if (periodConflict.value) {
+  // Check for date range conflicts
+  if (dateRangeConflict.value) {
     toast.add({
       title: "Conflict",
-      description: `Periode ${periodConflict.value.join(', ')} sudah memiliki rent bill. Pilih periode lain atau hapus rent bill yang lama terlebih dahulu.`,
+      description: `Periode ${dateRangeConflict.value} sudah memiliki rent bill. Pilih tanggal lain atau hapus rent bill yang lama terlebih dahulu.`,
       color: "error",
     });
     return;
@@ -304,7 +354,7 @@ const generateRentBill = async () => {
   try {
     await store.generateRentBill({
       roomId: genRoomId.value,
-      period: genPeriod.value.slice(0, 7),
+      periodStartDate: genPeriodStartDate.value,
       monthsCovered: genMonthsCovered.value,
       roomPrice: Number(genRoom.value.price),
     });
@@ -796,7 +846,7 @@ const sendReminder = async (reminder: any) => {
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="p-6 space-y-6">
     <!-- Header -->
     <div
       class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-6"
@@ -860,80 +910,29 @@ const sendReminder = async (reminder: any) => {
 
     <!-- Due Soon Reminders Alert -->
     <div v-if="dueSoonReminders.length > 0" class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-      <div class="flex items-start gap-3">
-        <UIcon name="i-heroicons-bell-alert" class="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-        <div class="flex-1">
-          <h3 class="font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-2">
-            Pengingat Tagihan
-            <UBadge color="warning" variant="solid" size="xs">{{ dueSoonReminders.length }}</UBadge>
-          </h3>
-          <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">
-            {{ dueSoonReminders.length }} penghuni memiliki tagihan belum dibayar.
-          </p>
-          <div class="mt-3 space-y-2 max-h-80 overflow-y-auto">
-            <div 
-              v-for="reminder in dueSoonReminders" 
-              :key="reminder.room.id"
-              class="flex items-center justify-between rounded-lg p-3 border"
-              :class="{
-                'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800': reminder.reminderType === 'overdue',
-                'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800': reminder.reminderType === 'due_soon',
-                'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800': reminder.reminderType === 'unpaid'
-              }"
-            >
-              <div class="flex items-center gap-3">
-                <div 
-                  class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold"
-                  :class="{
-                    'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400': reminder.reminderType === 'overdue',
-                    'bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-400': reminder.reminderType === 'due_soon',
-                    'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400': reminder.reminderType === 'unpaid'
-                  }"
-                >
-                  <template v-if="reminder.reminderType === 'overdue'">
-                    <span>+{{ Math.abs(reminder.daysUntilDue) }}</span>
-                  </template>
-                  <template v-else-if="reminder.reminderType === 'due_soon'">
-                    <span>H-{{ reminder.daysUntilDue }}</span>
-                  </template>
-                  <template v-else>
-                    <UIcon name="i-heroicons-document-text" class="w-5 h-5" />
-                  </template>
-                </div>
-                <div>
-                  <div class="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                    {{ reminder.tenant.name }}
-                    <UBadge v-if="reminder.reminderType === 'overdue'" color="error" variant="subtle" size="xs">Lewat</UBadge>
-                    <UBadge v-else-if="reminder.reminderType === 'due_soon'" color="warning" variant="subtle" size="xs">Segera</UBadge>
-                  </div>
-                  <div class="text-xs text-gray-500">
-                    {{ reminder.property?.name }} - {{ reminder.room.name }}
-                    <span v-if="reminder.dueDay"> • Tgl {{ reminder.dueDay }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <div class="text-right">
-                  <div class="font-bold" :class="reminder.reminderType === 'overdue' ? 'text-red-600' : 'text-gray-900 dark:text-white'">
-                    {{ formatCurrency(reminder.totalUnpaid) }}
-                  </div>
-                  <div class="text-xs text-gray-500">
-                    {{ reminder.unpaidRentBills + reminder.unpaidUtilityBills }} invoice
-                  </div>
-                </div>
-                <UButton 
-                  color="success" 
-                  variant="soft" 
-                  icon="i-heroicons-chat-bubble-left-ellipsis"
-                  size="sm"
-                  @click="sendReminder(reminder)"
-                >
-                  WA
-                </UButton>
-              </div>
-            </div>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <UIcon name="i-heroicons-bell-alert" class="w-6 h-6 text-amber-500 shrink-0" />
+          <div>
+            <h3 class="font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-2">
+              Pengingat Tagihan
+              <UBadge color="warning" variant="solid" size="xs">{{ dueSoonReminders.length }}</UBadge>
+            </h3>
+            <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              {{ dueSoonReminders.length }} penghuni memiliki tagihan belum dibayar.
+            </p>
           </div>
         </div>
+        <NuxtLink to="/reminders">
+          <UButton 
+            color="warning" 
+            variant="solid"
+            icon="i-heroicons-arrow-right"
+            trailing
+          >
+            Lihat Detail
+          </UButton>
+        </NuxtLink>
       </div>
     </div>
 
@@ -1014,10 +1013,11 @@ const sendReminder = async (reminder: any) => {
             class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700"
           >
             <tr>
-              <th class="p-3 font-medium">Period</th>
+              <th class="p-3 font-medium">Periode</th>
+              <th class="p-3 font-medium">Jumlah Hari</th>
+              <th class="p-3 font-medium">Due Date</th>
               <th class="p-3 font-medium">Property</th>
               <th class="p-3 font-medium">Room</th>
-              <th class="p-3 font-medium">Months</th>
               <th class="p-3 font-medium">Total</th>
               <th class="p-3 font-medium">Status</th>
               <th class="p-3 font-medium text-right">Actions</th>
@@ -1030,8 +1030,22 @@ const sendReminder = async (reminder: any) => {
               class="hover:bg-gray-50 dark:hover:bg-gray-800/30"
             >
               <td class="p-3 font-medium">
-                {{ bill.period
-                }}{{ bill.periodEnd ? ` - ${bill.periodEnd}` : "" }}
+                <div>{{ formatDateRange(bill.periodStartDate, bill.periodEndDate) }}</div>
+                <div class="text-xs text-gray-400">{{ bill.monthsCovered || 1 }} bulan</div>
+              </td>
+              <td class="p-3">
+                <div class="font-semibold text-gray-900 dark:text-white">
+                  {{ (() => {
+                    const [startY, startM, startD] = bill.periodStartDate.split('-').map(Number);
+                    const [endY, endM, endD] = bill.periodEndDate.split('-').map(Number);
+                    const start = new Date(startY, startM - 1, startD);
+                    const end = new Date(endY, endM - 1, endD);
+                    return Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                  })() }} hari
+                </div>
+              </td>
+              <td class="p-3 text-gray-600">
+                {{ new Date(bill.dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) }}
               </td>
               <td class="p-3 text-gray-500">
                 {{ bill.property?.name || "Unknown" }}
@@ -1042,7 +1056,6 @@ const sendReminder = async (reminder: any) => {
                   {{ bill.tenant.name }}
                 </div>
               </td>
-              <td class="p-3">{{ bill.monthsCovered || 1 }}</td>
               <td class="p-3 font-bold text-gray-900 dark:text-white">
                 {{ formatCurrency(bill.totalAmount) }}
               </td>
@@ -1389,35 +1402,54 @@ const sendReminder = async (reminder: any) => {
             </p>
           </UFormField>
 
-          <UFormField label="Periode Mulai" required>
-            <DatePicker
-              v-model="genPeriod"
-              granularity="month"
-              class="w-full"
-              :is-date-unavailable="isDateUnavailable"
-            />
+          <UFormField label="Tanggal Mulai Periode" required>
+            <div class="flex gap-2 items-center">
+              <DatePicker
+                v-model="genPeriodStartDate"
+                granularity="day"
+                class="flex-1"
+                :is-date-unavailable="isDateUnavailable"
+              />
+              <UButton
+                v-if="genRoom?.moveInDate"
+                variant="soft"
+                color="primary"
+                size="sm"
+                @click="setNextBillingCycle"
+                icon="i-heroicons-arrow-path"
+              >
+                Auto
+              </UButton>
+            </div>
             <!-- Show moveInDate info -->
-            <div v-if="genTenant?.moveInDate" class="mt-2">
+            <div v-if="genRoom?.moveInDate" class="mt-2">
               <p class="text-xs text-blue-600 dark:text-blue-400">
                 <UIcon name="i-heroicons-calendar" class="w-3 h-3 inline" />
-                Tanggal masuk: {{ new Date(genTenant.moveInDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Billing dapat di-generate mulai bulan {{ new Date(new Date(genTenant.moveInDate).setMonth(new Date(genTenant.moveInDate).getMonth() + 1)).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' }) }} (31 hari setelah masuk)
+                Tanggal masuk: {{ new Date(genRoom.moveInDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}
               </p>
             </div>
-            <!-- Show existing periods info -->
-            <div v-if="genRoomId && existingRentBillPeriods.length > 0" class="mt-2">
+            <!-- Show date range preview -->
+            <div v-if="genPeriodStartDate && genPeriodEndDate" class="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+              <p class="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                <UIcon name="i-heroicons-calendar-days" class="w-4 h-4" />
+                <span>Periode: <strong>{{ formatDateRange(genPeriodStartDate, genPeriodEndDate) }}</strong></span>
+              </p>
+              <p class="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                Due Date: {{ new Date(genDueDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+              </p>
+            </div>
+            <!-- Show existing bills info -->
+            <div v-if="genRoomId && existingRentBillRanges.length > 0" class="mt-2">
               <p class="text-xs text-gray-600 dark:text-gray-400">
-                Periode sudah dibayar (disabled): 
-                <span class="font-mono font-semibold">{{ existingRentBillPeriods.join(', ') }}</span>
+                Periode terisi (disabled): 
+                <span class="font-mono font-semibold">{{ existingRentBillRanges.map(r => r.formatted).join('; ') }}</span>
               </p>
             </div>
             <!-- Show conflict warning -->
-            <div v-if="periodConflict" class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+            <div v-if="dateRangeConflict" class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
               <p class="text-xs text-red-700 dark:text-red-400 flex items-center gap-1">
                 <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4" />
-                <span>Konflik: Periode {{ periodConflict.join(', ') }} sudah memiliki rent bill!</span>
+                <span>Konflik: Periode {{ dateRangeConflict }} sudah memiliki rent bill!</span>
               </p>
             </div>
           </UFormField>
@@ -1483,7 +1515,7 @@ const sendReminder = async (reminder: any) => {
             <UButton
               @click="generateRentBill"
               color="primary"
-              :disabled="!genRoomId || !!periodConflict"
+              :disabled="!genRoomId || !!dateRangeConflict"
               :loading="rentBillsLoading"
               icon="i-heroicons-plus"
             >

@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rooms, properties } from '../../database/schema';
+import { rooms, properties, rentBills } from '../../database/schema';
 import { roomSchema } from '../../validations/room';
 import { eq, and, ne } from 'drizzle-orm';
 
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     const parseResult = roomSchema.partial().safeParse(body); // Partial for updates
 
     if (!parseResult.success) {
-        throw createError({ statusCode: 400, statusMessage: 'Validation Error', data: parseResult.error.errors });
+        throw createError({ statusCode: 400, statusMessage: 'Validation Error', data: parseResult.error.issues });
     }
 
     const input = parseResult.data;
@@ -68,6 +68,63 @@ export default defineEventHandler(async (event) => {
         price: input.price ? input.price.toString() : undefined,
         status: input.status as any,
     }).where(eq(rooms.id, id)).returning();
+
+    // 7. Auto-generate first rent bill if:
+    //    - New moveInDate is being set (wasn't set before or changed)
+    //    - tenantId is provided (either in input or existing)
+    const effectiveMoveInDate = input.moveInDate ?? room.moveInDate;
+    const effectiveTenantId = input.tenantId ?? room.tenantId;
+    const effectivePrice = input.price ?? Number(room.price);
+    
+    // Only auto-generate if moveInDate is being newly set (wasn't set before)
+    const isNewMoveIn = input.moveInDate && !room.moveInDate && effectiveTenantId;
+    
+    if (isNewMoveIn && updatedRoom[0]) {
+        try {
+            // Check if a rent bill already exists for this room starting from moveInDate
+            const existingBills = await db.select()
+                .from(rentBills)
+                .where(eq(rentBills.roomId, id))
+                .limit(1);
+            
+            if (existingBills.length === 0) {
+                // No existing bills, create first one
+                const moveInDateStr = input.moveInDate!;
+                const startDate = new Date(moveInDateStr + 'T00:00:00');
+                const endDate = new Date(startDate);
+                endDate.setMonth(endDate.getMonth() + 1);
+                endDate.setDate(endDate.getDate() - 1);
+                
+                const periodStartDate = moveInDateStr;
+                const periodEndDate = endDate.toISOString().slice(0, 10);
+                const dueDate = periodEndDate;
+                const billingCycleDay = startDate.getDate();
+                const period = moveInDateStr.slice(0, 7);
+                
+                const roomPrice = Number(effectivePrice);
+                const totalAmount = roomPrice;
+                
+                await db.insert(rentBills).values({
+                    roomId: id,
+                    tenantId: effectiveTenantId,
+                    periodStartDate: periodStartDate,
+                    periodEndDate: periodEndDate,
+                    dueDate: dueDate,
+                    billingCycleDay: billingCycleDay,
+                    period: period,
+                    monthsCovered: 1,
+                    roomPrice: roomPrice.toString(),
+                    totalAmount: totalAmount.toString(),
+                    isPaid: false,
+                    generatedAt: new Date(),
+                });
+                
+                console.log(`[Auto-Bill] Created first rent bill for room ${updatedRoom[0].name} (${periodStartDate} - ${periodEndDate})`);
+            }
+        } catch (error) {
+            console.error('[Auto-Bill] Failed to create first rent bill:', error);
+        }
+    }
 
     return updatedRoom[0];
 });

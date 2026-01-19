@@ -94,12 +94,21 @@ export const rentBills = pgTable("rent_bills", {
     .references(() => rooms.id)
     .notNull(),
   tenantId: uuid("tenant_id").references(() => tenants.id),
-  period: varchar("period", { length: 7 }).notNull(), // YYYY-MM (start period)
+  
+  // Date-based billing (primary)
+  periodStartDate: date("period_start_date").notNull(),
+  periodEndDate: date("period_end_date").notNull(),
+  dueDate: date("due_date").notNull(),
+  billingCycleDay: integer("billing_cycle_day"), // Day of month from moveInDate (1-31)
+  
+  // Legacy fields (for backward compatibility & reporting)
+  period: varchar("period", { length: 7 }), // YYYY-MM (nullable now)
   periodEnd: varchar("period_end", { length: 7 }), // For multi-month payments
+  
   monthsCovered: integer("months_covered").default(1),
   roomPrice: decimal("room_price", { precision: 12, scale: 2 }).notNull(),
-  waterFee: decimal("water_fee", { precision: 12, scale: 2 }).default("0"), // For multi-month billing
-  trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).default("0"), // For multi-month billing
+  waterFee: decimal("water_fee", { precision: 12, scale: 2 }).default("0"),
+  trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).default("0"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   isPaid: boolean("is_paid").default(false),
   paidAt: timestamp("paid_at"),

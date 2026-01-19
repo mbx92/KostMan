@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rooms, properties } from '../../database/schema';
+import { rooms, properties, rentBills } from '../../database/schema';
 import { roomSchema } from '../../validations/room';
 import { eq, and } from 'drizzle-orm';
 
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
         throw createError({
             statusCode: 400,
             statusMessage: 'Validation Error',
-            data: parseResult.error.errors,
+            data: parseResult.error.issues,
         });
     }
 
@@ -58,6 +58,53 @@ export default defineEventHandler(async (event) => {
         useTrashService: input.useTrashService ?? true,
         moveInDate: input.moveInDate ? input.moveInDate : null, // Drizzle handles string date usually
     }).returning();
+
+    // 6. Auto-generate first rent bill if moveInDate and tenantId are provided
+    if (input.moveInDate && input.tenantId && newRoom[0]) {
+        try {
+            // Parse moveInDate to get periodStartDate and calculate periodEndDate
+            const moveInDate = input.moveInDate; // YYYY-MM-DD
+            const startDate = new Date(moveInDate + 'T00:00:00');
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + 1);
+            endDate.setDate(endDate.getDate() - 1);
+            
+            const periodStartDate = moveInDate;
+            const periodEndDate = endDate.toISOString().slice(0, 10);
+            const dueDate = periodEndDate;
+            
+            // Extract billing cycle day from moveInDate
+            const billingCycleDay = startDate.getDate();
+            
+            // Generate legacy period (YYYY-MM) for backward compatibility
+            const period = moveInDate.slice(0, 7);
+            
+            // Calculate total amount
+            const roomPrice = Number(input.price);
+            const totalAmount = roomPrice; // First month, no proration for now
+            
+            // Insert first rent bill
+            await db.insert(rentBills).values({
+                roomId: newRoom[0].id,
+                tenantId: input.tenantId,
+                periodStartDate: periodStartDate,
+                periodEndDate: periodEndDate,
+                dueDate: dueDate,
+                billingCycleDay: billingCycleDay,
+                period: period,
+                monthsCovered: 1,
+                roomPrice: roomPrice.toString(),
+                totalAmount: totalAmount.toString(),
+                isPaid: false,
+                generatedAt: new Date(),
+            });
+            
+            console.log(`[Auto-Bill] Created first rent bill for room ${newRoom[0].name} (${periodStartDate} - ${periodEndDate})`);
+        } catch (error) {
+            console.error('[Auto-Bill] Failed to create first rent bill:', error);
+            // Don't throw - room was created successfully, just log the bill creation failure
+        }
+    }
 
     return newRoom[0];
 });

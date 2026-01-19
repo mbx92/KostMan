@@ -108,20 +108,19 @@ export const usePdfReceipt = () => {
         if (!mainBill) return
 
         const isFullyPaid = (rentBill ? rentBill.isPaid : true) && (utilBill ? utilBill.isPaid : true)
-        const partialPaid = !isFullyPaid && ((rentBill && rentBill.isPaid) || (utilBill && utilBill.isPaid))
+        const hasUnpaid = (rentBill && !rentBill.isPaid) || (utilBill && !utilBill.isPaid)
         
-        let title = 'MONTHLY STATEMENT'
-        if (isFullyPaid) title = 'PAYMENT RECEIPT'
-        else if(partialPaid) title = 'PARTIAL STATEMENT'
-        else title = 'INVOICE STATEMENT'
+        // Simplified title logic
+        let title = isFullyPaid ? 'PAYMENT RECEIPT' : 'INVOICE'
 
         const doc = _createDoc(property, room, tenant, title, mainBill.id, mainBill.generatedAt, isFullyPaid)
 
-        // Custom status text color override if partial
-        if (partialPaid) {
+        // Override status for better clarity
+        if (hasUnpaid) {
             const pageWidth = doc.internal.pageSize.width
-            doc.setTextColor(255, 165, 0) // Orange
-            doc.text('PARTIAL', pageWidth - 14, 31, { align: 'right' })
+            doc.setFontSize(10)
+            doc.setTextColor(220, 53, 69) // Red
+            doc.text('UNPAID', pageWidth - 14, 31, { align: 'right' })
         }
 
         const tableBody: any[] = []

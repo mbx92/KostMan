@@ -2,7 +2,53 @@ import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
 import { rentBills, rooms, properties, propertySettings } from '../../database/schema';
 import { rentBillGenerateSchema } from '../../validations/billing';
-import { eq } from 'drizzle-orm';
+import { eq, and, or, lte, gte } from 'drizzle-orm';
+
+/**
+ * Helper: Calculate period end date (start + monthsCovered, inclusive)
+ * Note: End date is inclusive (last day tenant can stay)
+ * For 3 months from Feb 18: Feb 18 + 3 months = May 18 (90 days inclusive)
+ * Next period will start on May 19
+ */
+function calculatePeriodEndDate(startDateStr: string, monthsCovered: number = 1): string {
+    const [year, month, day] = startDateStr.split('-').map(Number);
+    const startDate = new Date(year, month - 1, day);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + monthsCovered);
+    // Don't subtract 1 day - end date is the last day tenant can stay
+    return endDate.toISOString().split('T')[0];
+}
+
+/**
+ * Helper: Extract billing cycle day from a date
+ */
+function extractBillingCycleDay(dateStr: string | null): number {
+    if (!dateStr) return 1; // Default to 1st of month
+    return new Date(dateStr).getDate();
+}
+
+/**
+ * Helper: Generate legacy period string (YYYY-MM) from date
+ */
+function generateLegacyPeriod(dateStr: string): string {
+    const date = new Date(dateStr);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Helper: Check if two date ranges overlap
+ */
+function dateRangesOverlap(
+    start1: string, end1: string,
+    start2: string, end2: string
+): boolean {
+    const s1 = new Date(start1).getTime();
+    const e1 = new Date(end1).getTime();
+    const s2 = new Date(start2).getTime();
+    const e2 = new Date(end2).getTime();
+
+    return s1 <= e2 && e1 >= s2;
+}
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
@@ -44,11 +90,19 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    // Calculate totals - NO PRORATION (full monthly billing only)
+    // Calculate dates
     const monthsCovered = input.monthsCovered || 1;
+    const periodStartDate = input.periodStartDate;
+    const periodEndDate = input.periodEndDate || calculatePeriodEndDate(periodStartDate, monthsCovered);
+    const dueDate = input.dueDate || periodEndDate;
+    const billingCycleDay = extractBillingCycleDay(roomData.moveInDate);
+    
+    // Legacy period for backward compatibility
+    const period = generateLegacyPeriod(periodStartDate);
+
+    // Calculate totals
     const roomPrice = Number(input.roomPrice) * monthsCovered;
 
-    // Include water + trash fees for all rent bills (single or multi-month)
     // Get property settings for water/trash fees
     const propSettings = await db.select()
         .from(propertySettings)
@@ -66,54 +120,40 @@ export default defineEventHandler(async (event) => {
 
     const totalAmount = roomPrice + waterFee + trashFee;
 
-    // Calculate periodEnd for multi-month
-    let periodEnd = input.periodEnd;
-    if (monthsCovered > 1 && !periodEnd) {
-        const startDate = new Date(input.period + '-01');
-        startDate.setMonth(startDate.getMonth() + monthsCovered - 1);
-        periodEnd = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
-    }
-
-    // Generate list of all months covered by this new bill
-    const newBillMonths: string[] = [];
-    const startDate = new Date(input.period + '-01');
-    for (let i = 0; i < monthsCovered; i++) {
-        const d = new Date(startDate);
-        d.setMonth(d.getMonth() + i);
-        newBillMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
-
-    // Check for overlapping rent bills
+    // Check for overlapping rent bills using date ranges
     const existingBills = await db.select().from(rentBills).where(eq(rentBills.roomId, input.roomId));
     
     for (const existingBill of existingBills) {
-        // Generate months covered by existing bill
-        const existingMonths: string[] = [];
-        const existingStart = new Date(existingBill.period + '-01');
-        const existingMonthsCovered = existingBill.monthsCovered || 1;
-        for (let i = 0; i < existingMonthsCovered; i++) {
-            const d = new Date(existingStart);
-            d.setMonth(d.getMonth() + i);
-            existingMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-        }
-
-        // Check for overlap
-        const overlap = newBillMonths.find(m => existingMonths.includes(m));
-        if (overlap) {
+        const existingStart = existingBill.periodStartDate;
+        const existingEnd = existingBill.periodEndDate;
+        
+        if (dateRangesOverlap(periodStartDate, periodEndDate, existingStart, existingEnd)) {
+            const formatDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { 
+                day: 'numeric', month: 'short', year: 'numeric' 
+            });
             throw createError({
                 statusCode: 409,
                 statusMessage: 'Conflict',
-                message: `Rent bill untuk periode "${overlap}" pada kamar ini sudah ada. Hapus rent bill yang lama terlebih dahulu.`
+                message: `Rent bill untuk periode "${formatDate(existingStart)} - ${formatDate(existingEnd)}" sudah ada dan overlap dengan periode yang diminta. Hapus rent bill yang lama terlebih dahulu.`
             });
         }
     }
 
-    // Insert rent bill
+    // Insert rent bill with date-based fields
     const newBill = await db.insert(rentBills).values({
         roomId: input.roomId,
         tenantId: roomData.tenantId || null,
-        period: input.period,
-        periodEnd: periodEnd || null,
+        
+        // Date-based fields (primary)
+        periodStartDate: periodStartDate,
+        periodEndDate: periodEndDate,
+        dueDate: dueDate,
+        billingCycleDay: billingCycleDay,
+        
+        // Legacy fields (for backward compatibility)
+        period: period,
+        periodEnd: null, // No longer used for multi-month tracking
+        
         monthsCovered: monthsCovered,
         roomPrice: roomPrice.toString(),
         waterFee: waterFee.toString(),
