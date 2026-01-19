@@ -66,6 +66,7 @@ const statusOptions = [
 const roomStatus = ref<'available' | 'occupied' | 'maintenance'>('available')
 const useTrashService = ref(true)
 const moveInDate = ref('')
+const occupantCount = ref(1)
 const selectedTenantId = ref<string | null>(null)
 const isCreatingNewTenant = ref(false)
 const newTenantName = ref('')
@@ -98,6 +99,7 @@ watch(room, (r) => {
     roomStatus.value = r.status
     useTrashService.value = r.useTrashService ?? true
     moveInDate.value = r.moveInDate || ''
+    occupantCount.value = r.occupantCount || 1
     // Set tenantId directly from room data
     selectedTenantId.value = r.tenantId || null
   }
@@ -169,7 +171,8 @@ const updateRoomStatus = async () => {
       tenantId: roomStatus.value === 'occupied' ? tenantId : null,
       tenantName: roomStatus.value === 'occupied' ? tenantName : undefined,
       useTrashService: useTrashService.value,
-      moveInDate: roomStatus.value === 'occupied' ? moveInDate.value : null
+      moveInDate: roomStatus.value === 'occupied' ? moveInDate.value : null,
+      occupantCount: roomStatus.value === 'occupied' ? occupantCount.value : 1
     })
     
     // Reload room to get updated data
@@ -549,7 +552,14 @@ const goBack = () => {
                         <div class="space-y-1">
                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Move-In Date</label>
                             <DatePicker v-model="moveInDate" class="w-full" />
-                            <p class="text-xs text-gray-500">Used for prorated billing calculation.</p>
+                            <p class="text-xs text-gray-500">Tanggal masuk penghuni (jatuh tempo tagihan).</p>
+                        </div>
+
+                        <!-- Occupant Count -->
+                        <div class="space-y-1">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah Penghuni</label>
+                            <UInput v-model.number="occupantCount" type="number" min="1" max="10" class="w-full" />
+                            <p class="text-xs text-gray-500">Biaya air dihitung per kepala.</p>
                         </div>
                     </div>
 

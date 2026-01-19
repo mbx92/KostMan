@@ -6,9 +6,18 @@ import { z } from 'zod'
 
 const updateSettingsSchema = z.object({
   appName: z.string().min(1).max(255).optional(),
-  costPerKwh: z.union([z.string(), z.number()]).optional(),
-  waterFee: z.union([z.string(), z.number()]).optional(),
-  trashFee: z.union([z.string(), z.number()]).optional(),
+  costPerKwh: z.union([z.string(), z.number()]).refine(
+    (val) => Number(val) >= 0,
+    { message: 'Cost per kWh cannot be negative' }
+  ).optional(),
+  waterFee: z.union([z.string(), z.number()]).refine(
+    (val) => Number(val) >= 0,
+    { message: 'Water fee cannot be negative' }
+  ).optional(),
+  trashFee: z.union([z.string(), z.number()]).refine(
+    (val) => Number(val) >= 0,
+    { message: 'Trash fee cannot be negative' }
+  ).optional(),
 })
 
 export default defineEventHandler(async (event) => {

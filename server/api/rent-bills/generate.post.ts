@@ -1,6 +1,6 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rentBills, rooms, properties } from '../../database/schema';
+import { rentBills, rooms, properties, propertySettings } from '../../database/schema';
 import { rentBillGenerateSchema } from '../../validations/billing';
 import { eq } from 'drizzle-orm';
 
@@ -44,36 +44,32 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    // Calculate totals
+    // Calculate totals - NO PRORATION (full monthly billing only)
     const monthsCovered = input.monthsCovered || 1;
+    const roomPrice = Number(input.roomPrice) * monthsCovered;
 
-    // Proration calculation (logic from Friend's version)
-    let prorationFactor = 1;
-    let isProrated = false;
+    // For multi-month billing: include water + trash (exclude electricity/kWh)
+    let waterFee = 0;
+    let trashFee = 0;
+    
+    if (monthsCovered > 1) {
+        // Get property settings for water/trash fees
+        const propSettings = await db.select()
+            .from(propertySettings)
+            .where(eq(propertySettings.propertyId, roomData.propertyId))
+            .limit(1);
 
-    if (roomData.moveInDate) {
-        const moveInDate = new Date(roomData.moveInDate);
-        const billPeriodDate = new Date(input.period + '-01');
-
-        // Check if this is the first billing period (same month as move-in)
-        const isSameMonth = moveInDate.getFullYear() === billPeriodDate.getFullYear() &&
-            moveInDate.getMonth() === billPeriodDate.getMonth();
-
-        // If move-in is after the 1st of the month
-        if (isSameMonth && moveInDate.getDate() > 1) {
-            const daysInMonth = new Date(billPeriodDate.getFullYear(), billPeriodDate.getMonth() + 1, 0).getDate();
-            const daysOccupied = daysInMonth - moveInDate.getDate() + 1; // +1 to include move-in day
-            prorationFactor = daysOccupied / daysInMonth;
-            isProrated = true;
-        }
+        const occupantCount = roomData.occupantCount || 1;
+        const baseWaterFee = propSettings.length > 0 ? Number(propSettings[0].waterFee) : 0;
+        const baseTrashFee = propSettings.length > 0 ? Number(propSettings[0].trashFee) : 0;
+        
+        // Water fee multiplied by occupant count and months
+        waterFee = baseWaterFee * occupantCount * monthsCovered;
+        // Trash fee only if room uses trash service
+        trashFee = roomData.useTrashService ? baseTrashFee * monthsCovered : 0;
     }
 
-    const roomPrice = Number(input.roomPrice) * monthsCovered * prorationFactor;
-    const totalAmount = roomPrice; // For rent bills, currently only room price is calculated here. 
-    // Note: utility fees (water/trash) are typically in utility bills or fixed here? 
-    // User's current implementation only sums roomPrice. Friend's had water/trash here too.
-    // Sticking to User's base logic of ONLY room price for RentBill, but applying proration.
-
+    const totalAmount = roomPrice + waterFee + trashFee;
 
     // Calculate periodEnd for multi-month
     let periodEnd = input.periodEnd;
@@ -125,6 +121,8 @@ export default defineEventHandler(async (event) => {
         periodEnd: periodEnd || null,
         monthsCovered: monthsCovered,
         roomPrice: roomPrice.toString(),
+        waterFee: waterFee.toString(),
+        trashFee: trashFee.toString(),
         totalAmount: totalAmount.toString(),
         isPaid: false,
         generatedAt: new Date(),

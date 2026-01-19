@@ -9,6 +9,7 @@ export const roomSchema = z.object({
     tenantId: z.string().uuid('Invalid tenant ID').optional(),
     useTrashService: z.boolean().optional(),
     moveInDate: z.string().date().optional(), // Zod 'date' string validation (YYYY-MM-DD)
+    occupantCount: z.number().int().min(1).max(10).optional().default(1),
 });
 
 export type RoomInput = z.infer<typeof roomSchema>;

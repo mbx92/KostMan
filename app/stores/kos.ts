@@ -32,6 +32,7 @@ export interface Room {
     tenantName?: string
     useTrashService?: boolean
     moveInDate?: string | null
+    occupantCount?: number
     property?: Property
 }
 
@@ -63,6 +64,8 @@ export interface RentBill {
     periodEnd?: string | null
     monthsCovered?: number
     roomPrice: number | string
+    waterFee?: number | string // For multi-month billing
+    trashFee?: number | string // For multi-month billing
     totalAmount: number | string
     isPaid: boolean
     paidAt?: string | null

@@ -44,9 +44,11 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    // Calculate costs
+    // Calculate costs - waterFee multiplied by occupant count
+    const occupantCount = roomData.occupantCount || 1;
     const usageCost = (input.meterEnd - input.meterStart) * input.costPerKwh;
-    const totalAmount = usageCost + input.waterFee + input.trashFee + (input.additionalCost || 0);
+    const adjustedWaterFee = input.waterFee * occupantCount;
+    const totalAmount = usageCost + adjustedWaterFee + input.trashFee + (input.additionalCost || 0);
 
     // Insert utility bill
     const newBill = await db.insert(utilityBills).values({
@@ -57,7 +59,7 @@ export default defineEventHandler(async (event) => {
         meterEnd: input.meterEnd,
         costPerKwh: input.costPerKwh.toString(),
         usageCost: usageCost.toString(),
-        waterFee: input.waterFee.toString(),
+        waterFee: adjustedWaterFee.toString(), // Store adjusted water fee
         trashFee: input.trashFee.toString(),
         additionalCost: (input.additionalCost || 0).toString(),
         totalAmount: totalAmount.toString(),
@@ -67,3 +69,4 @@ export default defineEventHandler(async (event) => {
 
     return newBill[0];
 });
+

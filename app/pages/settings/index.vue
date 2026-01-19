@@ -182,8 +182,9 @@ const onSaveMidtrans = async () => {
           <template #header>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                 <img src="/midtrans.svg" alt="Midtrans" class="h-6" /> 
-                 <span class="text-lg font-semibold text-left">Midtrans</span>
+                 <div class="bg-gray-900 dark:bg-transparent px-3 py-1.5 rounded-lg">
+                   <img src="/midtrans.svg" alt="Midtrans" class="h-5" />
+                 </div>
               </div>
               <USwitch v-model="midtransState.isEnabled" />
             </div>

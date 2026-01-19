@@ -25,6 +25,21 @@ const { generateRentReceipt, generateUtilityReceipt, generateCombinedReceipt } =
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog> | null>(null);
 
 // Fetch data on mount
+const dueSoonReminders = ref<any[]>([]);
+const dueSoonLoading = ref(false);
+
+async function fetchDueSoonReminders() {
+  dueSoonLoading.value = true;
+  try {
+    const data = await $fetch<{ count: number; items: any[] }>('/api/reminders/due-soon');
+    dueSoonReminders.value = data.items;
+  } catch (e) {
+    console.error('Failed to fetch due-soon reminders:', e);
+  } finally {
+    dueSoonLoading.value = false;
+  }
+}
+
 onMounted(async () => {
   await Promise.all([
     store.fetchRentBills(),
@@ -33,6 +48,7 @@ onMounted(async () => {
     store.fetchProperties(),
     store.fetchSettings(),
     store.fetchTenants(),
+    fetchDueSoonReminders(),
   ]);
 });
 
@@ -152,9 +168,27 @@ const totalUnpaid = computed(
 
 // Generate Rent Bill Form
 const isGenerating = ref(false);
+const genPropertyId = ref("");
 const genRoomId = ref("");
 const genPeriod = ref(new Date().toISOString().slice(0, 7));
 const genMonthsCovered = ref(1);
+
+// Filtered room options for generate modal based on selected property
+const genRoomOptions = computed(() => {
+  const baseRooms = genPropertyId.value
+    ? rooms.value.filter((r) => r.propertyId === genPropertyId.value)
+    : rooms.value;
+  return baseRooms
+    .filter((r) => r.status === 'occupied') // Only show occupied rooms
+    .map((r) => {
+      const tenant = tenants.value.find((t) => t.id === r.tenantId);
+      const tenantName = tenant?.name || r.tenantName || '';
+      return { 
+        label: tenantName ? `${r.name} - ${tenantName}` : r.name, 
+        value: r.id 
+      };
+    });
+});
 
 const genRoom = computed(() =>
   rooms.value.find((r) => r.id === genRoomId.value)
@@ -422,6 +456,47 @@ const formatCurrency = (val: number | string) =>
     currency: "IDR",
     minimumFractionDigits: 0,
   }).format(Number(val));
+
+// Send reminder to WhatsApp
+const sendReminder = (reminder: any) => {
+  if (!reminder.tenant?.contact) {
+    toast.add({ title: 'Error', description: 'Nomor kontak tidak tersedia', color: 'error' });
+    return;
+  }
+
+  let phoneNumber = reminder.tenant.contact.replace(/\D/g, '');
+  if (phoneNumber.startsWith('0')) {
+    phoneNumber = '62' + phoneNumber.slice(1);
+  } else if (!phoneNumber.startsWith('62')) {
+    phoneNumber = '62' + phoneNumber;
+  }
+
+  let message = `*PENGINGAT TAGIHAN KOST*\n`;
+  message += `\nHalo ${reminder.tenant.name},\n`;
+  
+  // Different message based on reminder type
+  if (reminder.reminderType === 'overdue') {
+    message += `\n⚠️ *Tagihan Anda sudah LEWAT JATUH TEMPO* (${Math.abs(reminder.daysUntilDue)} hari).\n`;
+  } else if (reminder.reminderType === 'due_soon') {
+    message += `\nIni adalah pengingat bahwa tagihan Anda akan jatuh tempo dalam *${reminder.daysUntilDue} hari* (tanggal ${reminder.dueDay}).\n`;
+  } else {
+    message += `\nAnda memiliki tagihan yang belum dibayar.\n`;
+  }
+  
+  message += `\n📍 ${reminder.property?.name || 'Kost'}\n`;
+  message += `🏠 Kamar: ${reminder.room.name}\n`;
+  message += `\n💰 *Total Tagihan: ${formatCurrency(reminder.totalUnpaid)}*\n`;
+  if (reminder.totalUnpaidRent > 0) {
+    message += `   - Sewa: ${formatCurrency(reminder.totalUnpaidRent)}\n`;
+  }
+  if (reminder.totalUnpaidUtility > 0) {
+    message += `   - Utilitas: ${formatCurrency(reminder.totalUnpaidUtility)}\n`;
+  }
+  message += `\nMohon segera melakukan pembayaran. Terima kasih 🙏`;
+
+  const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  window.open(waUrl, '_blank');
+};
 </script>
 
 <template>
@@ -483,6 +558,85 @@ const formatCurrency = (val: number | string) =>
         </div>
         <div class="text-2xl font-bold text-yellow-500 mt-1">
           {{ formatCurrency(totalUnpaidUtility) }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Due Soon Reminders Alert -->
+    <div v-if="dueSoonReminders.length > 0" class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+      <div class="flex items-start gap-3">
+        <UIcon name="i-heroicons-bell-alert" class="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+        <div class="flex-1">
+          <h3 class="font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-2">
+            Pengingat Tagihan
+            <UBadge color="warning" variant="solid" size="xs">{{ dueSoonReminders.length }}</UBadge>
+          </h3>
+          <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">
+            {{ dueSoonReminders.length }} penghuni memiliki tagihan belum dibayar.
+          </p>
+          <div class="mt-3 space-y-2 max-h-80 overflow-y-auto">
+            <div 
+              v-for="reminder in dueSoonReminders" 
+              :key="reminder.room.id"
+              class="flex items-center justify-between rounded-lg p-3 border"
+              :class="{
+                'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800': reminder.reminderType === 'overdue',
+                'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800': reminder.reminderType === 'due_soon',
+                'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800': reminder.reminderType === 'unpaid'
+              }"
+            >
+              <div class="flex items-center gap-3">
+                <div 
+                  class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold"
+                  :class="{
+                    'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400': reminder.reminderType === 'overdue',
+                    'bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-400': reminder.reminderType === 'due_soon',
+                    'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400': reminder.reminderType === 'unpaid'
+                  }"
+                >
+                  <template v-if="reminder.reminderType === 'overdue'">
+                    <span>+{{ Math.abs(reminder.daysUntilDue) }}</span>
+                  </template>
+                  <template v-else-if="reminder.reminderType === 'due_soon'">
+                    <span>H-{{ reminder.daysUntilDue }}</span>
+                  </template>
+                  <template v-else>
+                    <UIcon name="i-heroicons-document-text" class="w-5 h-5" />
+                  </template>
+                </div>
+                <div>
+                  <div class="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                    {{ reminder.tenant.name }}
+                    <UBadge v-if="reminder.reminderType === 'overdue'" color="error" variant="subtle" size="xs">Lewat</UBadge>
+                    <UBadge v-else-if="reminder.reminderType === 'due_soon'" color="warning" variant="subtle" size="xs">Segera</UBadge>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    {{ reminder.property?.name }} - {{ reminder.room.name }}
+                    <span v-if="reminder.dueDay"> • Tgl {{ reminder.dueDay }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="text-right">
+                  <div class="font-bold" :class="reminder.reminderType === 'overdue' ? 'text-red-600' : 'text-gray-900 dark:text-white'">
+                    {{ formatCurrency(reminder.totalUnpaid) }}
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    {{ reminder.unpaidRentBills + reminder.unpaidUtilityBills }} invoice
+                  </div>
+                </div>
+                <UButton 
+                  color="success" 
+                  variant="soft" 
+                  icon="i-heroicons-chat-bubble-left-ellipsis"
+                  size="sm"
+                  @click="sendReminder(reminder)"
+                >
+                  WA
+                </UButton>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -883,15 +1037,31 @@ const formatCurrency = (val: number | string) =>
         </template>
 
         <div class="space-y-4 p-1">
+          <UFormField label="Property">
+            <USelect
+              v-model="genPropertyId"
+              :items="propertyOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Semua properti..."
+              class="w-full"
+              @update:model-value="genRoomId = ''"
+            />
+          </UFormField>
+
           <UFormField label="Room" required>
             <USelect
               v-model="genRoomId"
-              :items="roomOptions.slice(1)"
+              :items="genRoomOptions"
               value-key="value"
               label-key="label"
               placeholder="Pilih kamar..."
               class="w-full"
+              :disabled="genRoomOptions.length === 0"
             />
+            <p v-if="genRoomOptions.length === 0" class="text-xs text-amber-600 mt-1">
+              {{ genPropertyId ? 'Tidak ada kamar terisi di properti ini' : 'Pilih properti terlebih dahulu' }}
+            </p>
           </UFormField>
 
           <UFormField label="Periode Mulai" required>
