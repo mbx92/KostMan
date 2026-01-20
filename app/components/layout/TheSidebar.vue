@@ -50,7 +50,7 @@ const defaultNavigation: NavItem[] = [
         to: '/rooms'
       },
       {
-        label: 'Penyewa',
+        label: 'Penghuni',
         icon: 'i-heroicons-users',
         to: '/tenants'
       }

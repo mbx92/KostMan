@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import ConfirmDialog from "~/components/ConfirmDialog.vue";
+
 const toast = useToast()
+const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 // Modals
 const categoryModalOpen = ref(false)
@@ -23,7 +26,14 @@ const openEditCategory = (category: any) => {
 }
 
 const deleteCategory = async (id: string) => {
-  if (!confirm('Apakah Anda yakin ingin menghapus kategori ini?')) return
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Kategori?',
+    message: 'Apakah Anda yakin ingin menghapus kategori ini? Tindakan ini tidak dapat dibatalkan.',
+    confirmText: 'Ya, Hapus',
+    confirmColor: 'error'
+  })
+  
+  if (!confirmed) return
 
   try {
     await $fetch(`/api/expenses/categories/${id}`, { method: 'DELETE' })
@@ -207,5 +217,7 @@ const onCategorySaved = async () => {
       :category="selectedCategory"
       @saved="onCategorySaved"
     />
+    
+    <ConfirmDialog ref="confirmDialog" />
   </div>
 </template>

@@ -149,9 +149,8 @@ const periodFormatted = computed(() => {
       <div class="p-3 flex flex-wrap gap-2 border-t border-gray-100 dark:border-gray-800">
         <UButton 
           size="sm" 
-          color="success" 
-          variant="soft"
-          icon="i-heroicons-chat-bubble-left-ellipsis"
+          class="bg-[#25D366] hover:bg-[#128C7E] text-white"
+          icon="i-simple-icons-whatsapp"
           @click.stop="emit('sendWhatsApp', item)"
         >
           WhatsApp

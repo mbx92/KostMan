@@ -29,7 +29,7 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'NuxtBase - Premium Starter Kit',
+      title: 'Kost Man  - Premium Starter Kit',
       meta: [
         { name: 'description', content: 'A premium Nuxt UI starter kit with comprehensive component documentation' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },

@@ -216,6 +216,26 @@ const onSaveMidtrans = async () => {
       </div>
     </section>
 
+    <!-- System Logs Section -->
+    <section class="space-y-6">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">System Logs</h2>
+          <p class="text-sm text-gray-500">View application logs and manage log retention.</p>
+        </div>
+      </div>
+
+      <UCard class="flex items-center justify-between">
+        <div>
+          <h3 class="font-medium text-gray-900 dark:text-white">View System Logs</h3>
+          <p class="text-sm text-gray-500 mt-1 mb-2">Monitor API requests, errors, and system events.</p>
+        </div>
+        <UButton to="/settings/logs" icon="i-heroicons-document-text" variant="soft">
+          Open Logs
+        </UButton>
+      </UCard>
+    </section>
+
     <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 flex items-center gap-4 text-sm text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-900/30">
         <UIcon name="i-heroicons-information-circle" class="w-5 h-5 shrink-0" />
         <p>Global billing rates are used as defaults when creating new properties. You can override these rates in specific property settings.</p>

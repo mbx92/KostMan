@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DatePicker from '~/components/DatePicker.vue'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -16,8 +18,15 @@ const getEndOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0
 const getStartOfYear = (d: Date) => new Date(d.getFullYear(), 0, 1) // Jan 1st
 const getEndOfYear = (d: Date) => new Date(d.getFullYear(), 11, 31) // Dec 31st
 
-const startDate = ref(formatDateForInput(getStartOfYear(now))) // Default to This Year for P&L usually
-const endDate = ref(formatDateForInput(getEndOfYear(now)))
+const formatDateToString = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const startDate = ref(formatDateToString(getStartOfYear(now))) // Default to This Year for P&L usually
+const endDate = ref(formatDateToString(getEndOfYear(now)))
 
 const selectedPropertyId = ref('all')
 const groupBy = ref('month')
@@ -42,14 +51,14 @@ const presetRanges = [
 
 const applyPreset = (range: { getValue: () => Date[] }) => {
     const [start, end] = range.getValue()
-    startDate.value = formatDateForInput(start)
-    endDate.value = formatDateForInput(end)
+    startDate.value = formatDateToString(start)
+    endDate.value = formatDateToString(end)
 }
 
 const isPresetSelected = (range: { getValue: () => Date[] }) => {
     const [start, end] = range.getValue()
-    return startDate.value === formatDateForInput(start) && 
-           endDate.value === formatDateForInput(end)
+    return startDate.value === formatDateToString(start) && 
+           endDate.value === formatDateToString(end)
 }
 
 // -- Interfaces --
@@ -241,11 +250,11 @@ const maxVal = computed(() => {
                      <div class="w-full h-full relative flex items-end justify-center gap-1">
                          <!-- Revenue Bar -->
                          <div class="w-3 bg-green-500/80 hover:bg-green-500 rounded-t-sm transition-all" 
-                              :style="{ height: `${(item.revenue / (maxVal || 1)) * 100}%` }"
+                              :style="{ height: item.revenue > 0 ? `${Math.max(10, (item.revenue / (maxVal || 1)) * 100)}%` : '8px' }"
                               :title="'Rev: ' + formatCurrency(item.revenue)"></div>
                          <!-- Expense Bar -->
                          <div class="w-3 bg-red-500/80 hover:bg-red-500 rounded-t-sm transition-all" 
-                              :style="{ height: `${(item.expenses / (maxVal || 1)) * 100}%` }"
+                              :style="{ height: item.expenses > 0 ? `${Math.max(10, (item.expenses / (maxVal || 1)) * 100)}%` : '8px' }"
                               :title="'Exp: ' + formatCurrency(item.expenses)"></div>
                      </div>
                      <span class="text-xs text-gray-500">{{ item.period }}</span>

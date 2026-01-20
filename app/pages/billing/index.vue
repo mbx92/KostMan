@@ -1644,9 +1644,8 @@ const sendReminder = async (reminder: any) => {
               <UTooltip text="Kirim ke WhatsApp">
                 <UButton
                   size="sm"
-                  color="success"
-                  variant="soft"
-                  icon="i-heroicons-chat-bubble-left-ellipsis"
+                  class="bg-[#25D366] hover:bg-[#128C7E] text-white"
+                  icon="i-simple-icons-whatsapp"
                   @click="sendToWhatsApp(row.original)"
                 >WA</UButton>
               </UTooltip>

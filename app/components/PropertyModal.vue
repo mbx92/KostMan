@@ -30,10 +30,10 @@ const state = reactive({
 
 // Validation Schema
 const schema = z.object({
-  name: z.string().min(3, 'Name is too short'),
-  address: z.string().min(5, 'Address is too short'),
+  name: z.string().min(3, 'Nama terlalu pendek'),
+  address: z.string().min(5, 'Alamat terlalu pendek'),
   description: z.string().optional(),
-  image: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  image: z.string().url('Harus berupa URL yang valid').optional().or(z.literal('')),
   // Settings validation
   overrideSettings: z.boolean(),
   costPerKwh: z.number().min(0).optional(),
@@ -103,15 +103,15 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     if (props.property) {
       await store.updateProperty(props.property.id, payload)
       toast.add({
-        title: 'Property Updated',
-        description: 'Property has been updated successfully.',
+        title: 'Properti Diperbarui',
+        description: 'Properti berhasil diperbarui.',
         color: 'success',
       })
     } else {
       await store.addProperty(payload)
       toast.add({
-        title: 'Property Created',
-        description: 'New property has been added successfully.',
+        title: 'Properti Dibuat',
+        description: 'Properti baru berhasil ditambahkan.',
         color: 'success',
       })
     }
@@ -120,8 +120,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     isOpen.value = false
   } catch (err: any) {
     toast.add({
-      title: 'Error',
-      description: err?.data?.message || err?.message || 'Failed to save property',
+      title: 'Gagal',
+      description: err?.data?.message || err?.message || 'Gagal menyimpan properti',
       color: 'error',
     })
   } finally {
@@ -131,7 +131,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" :title="property ? 'Edit Property' : 'Add New Property'">
+  <UModal v-model:open="isOpen" :title="property ? 'Edit Properti' : 'Tambah Properti Baru'">
     <!-- Empty default slot since we use external trigger -->
     <template #default />
     
@@ -140,21 +140,21 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         <UForm :schema="schema" :state="state" class="space-y-6" @submit="onSubmit">
           
           <div class="space-y-4">
-              <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Basic Info</h3>
+              <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Informasi Dasar</h3>
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Property Name</label>
-                <UInput v-model="state.name" placeholder="e.g. Kos Melati" autofocus class="w-full" />
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Properti</label>
+                <UInput v-model="state.name" placeholder="contoh: Kos Melati" autofocus class="w-full" />
               </div>
 
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                <UTextarea v-model="state.address" placeholder="e.g. Jl. Sudirman No. 123" class="w-full" />
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Alamat</label>
+                <UTextarea v-model="state.address" placeholder="contoh: Jl. Sudirman No. 123" class="w-full" />
               </div>
 
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Image URL</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">URL Gambar</label>
                 <UInput v-model="state.image" placeholder="https://..." class="w-full" />
-                <p class="text-xs text-gray-500 mt-1">Leave empty for default image</p>
+                <p class="text-xs text-gray-500 mt-1">Kosongkan untuk gambar default</p>
               </div>
               
               <div v-if="state.image" class="w-full h-32 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
@@ -162,42 +162,42 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
               </div>
 
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                <UTextarea v-model="state.description" placeholder="Facility details, environment..." class="w-full" />
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi</label>
+                <UTextarea v-model="state.description" placeholder="Detail fasilitas, lingkungan..." class="w-full" />
               </div>
           </div>
 
           <!-- Billing Settings -->
           <div class="space-y-4">
                <div class="flex items-center justify-between border-b pb-2 border-gray-100 dark:border-gray-800">
-                    <h3 class="font-medium text-gray-900 dark:text-white">Billing Configuration</h3>
+                    <h3 class="font-medium text-gray-900 dark:text-white">Konfigurasi Tagihan</h3>
                     <div class="flex items-center gap-2">
-                         <span class="text-xs text-gray-500">Custom Rates</span>
+                         <span class="text-xs text-gray-500">Tarif Khusus</span>
                          <USwitch v-model="state.overrideSettings" />
                     </div>
                </div>
 
                <div v-if="!state.overrideSettings" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg text-sm text-gray-500">
-                    Using global settings. Enable "Custom Rates" to override for this property.
+                    Menggunakan pengaturan global. Aktifkan "Tarif Khusus" untuk mengubah tarif properti ini.
                     <div class="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-                        <div class="bg-white dark:bg-gray-800 p-1 rounded border">Flash: {{ globalSettings.costPerKwh }}</div>
-                        <div class="bg-white dark:bg-gray-800 p-1 rounded border">Water: {{ globalSettings.waterFee }}</div>
-                        <div class="bg-white dark:bg-gray-800 p-1 rounded border">Trash: {{ globalSettings.trashFee }}</div>
+                        <div class="bg-white dark:bg-gray-800 p-1 rounded border">Listrik: {{ globalSettings.costPerKwh }}</div>
+                        <div class="bg-white dark:bg-gray-800 p-1 rounded border">Air: {{ globalSettings.waterFee }}</div>
+                        <div class="bg-white dark:bg-gray-800 p-1 rounded border">Sampah: {{ globalSettings.trashFee }}</div>
                     </div>
                </div>
 
                <div v-else class="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in">
-                    <UFormField label="Electricity (/kWh)">
+                    <UFormField label="Listrik (/kWh)">
                         <UInput v-model="state.costPerKwh" type="number" step="100">
                              <template #leading>Rp</template>
                         </UInput>
                     </UFormField>
-                    <UFormField label="Water Fee">
+                    <UFormField label="Biaya Air">
                         <UInput v-model="state.waterFee" type="number" step="1000">
                              <template #leading>Rp</template>
                         </UInput>
                     </UFormField>
-                    <UFormField label="Trash Fee">
+                    <UFormField label="Biaya Sampah">
                         <UInput v-model="state.trashFee" type="number" step="1000">
                              <template #leading>Rp</template>
                         </UInput>
@@ -206,8 +206,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           </div>
 
           <div class="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
-            <UButton type="submit" label="Save Property" color="primary" :loading="isSaving" />
+            <UButton label="Batal" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
+            <UButton type="submit" label="Simpan Properti" color="primary" :loading="isSaving" />
           </div>
         </UForm>
       </div>

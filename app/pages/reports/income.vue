@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DatePicker from '~/components/DatePicker.vue'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -11,12 +13,11 @@ const getEndOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0
 const getStartOfYear = (d: Date) => new Date(d.getFullYear(), 0, 1)
 const getEndOfYear = (d: Date) => new Date(d.getFullYear(), 11, 31)
 
-const formatDateForInput = (date: Date) => {
-    // Helper to deal with local timezone offset for input value
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
+const formatDateToString = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const presetRanges = [
@@ -29,8 +30,8 @@ const presetRanges = [
   { label: 'Tahun Ini', getValue: () => [getStartOfYear(new Date()), getEndOfYear(new Date())] }
 ]
 
-const startDate = ref(formatDateForInput(getStartOfMonth(now)))
-const endDate = ref(formatDateForInput(getEndOfMonth(now)))
+const startDate = ref(formatDateToString(getStartOfMonth(now)))
+const endDate = ref(formatDateToString(getEndOfMonth(now)))
 const selectedPropertyId = ref('all')
 const groupBy = ref('month')
 
@@ -96,14 +97,14 @@ const { data: reportData, pending } = await useFetch<IncomeReportData>('/api/rep
 // -- Actions --
 const applyPreset = (range: { getValue: () => Date[] }) => {
     const [start, end] = range.getValue()
-    startDate.value = formatDateForInput(start)
-    endDate.value = formatDateForInput(end)
+    startDate.value = formatDateToString(start)
+    endDate.value = formatDateToString(end)
 }
 
 const isPresetSelected = (range: { getValue: () => Date[] }) => {
     const [start, end] = range.getValue()
-    return startDate.value === formatDateForInput(start) && 
-           endDate.value === formatDateForInput(end)
+    return startDate.value === formatDateToString(start) && 
+           endDate.value === formatDateToString(end)
 }
 
 // -- Helpers --
@@ -251,12 +252,14 @@ const maxIncome = computed(() => {
                  <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[40px] flex-1">
                      
                      <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-t-lg relative flex items-end justify-center overflow-hidden" 
-                          :style="{ height: `${(item.total / (maxIncome || 1)) * 100}%` }">
+                          :style="{ height: item.total > 0 ? `${Math.max(10, (item.total / (maxIncome || 1)) * 100)}%` : '8px' }">
                          <!-- Stacks -->
-                         <div class="w-full bg-blue-500/80 group-hover:bg-blue-500 transition-colors absolute bottom-0" 
-                              :style="{ height: `${(item.rentIncome / item.total) * 100}%` }"></div>
-                         <div class="w-full bg-orange-500/80 group-hover:bg-orange-500 transition-colors absolute top-0" 
-                              :style="{ height: `${(item.utilityIncome / item.total) * 100}%`, bottom: `${(item.rentIncome / item.total) * 100}%` }"></div>
+                         <div v-if="item.total > 0" class="w-full bg-blue-500/80 group-hover:bg-blue-500 transition-colors absolute bottom-0" 
+                              :style="{ height: `${(item.rentIncome / item.total) * 100}%` }">
+                         </div>
+                         <div v-if="item.total > 0" class="w-full bg-orange-500/80 group-hover:bg-orange-500 transition-colors absolute top-0" 
+                              :style="{ height: `${(item.utilityIncome / item.total) * 100}%`, bottom: `${(item.rentIncome / item.total) * 100}%` }">
+                         </div>
                               
                          <!-- Tooltip -->
                          <div class="opacity-0 group-hover:opacity-100 absolute -top-12 left-1/2 -translate-x-1/2 bg-black text-white text-xs p-1.5 rounded pointer-events-none whitespace-nowrap z-10">
@@ -265,7 +268,7 @@ const maxIncome = computed(() => {
                      </div>
                      <span class="text-xs text-gray-500 rotate-0 truncate max-w-full">{{ item.period }}</span>
                  </div>
-                 <div v-if="!reportData?.byPeriod.length" class="w-full h-full flex items-center justify-center text-gray-400">
+                 <div v-if="!reportData?.byPeriod || reportData?.byPeriod.length === 0" class="w-full h-full flex items-center justify-center text-gray-400">
                      Tidak ada data tren
                  </div>
              </div>

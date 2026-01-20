@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DatePicker from '~/components/DatePicker.vue'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -7,12 +9,15 @@ const now = new Date()
 const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-const formatDateForInput = (date: Date) => {
-  return date.toISOString().split('T')[0]
+const formatDateToString = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-const startDate = ref(formatDateForInput(firstDayOfMonth))
-const endDate = ref(formatDateForInput(lastDayOfMonth))
+const startDate = ref(formatDateToString(firstDayOfMonth))
+const endDate = ref(formatDateToString(lastDayOfMonth))
 const selectedPropertyId = ref('all')
 const selectedPaymentMethod = ref('all')
 const selectedBillType = ref('all')

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { useKosStore, type Property } from "~/stores/kos";
+import ConfirmDialog from "~/components/ConfirmDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
 const store = useKosStore();
 const toast = useToast();
+const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 const propertyId = computed(() => route.params.id as string);
 
@@ -73,8 +75,8 @@ const saveChanges = async () => {
   // Validation - ensure required fields are filled
   if (!form.name || form.name.trim().length < 1) {
     toast.add({
-      title: "Validation Error",
-      description: "Property name is required.",
+      title: "Kesalahan Validasi",
+      description: "Nama properti wajib diisi.",
       color: "error",
     });
     return;
@@ -82,8 +84,8 @@ const saveChanges = async () => {
   
   if (!form.address || form.address.trim().length < 1) {
     toast.add({
-      title: "Validation Error",
-      description: "Property address is required.",
+      title: "Kesalahan Validasi",
+      description: "Alamat properti wajib diisi.",
       color: "error",
     });
     return;
@@ -112,14 +114,14 @@ const saveChanges = async () => {
     await loadProperty();
     
     toast.add({
-      title: "Changes Saved",
-      description: "Property details updated successfully.",
+      title: "Perubahan Disimpan",
+      description: "Detail properti berhasil diperbarui.",
       color: "success",
     });
   } catch (err: any) {
     toast.add({
-      title: "Error",
-      description: err?.data?.message || err?.message || "Failed to save changes",
+      title: "Gagal",
+      description: err?.data?.message || err?.message || "Gagal menyimpan perubahan",
       color: "error",
     });
   } finally {
@@ -128,27 +130,30 @@ const saveChanges = async () => {
 };
 
 const deleteProperty = async () => {
-  if (
-    confirm(
-      `Delete "${property.value?.name}"? This will also delete ${rooms.value.length} room(s).`
-    )
-  ) {
-    try {
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Properti?',
+    message: `Apakah Anda yakin ingin menghapus "${property.value?.name}"? Ini juga akan menghapus ${rooms.value.length} kamar.`,
+    confirmText: 'Ya, Hapus',
+    confirmColor: 'error'
+  })
+  
+  if (!confirmed) return
+  
+try {
       await store.deleteProperty(propertyId.value);
       toast.add({
-        title: "Property Deleted",
-        description: "Property has been deleted successfully.",
+        title: "Properti Dihapus",
+        description: "Properti berhasil dihapus.",
         color: "success",
       });
       router.push("/properties");
     } catch (err: any) {
       toast.add({
-        title: "Error",
-        description: err?.data?.message || err?.message || "Failed to delete property",
+        title: "Gagal",
+        description: err?.data?.message || err?.message || "Gagal menghapus properti",
         color: "error",
       });
     }
-  }
 };
 
 const occupiedRooms = computed(
@@ -181,7 +186,7 @@ const occupiedRooms = computed(
           variant="ghost"
           color="white"
           icon="i-heroicons-arrow-left"
-          >Back to Properties</UButton
+          >Kembali ke Properti</UButton
         >
       </div>
 
@@ -195,7 +200,7 @@ const occupiedRooms = computed(
             <input
               v-model="form.name"
               class="w-full bg-transparent text-4xl md:text-6xl font-extrabold text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-white/50 border-none outline-none focus:ring-0 px-0"
-              placeholder="Property Name"
+              placeholder="Nama Properti"
               autocomplete="off"
             />
             <UIcon
@@ -215,7 +220,7 @@ const occupiedRooms = computed(
             <input
               v-model="form.address"
               class="w-full bg-transparent border-none outline-none focus:ring-0 px-0 text-gray-700 dark:text-white placeholder-gray-500 dark:placeholder-white/50"
-              placeholder="Property Address"
+              placeholder="Alamat Properti"
               autocomplete="off"
             />
           </div>
@@ -240,7 +245,7 @@ const occupiedRooms = computed(
             <div
               class="text-xs text-gray-500 uppercase tracking-wide font-medium"
             >
-              Total Rooms
+              Total Kamar
             </div>
           </div>
           <div
@@ -252,7 +257,7 @@ const occupiedRooms = computed(
             <div
               class="text-xs text-gray-500 uppercase tracking-wide font-medium"
             >
-              Occupied
+              Terisi
             </div>
           </div>
           <div
@@ -264,7 +269,7 @@ const occupiedRooms = computed(
             <div
               class="text-xs text-gray-500 uppercase tracking-wide font-medium"
             >
-              Occupancy
+              Tingkat Hunian
             </div>
           </div>
         </div>
@@ -279,7 +284,7 @@ const occupiedRooms = computed(
             <div
               class="text-sm text-gray-500 uppercase tracking-wide font-medium"
             >
-              Total Rooms
+              Total Kamar
             </div>
           </div>
           <div class="w-px h-12 bg-gray-200 dark:bg-gray-800"></div>
@@ -290,7 +295,7 @@ const occupiedRooms = computed(
             <div
               class="text-sm text-gray-500 uppercase tracking-wide font-medium"
             >
-              Occupied
+              Terisi
             </div>
           </div>
           <div class="w-px h-12 bg-gray-200 dark:bg-gray-800"></div>
@@ -301,7 +306,7 @@ const occupiedRooms = computed(
             <div
               class="text-sm text-gray-500 uppercase tracking-wide font-medium"
             >
-              Occupancy
+              Tingkat Hunian
             </div>
           </div>
         </div>
@@ -317,19 +322,19 @@ const occupiedRooms = computed(
               name="i-heroicons-information-circle"
               class="text-primary-500"
             />
-            General Information
+            Informasi Umum
           </h3>
 
           <!-- Description -->
           <div class="space-y-4">
             <label
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >Description</label
+              >Deskripsi</label
             >
             <UTextarea
               v-model="form.description"
               variant="none"
-              placeholder="Describe your property here..."
+              placeholder="Deskripsikan properti Anda di sini..."
               :rows="4"
               class="w-full text-gray-600 dark:text-gray-300 text-lg leading-relaxed bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 focus:ring-2 ring-primary-500 transition-all"
             />
@@ -342,7 +347,7 @@ const occupiedRooms = computed(
             <div class="flex items-center justify-between">
               <label
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >Cover Image URL</label
+                >URL Gambar Cover</label
               >
               <UButton
                 size="xs"
@@ -350,7 +355,7 @@ const occupiedRooms = computed(
                 variant="ghost"
                 icon="i-heroicons-eye"
                 @click="isPreviewOpen = true"
-                >Preview</UButton
+                >Pratinjau</UButton
               >
             </div>
             <UInput
@@ -360,7 +365,7 @@ const occupiedRooms = computed(
               placeholder="https://..."
             />
             <p class="text-xs text-gray-500">
-              Paste a URL to update the hero background.
+              Tempelkan URL untuk memperbarui gambar latar belakang.
             </p>
           </div>
         </div>
@@ -374,11 +379,11 @@ const occupiedRooms = computed(
               class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"
             >
               <UIcon name="i-heroicons-banknotes" class="text-primary-500" />
-              Billing Configuration
+              Konfigurasi Tagihan
             </h3>
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-500">{{
-                form.useCustomSettings ? "Custom Rates" : "Global Rates"
+                form.useCustomSettings ? "Tarif Khusus" : "Tarif Global"
               }}</span>
               <USwitch v-model="form.useCustomSettings" />
             </div>
@@ -394,7 +399,7 @@ const occupiedRooms = computed(
             <div class="space-y-2">
               <label
                 class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                >Electricity / kWh</label
+                >Listrik / kWh</label
               >
               <UInput
                 v-model="form.costPerKwh"
@@ -411,7 +416,7 @@ const occupiedRooms = computed(
             <div class="space-y-2">
               <label
                 class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                >Water Fee / mo</label
+                >Biaya Air / bulan</label
               >
               <UInput
                 v-model="form.waterFee"
@@ -428,7 +433,7 @@ const occupiedRooms = computed(
             <div class="space-y-2">
               <label
                 class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                >Trash Fee / mo</label
+                >Biaya Sampah / bulan</label
               >
               <UInput
                 v-model="form.trashFee"
@@ -471,14 +476,13 @@ const occupiedRooms = computed(
               <span
                 class="bg-white/10 text-xs font-bold px-3 py-1 rounded-full backdrop-blur-md border border-white/20"
               >
-                {{ rooms.length }} Rooms
+                {{ rooms.length }} Kamar
               </span>
             </div>
 
-            <h3 class="text-2xl font-bold mb-2">Manage Rooms</h3>
+            <h3 class="text-2xl font-bold mb-2">Kelola Kamar</h3>
             <p class="text-primary-100/90 text-sm mb-6 leading-relaxed">
-              Control occupancy, manage tenants, and handle monthly billing
-              efficiently.
+              Kontrol hunian, kelola penghuni, dan handle tagihan bulanan secara efisien.
             </p>
           </div>
         </div>
@@ -488,7 +492,7 @@ const occupiedRooms = computed(
           class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 space-y-3"
         >
           <h3 class="font-bold text-gray-900 dark:text-white mb-4">
-            Property Actions
+            Aksi Properti
           </h3>
           <UButton
             color="black"
@@ -499,7 +503,7 @@ const occupiedRooms = computed(
             class="dark:bg-white dark:text-black"
             :loading="isSaving"
             @click="saveChanges"
-            >Save Changes</UButton
+            >Simpan Perubahan</UButton
           >
           <UButton
             color="error"
@@ -507,7 +511,7 @@ const occupiedRooms = computed(
             block
             icon="i-heroicons-trash"
             @click="deleteProperty"
-            >Delete Property</UButton
+            >Hapus Properti</UButton
           >
         </div>
 
@@ -519,18 +523,18 @@ const occupiedRooms = computed(
             class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"
           >
             <UIcon name="i-heroicons-map" class="text-primary-500" />
-            Location
+            Lokasi
           </h3>
 
           <div class="space-y-4">
             <UInput
               v-model="form.mapUrl"
               icon="i-heroicons-link"
-              placeholder="Paste Embed URL"
+              placeholder="Tempel URL Embed"
               class="text-sm w-full"
             />
             <p class="text-xs text-gray-500">
-              If not provided, map will be displayed based on the address.
+              Jika tidak disediakan, peta akan ditampilkan berdasarkan alamat.
             </p>
 
             <div
@@ -557,8 +561,8 @@ const occupiedRooms = computed(
     <UModal
       v-model:open="isPreviewOpen"
       :ui="{ width: 'w-full sm:max-w-4xl' }"
-      title="Cover Image Preview"
-      description="Full size view of the property cover image"
+      title="Pratinjau Gambar Cover"
+      description="Tampilan ukuran penuh dari gambar cover properti"
     >
       <template #content>
         <div class="p-1">
@@ -566,5 +570,7 @@ const occupiedRooms = computed(
         </div>
       </template>
     </UModal>
+    
+    <ConfirmDialog ref="confirmDialog" />
   </div>
 </template>

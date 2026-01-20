@@ -29,11 +29,11 @@ const onModalClose = () => {
       <div>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
            <UIcon name="i-heroicons-building-office-2" class="w-8 h-8 text-primary-500" />
-           Properties
+           Properti
         </h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-1">Manage your kos properties and buildings.</p>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Kelola properti dan bangunan kos Anda.</p>
       </div>
-      <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Add Property</UButton>
+      <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Tambah Properti</UButton>
     </div>
 
     <!-- Error State -->
@@ -41,11 +41,11 @@ const onModalClose = () => {
       <div class="flex items-center gap-3">
         <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-500" />
         <div>
-          <h3 class="font-medium text-red-800 dark:text-red-200">Error loading properties</h3>
+          <h3 class="font-medium text-red-800 dark:text-red-200">Gagal memuat properti</h3>
           <p class="text-sm text-red-600 dark:text-red-400">{{ propertiesError }}</p>
         </div>
         <UButton size="sm" color="error" variant="soft" class="ml-auto" @click="store.fetchProperties()">
-          Retry
+          Coba Lagi
         </UButton>
       </div>
     </div>
@@ -104,11 +104,11 @@ const onModalClose = () => {
             <div class="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <div class="flex items-center gap-2 text-sm text-gray-500">
                     <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                    <span>{{ store.getRoomsByPropertyId(property.id).length }} Rooms</span>
+                    <span>{{ store.getRoomsByPropertyId(property.id).length }} Kamar</span>
                 </div>
                 
                 <UButton :to="`/properties/${property.id}`" variant="ghost" color="primary" trailing-icon="i-heroicons-arrow-right">
-                    Manage Property
+                    Kelola Properti
                 </UButton>
             </div>
         </div>
@@ -118,9 +118,9 @@ const onModalClose = () => {
     <!-- Empty State -->
     <div v-else class="text-center py-20 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
         <UIcon name="i-heroicons-building-office-2" class="w-16 h-16 text-gray-400 mb-4" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">No properties yet</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">Start by adding your first property to manage.</p>
-        <UButton icon="i-heroicons-plus" @click="openAddModal">Add Property</UButton>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Belum ada properti</h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-6">Mulai dengan menambahkan properti pertama Anda.</p>
+        <UButton icon="i-heroicons-plus" @click="openAddModal">Tambah Properti</UButton>
     </div>
 
     <!-- Modal -->

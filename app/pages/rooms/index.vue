@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useKosStore, type Room } from '~/stores/kos'
+import ConfirmDialog from "~/components/ConfirmDialog.vue";
 
 const store = useKosStore()
 const { rooms, properties, tenants, roomsLoading, roomsError } = storeToRefs(store)
 const toast = useToast()
+const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 // Filter state
 const route = useRoute()
@@ -94,8 +96,16 @@ const openEditRoomModal = (room: Room) => {
 }
 
 const deleteRoom = async (room: Room) => {
-    if (confirm(`Delete "${room.name}"? This will also delete its billing history.`)) {
-        try {
+    const confirmed = await confirmDialog.value?.confirm({
+      title: 'Hapus Kamar?',
+      message: `Apakah Anda yakin ingin menghapus "${room.name}"? Ini juga akan menghapus riwayat billing-nya.`,
+      confirmText: 'Ya, Hapus',
+      confirmColor: 'error'
+    })
+    
+    if (!confirmed) return
+    
+try {
             await store.deleteRoom(room.id)
             toast.add({ title: 'Room Deleted', color: 'success' })
         } catch (err: any) {
@@ -105,7 +115,6 @@ const deleteRoom = async (room: Room) => {
                 color: 'error' 
             })
         }
-    }
 }
 
 const onModalClose = () => {
@@ -276,6 +285,8 @@ const onModalClose = () => {
 
     <!-- Room Modal -->
     <RoomModal v-model="isRoomModalOpen" :property-id="modalPropertyId" :room="selectedRoom" @update:modelValue="onModalClose" />
+    
+    <ConfirmDialog ref="confirmDialog" />
   </div>
 </template>
 

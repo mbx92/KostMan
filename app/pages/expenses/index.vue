@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import ConfirmDialog from "~/components/ConfirmDialog.vue";
+
 const toast = useToast()
+const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 // Modals
 const expenseModalOpen = ref(false)
@@ -102,7 +105,14 @@ const openEditExpense = (expense: any) => {
 }
 
 const deleteExpense = async (id: string) => {
-  if (!confirm('Apakah Anda yakin ingin menghapus pengeluaran ini?')) return
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Pengeluaran?',
+    message: 'Apakah Anda yakin ingin menghapus pengeluaran ini? Tindakan ini tidak dapat dibatalkan.',
+    confirmText: 'Ya, Hapus',
+    confirmColor: 'error'
+  })
+  
+  if (!confirmed) return
 
   try {
     await $fetch(`/api/expenses/${id}`, { method: 'DELETE' })
@@ -387,5 +397,7 @@ const onExpenseSaved = async () => {
       :categories="allCategories"
       @saved="onExpenseSaved"
     />
+    
+    <ConfirmDialog ref="confirmDialog" />
   </div>
 </template>

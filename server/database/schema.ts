@@ -277,3 +277,32 @@ export const expenses = pgTable("expenses", {
     .$onUpdate(() => new Date()),
 });
 
+// Log Level Enum
+export const logLevelEnum = pgEnum("log_level", ["debug", "info", "warn", "error"]);
+
+// System Logs - For request/error logging with auto-purge
+export const systemLogs = pgTable("system_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  level: logLevelEnum("level").notNull(),
+  message: text("message").notNull(),
+  method: varchar("method", { length: 10 }),
+  path: varchar("path", { length: 500 }),
+  statusCode: integer("status_code"),
+  duration: integer("duration"), // in milliseconds
+  userId: uuid("user_id").references(() => users.id),
+  ip: varchar("ip", { length: 45 }), // IPv6 compatible
+  userAgent: text("user_agent"),
+  context: text("context"), // JSON string for additional data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// System Settings - Key-value store for system configuration
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});

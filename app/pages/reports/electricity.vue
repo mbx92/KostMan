@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DatePicker from '~/components/DatePicker.vue'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -15,8 +17,15 @@ const formatDateForInput = (date: Date) => {
 const getStartOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
 const getEndOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0)
 
-const startDate = ref(formatDateForInput(getStartOfMonth(now)))
-const endDate = ref(formatDateForInput(getEndOfMonth(now)))
+const formatDateToString = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const startDate = ref(formatDateToString(getStartOfMonth(now)))
+const endDate = ref(formatDateToString(getEndOfMonth(now)))
 const selectedPropertyId = ref('all')
 
 // -- Fetch Properties --
@@ -196,14 +205,14 @@ const translateTrend = (trend: string): string => {
          <div class="h-64 flex items-end justify-between gap-2 overflow-x-auto pb-2">
              <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[40px] flex-1">
                  <div class="w-full bg-yellow-100 dark:bg-yellow-900/30 rounded-t-lg relative flex items-end justify-center group-hover:bg-yellow-200 transition-colors" 
-                      :style="{ height: `${(item.totalUsage / (maxUsage || 1)) * 100}%` }">
+                      :style="{ height: item.totalUsage > 0 ? `${Math.max(10, (item.totalUsage / (maxUsage || 1)) * 100)}%` : '8px' }">
                      <div class="opacity-0 group-hover:opacity-100 absolute -top-12 bg-black text-white text-xs p-1.5 rounded pointer-events-none whitespace-nowrap z-10">
                          {{ formatNumber(item.totalUsage) }} kWh
                      </div>
                  </div>
                  <span class="text-xs text-gray-500 rotate-0 truncate max-w-full">{{ item.period }}</span>
              </div>
-             <div v-if="!reportData?.byPeriod.length" class="w-full h-full flex items-center justify-center text-gray-400">
+             <div v-if="!reportData?.byPeriod || reportData?.byPeriod.length === 0" class="w-full h-full flex items-center justify-center text-gray-400">
                  Tidak ada data penggunaan untuk periode ini
              </div>
          </div>

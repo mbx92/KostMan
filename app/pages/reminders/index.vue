@@ -338,10 +338,9 @@ const openDetails = (group: any) => {
                             <div class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
                         </div>
                         <UButton 
-                            icon="i-heroicons-chat-bubble-left-ellipsis" 
-                            color="green" 
-                            variant="soft" 
-                            size="sm"
+                            icon="i-simple-icons-whatsapp" 
+                            size="md"
+                            class="bg-[#25D366] hover:bg-[#128C7E] text-white"
                             :loading="sendingWa === group.id"
                             @click.stop="sendWhatsApp(group)"
                         />
@@ -425,10 +424,9 @@ const openDetails = (group: any) => {
                             <div class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
                         </div>
                         <UButton 
-                            icon="i-heroicons-chat-bubble-left-ellipsis" 
-                            color="gray" 
-                            variant="ghost" 
-                            size="sm"
+                            icon="i-simple-icons-whatsapp" 
+                            size="md"
+                            class="bg-[#25D366] hover:bg-[#128C7E] text-white"
                             :loading="sendingWa === group.id"
                             @click.stop="sendWhatsApp(group)"
                         />
@@ -512,10 +510,9 @@ const openDetails = (group: any) => {
                             <div class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
                         </div>
                         <UButton 
-                            icon="i-heroicons-chat-bubble-left-ellipsis" 
-                            color="gray" 
-                            variant="ghost" 
-                            size="sm"
+                            icon="i-simple-icons-whatsapp" 
+                            size="md"
+                            class="bg-[#25D366] hover:bg-[#128C7E] text-white"
                             :loading="sendingWa === group.id"
                             @click.stop="sendWhatsApp(group)"
                         />
@@ -607,8 +604,8 @@ const openDetails = (group: any) => {
       </template>
 
       <template #footer="{ close }">
-        <UButton label="Close" color="neutral" variant="outline" @click="close" />
-        <UButton label="Send WhatsApp" color="green" variant="soft" icon="i-heroicons-chat-bubble-left-ellipsis" @click="sendWhatsApp(selectedGroup); close()" />
+        <UButton label="Close" size="lg" color="neutral" variant="outline" @click="close" />
+        <UButton label="Send WhatsApp" size="lg" icon="i-simple-icons-whatsapp" class="bg-[#25D366] hover:bg-[#128C7E] text-white" @click="sendWhatsApp(selectedGroup); close()" />
       </template>
     </UModal>
   </div>
