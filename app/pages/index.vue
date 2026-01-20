@@ -25,6 +25,27 @@ const totalTenants = computed(() => kosStore.tenants.length);
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <!-- Overdue Banner -->
+      <div v-if="kosStore.reminders.counts.overdue > 0" class="col-span-full">
+         <div class="bg-gray-900 border border-orange-500 rounded-lg p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-orange-500/10">
+            <div class="flex items-center gap-4">
+               <div class="bg-transparent text-orange-500">
+                  <UIcon name="i-heroicons-bell-alert" class="w-8 h-8" />
+               </div>
+               <div>
+                  <div class="flex items-center gap-2">
+                     <h3 class="text-orange-400 font-bold text-lg">Pengingat Tagihan</h3>
+                     <UBadge color="yellow" size="xs" variant="solid">{{ kosStore.reminders.counts.overdue }}</UBadge>
+                  </div>
+                  <p class="text-gray-300 text-sm mt-1">{{ kosStore.reminders.counts.overdue }} penghuni memiliki tagihan belum dibayar.</p>
+               </div>
+            </div>
+            <UButton to="/reminders" color="yellow" variant="solid" size="md" trailing-icon="i-heroicons-arrow-right">
+               Lihat Detail
+            </UButton>
+         </div>
+      </div>
+
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">

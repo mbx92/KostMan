@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { DateValue } from '@internationalized/date'
+import { getPaginationRowModel } from '@tanstack/vue-table'
+import type { TableColumn } from '@nuxt/ui'
+import { h, resolveComponent } from 'vue'
 import { useKosStore, type RentBill, type UtilityBill } from "~/stores/kos";
 import { usePdfReceipt } from "~/composables/usePdfReceipt";
 import ConfirmDialog from "~/components/ConfirmDialog.vue";
@@ -166,6 +169,174 @@ const totalUnpaidUtility = computed(() =>
 const totalUnpaid = computed(
   () => totalUnpaidRent.value + totalUnpaidUtility.value
 );
+
+// Mobile Pagination
+const mobileLimits = reactive({
+  rent: 5,
+  utility: 5,
+  summary: 5
+});
+
+const mobileLoading = reactive({
+  rent: false,
+  utility: false,
+  summary: false
+});
+
+const loadMoreMobile = async (section: 'rent' | 'utility' | 'summary') => {
+  mobileLoading[section] = true;
+  await new Promise(resolve => setTimeout(resolve, 300));
+  mobileLimits[section] += 5;
+  mobileLoading[section] = false;
+};
+
+const resetMobileLimit = (section: 'rent' | 'utility' | 'summary') => {
+  mobileLimits[section] = 5;
+};
+
+// Desktop Table Configuration
+const rentTable = useTemplateRef('rentTable');
+const utilityTable = useTemplateRef('utilityTable');
+const summaryTable = useTemplateRef('summaryTable');
+
+// Table Pagination
+const rentPagination = ref({ pageIndex: 0, pageSize: 10 });
+const utilityPagination = ref({ pageIndex: 0, pageSize: 10 });
+const summaryPagination = ref({ pageIndex: 0, pageSize: 10 });
+
+// Table Global Filters
+const rentFilter = ref('');
+const utilityFilter = ref('');
+const summaryFilter = ref('');
+
+// Rent Bills Column Definitions
+const rentColumns: TableColumn<RentBill>[] = [
+  {
+    accessorKey: 'periodStartDate',
+    header: 'Periode',
+  },
+  {
+    accessorKey: 'dueDate',
+    header: 'Due Date',
+  },
+  {
+    accessorFn: (row) => row.property?.name || 'Unknown',
+    id: 'property',
+    header: 'Property',
+  },
+  {
+    accessorFn: (row) => row.room?.name || 'Unknown',
+    id: 'room',
+    header: 'Room',
+  },
+  {
+    accessorKey: 'totalAmount',
+    header: 'Total',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  },
+  {
+    accessorFn: (row) => row.isPaid ? 'Paid' : 'Unpaid',
+    id: 'status',
+    header: 'Status',
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  }
+];
+
+// Utility Bills Column Definitions
+const utilityColumns: TableColumn<UtilityBill>[] = [
+  {
+    accessorKey: 'period',
+    header: 'Period',
+  },
+  {
+    accessorFn: (row) => row.property?.name || 'Unknown',
+    id: 'property',
+    header: 'Property',
+  },
+  {
+    accessorFn: (row) => row.room?.name || 'Unknown',
+    id: 'room',
+    header: 'Room',
+  },
+  {
+    accessorFn: (row) => (row.meterEnd || 0) - (row.meterStart || 0),
+    id: 'usage',
+    header: 'Usage',
+  },
+  {
+    accessorKey: 'totalAmount',
+    header: 'Total',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  },
+  {
+    accessorFn: (row) => row.isPaid ? 'Paid' : 'Unpaid',
+    id: 'status',
+    header: 'Status',
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  }
+];
+
+// Summary (Combined Bills) Column Definitions
+interface CombinedBillItem {
+  period: string;
+  roomId: string;
+  rent?: RentBill;
+  util?: UtilityBill;
+}
+
+const summaryColumns: TableColumn<CombinedBillItem>[] = [
+  {
+    accessorKey: 'period',
+    header: 'Period',
+  },
+  {
+    accessorFn: (row) => row.rent?.room?.name || row.util?.room?.name || 'Unknown',
+    id: 'room',
+    header: 'Room',
+  },
+  {
+    accessorFn: (row) => row.rent?.totalAmount || 0,
+    id: 'rent',
+    header: 'Rent',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  },
+  {
+    accessorFn: (row) => row.util?.totalAmount || 0,
+    id: 'utility',
+    header: 'Utility',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  },
+  {
+    accessorFn: (row) => Number(row.rent?.totalAmount || 0) + Number(row.util?.totalAmount || 0),
+    id: 'total',
+    header: 'Total',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  },
+  {
+    accessorFn: (row) => {
+      const rentPaid = row.rent?.isPaid !== false;
+      const utilPaid = row.util?.isPaid !== false;
+      if (rentPaid && utilPaid) return 'PAID';
+      if (row.rent?.isPaid || row.util?.isPaid) return 'PARTIAL';
+      return 'UNPAID';
+    },
+    id: 'status',
+    header: 'Status',
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+  }
+];
 
 // Generate Rent Bill Form
 const isGenerating = ref(false);
@@ -1007,214 +1178,317 @@ const sendReminder = async (reminder: any) => {
 
     <!-- Rent Bills Table -->
     <UCard v-if="activeTab === 'rent'">
-      <div v-if="filteredRentBills.length > 0" class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
-          <thead
-            class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700"
+      <!-- Mobile View: Accordion Cards -->
+      <div v-if="filteredRentBills.length > 0" class="lg:hidden p-4 space-y-3">
+        <BillingRentBillCard
+          v-for="bill in filteredRentBills.slice(0, mobileLimits.rent)"
+          :key="bill.id"
+          :bill="bill"
+          :format-currency="formatCurrency"
+          :format-date-range="formatDateRange"
+          @mark-paid="markRentPaid"
+          @pay-online="(id) => payOnline(id, 'rent')"
+          @print="printRent"
+          @delete="deleteRent"
+        />
+        
+        <!-- Loading Skeleton -->
+        <div v-if="mobileLoading.rent" class="space-y-3">
+          <div class="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-4 animate-pulse">
+            <div class="flex items-start gap-3">
+              <div class="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div class="flex-1 space-y-3">
+                <div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mt-3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Pagination Buttons -->
+        <div v-if="filteredRentBills.length > 5 && !mobileLoading.rent" class="flex justify-center gap-4 pt-2">
+          <span 
+            v-if="mobileLimits.rent < filteredRentBills.length"
+            class="text-sm text-primary-600 dark:text-primary-400 font-medium cursor-pointer hover:underline"
+            @click="loadMoreMobile('rent')"
           >
-            <tr>
-              <th class="p-3 font-medium">Periode</th>
-              <th class="p-3 font-medium">Jumlah Hari</th>
-              <th class="p-3 font-medium">Due Date</th>
-              <th class="p-3 font-medium">Property</th>
-              <th class="p-3 font-medium">Room</th>
-              <th class="p-3 font-medium">Total</th>
-              <th class="p-3 font-medium">Status</th>
-              <th class="p-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="bill in filteredRentBills"
-              :key="bill.id"
-              class="hover:bg-gray-50 dark:hover:bg-gray-800/30"
-            >
-              <td class="p-3 font-medium">
-                <div>{{ formatDateRange(bill.periodStartDate, bill.periodEndDate) }}</div>
-                <div class="text-xs text-gray-400">{{ bill.monthsCovered || 1 }} bulan</div>
-              </td>
-              <td class="p-3">
-                <div class="font-semibold text-gray-900 dark:text-white">
-                  {{ (() => {
-                    const [startY, startM, startD] = bill.periodStartDate.split('-').map(Number);
-                    const [endY, endM, endD] = bill.periodEndDate.split('-').map(Number);
-                    const start = new Date(startY, startM - 1, startD);
-                    const end = new Date(endY, endM - 1, endD);
-                    return Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-                  })() }} hari
-                </div>
-              </td>
-              <td class="p-3 text-gray-600">
-                {{ new Date(bill.dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) }}
-              </td>
-              <td class="p-3 text-gray-500">
-                {{ bill.property?.name || "Unknown" }}
-              </td>
-              <td class="p-3">
-                <div class="font-medium">{{ bill.room?.name || "Unknown" }}</div>
-                <div class="text-xs text-gray-500" v-if="bill.tenant?.name">
-                  {{ bill.tenant.name }}
-                </div>
-              </td>
-              <td class="p-3 font-bold text-gray-900 dark:text-white">
-                {{ formatCurrency(bill.totalAmount) }}
-              </td>
-              <td class="p-3">
-                <UBadge
-                  :color="bill.isPaid ? 'success' : 'warning'"
-                  variant="subtle"
-                  size="xs"
-                >
-                  {{ bill.isPaid ? "Paid" : "Unpaid" }}
-                </UBadge>
-              </td>
-              <td class="p-3 text-right">
-                <div class="flex justify-end gap-1">
-                  <UTooltip text="Bayar Online" v-if="!bill.isPaid">
-                    <UButton
-                      size="xs"
-                      color="primary"
-                      variant="soft"
-                      icon="i-heroicons-credit-card"
-                      :loading="payingBillId === bill.id"
-                      @click="payOnline(bill.id, 'rent')"
-                    />
-                  </UTooltip>
-                  <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
-                    <UButton
-                      size="xs"
-                      color="success"
-                      variant="soft"
-                      icon="i-heroicons-check"
-                      @click="markRentPaid(bill.id)"
-                    />
-                  </UTooltip>
-                  <UTooltip text="Print">
-                    <UButton
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      icon="i-heroicons-printer"
-                      @click="printRent(bill)"
-                    />
-                  </UTooltip>
-                  <UTooltip text="Delete">
-                    <UButton
-                      size="xs"
-                      color="error"
-                      variant="ghost"
-                      icon="i-heroicons-trash"
-                      @click="deleteRent(bill.id)"
-                    />
-                  </UTooltip>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            Lebih Banyak
+          </span>
+          <span 
+            v-if="mobileLimits.rent > 5"
+            class="text-sm text-gray-500 dark:text-gray-400 font-medium cursor-pointer hover:underline"
+            @click="resetMobileLimit('rent')"
+          >
+            Tampilkan Lebih Sedikit
+          </span>
+        </div>
       </div>
-      <div v-else class="text-center py-16">
+      
+      <!-- Desktop View: UTable with Pagination -->
+      <div v-if="filteredRentBills.length > 0" class="hidden lg:block">
+        <!-- Search Filter -->
+        <div class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
+          <UInput v-model="rentFilter" class="max-w-sm" placeholder="Cari tagihan..." icon="i-heroicons-magnifying-glass" />
+        </div>
+        
+        <UTable
+          ref="rentTable"
+          v-model:pagination="rentPagination"
+          v-model:global-filter="rentFilter"
+          :data="filteredRentBills"
+          :columns="rentColumns"
+          :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+        >
+          <!-- Period Cell -->
+          <template #periodStartDate-cell="{ row }">
+            <div class="font-medium">{{ formatDateRange(row.original.periodStartDate, row.original.periodEndDate) }}</div>
+            <div class="text-xs text-gray-400">{{ row.original.monthsCovered || 1 }} bulan</div>
+          </template>
+          
+          <!-- Due Date Cell -->
+          <template #dueDate-cell="{ row }">
+            <span class="text-gray-600">
+              {{ new Date(row.original.dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) }}
+            </span>
+          </template>
+          
+          <!-- Room Cell -->
+          <template #room-cell="{ row }">
+            <div class="font-medium">{{ row.original.room?.name || 'Unknown' }}</div>
+            <div v-if="row.original.tenant?.name" class="text-xs text-gray-500">{{ row.original.tenant.name }}</div>
+          </template>
+          
+          <!-- Total Cell -->
+          <template #totalAmount-cell="{ row }">
+            <span class="font-bold text-gray-900 dark:text-white">{{ formatCurrency(row.original.totalAmount) }}</span>
+          </template>
+          
+          <!-- Status Cell -->
+          <template #status-cell="{ row }">
+            <UBadge :color="row.original.isPaid ? 'success' : 'warning'" variant="subtle" size="xs">
+              {{ row.original.isPaid ? 'Paid' : 'Unpaid' }}
+            </UBadge>
+          </template>
+          
+          <!-- Actions Cell -->
+          <template #actions-cell="{ row }">
+            <div class="flex justify-end gap-1">
+              <UTooltip text="Bayar Online" v-if="!row.original.isPaid">
+                <UButton
+                  size="xs"
+                  color="primary"
+                  variant="soft"
+                  icon="i-heroicons-credit-card"
+                  :loading="payingBillId === row.original.id"
+                  @click="payOnline(row.original.id, 'rent')"
+                />
+              </UTooltip>
+              <UTooltip text="Mark as Paid" v-if="!row.original.isPaid">
+                <UButton
+                  size="xs"
+                  color="success"
+                  variant="soft"
+                  icon="i-heroicons-check"
+                  @click="markRentPaid(row.original.id)"
+                />
+              </UTooltip>
+              <UTooltip text="Print">
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-heroicons-printer"
+                  @click="printRent(row.original)"
+                />
+              </UTooltip>
+              <UTooltip text="Delete">
+                <UButton
+                  size="xs"
+                  color="error"
+                  variant="ghost"
+                  icon="i-heroicons-trash"
+                  @click="deleteRent(row.original.id)"
+                />
+              </UTooltip>
+            </div>
+          </template>
+        </UTable>
+        
+        <!-- Pagination -->
+        <div class="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4 px-4 pb-4">
+          <span class="text-sm text-gray-500">
+            Showing {{ (rentPagination.pageIndex * rentPagination.pageSize) + 1 }} - 
+            {{ Math.min((rentPagination.pageIndex + 1) * rentPagination.pageSize, rentTable?.tableApi?.getFilteredRowModel().rows.length || 0) }} 
+            of {{ rentTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
+          </span>
+          <UPagination
+            :page="(rentTable?.tableApi?.getState().pagination.pageIndex || 0) + 1"
+            :items-per-page="rentTable?.tableApi?.getState().pagination.pageSize"
+            :total="rentTable?.tableApi?.getFilteredRowModel().rows.length"
+            @update:page="(p) => rentTable?.tableApi?.setPageIndex(p - 1)"
+          />
+        </div>
+      </div>
+      <div v-if="filteredRentBills.length === 0" class="text-center py-16">
         <p class="text-gray-500">No rent bills found.</p>
       </div>
     </UCard>
 
     <!-- Utility Bills Table -->
     <UCard v-if="activeTab === 'utility'">
-      <div v-if="filteredUtilityBills.length > 0" class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
-          <thead
-            class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700"
+      <!-- Mobile View: Accordion Cards -->
+      <div v-if="filteredUtilityBills.length > 0" class="lg:hidden p-4 space-y-3">
+        <BillingUtilityBillCard
+          v-for="bill in filteredUtilityBills.slice(0, mobileLimits.utility)"
+          :key="bill.id"
+          :bill="bill"
+          :format-currency="formatCurrency"
+          @mark-paid="markUtilityPaid"
+          @pay-online="(id) => payOnline(id, 'utility')"
+          @print="printUtility"
+          @delete="deleteUtility"
+        />
+        
+        <!-- Loading Skeleton -->
+        <div v-if="mobileLoading.utility" class="space-y-3">
+          <div class="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-4 animate-pulse">
+            <div class="flex items-start gap-3">
+              <div class="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div class="flex-1 space-y-3">
+                <div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mt-3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Pagination Buttons -->
+        <div v-if="filteredUtilityBills.length > 5 && !mobileLoading.utility" class="flex justify-center gap-4 pt-2">
+          <span 
+            v-if="mobileLimits.utility < filteredUtilityBills.length"
+            class="text-sm text-primary-600 dark:text-primary-400 font-medium cursor-pointer hover:underline"
+            @click="loadMoreMobile('utility')"
           >
-            <tr>
-              <th class="p-3 font-medium">Period</th>
-              <th class="p-3 font-medium">Property</th>
-              <th class="p-3 font-medium">Room</th>
-              <th class="p-3 font-medium">Usage</th>
-              <th class="p-3 font-medium">Total</th>
-              <th class="p-3 font-medium">Status</th>
-              <th class="p-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="bill in filteredUtilityBills"
-              :key="bill.id"
-              class="hover:bg-gray-50 dark:hover:bg-gray-800/30"
-            >
-              <td class="p-3 font-medium">{{ bill.period }}</td>
-              <td class="p-3 text-gray-500">
-                {{ bill.property?.name || "Unknown" }}
-              </td>
-              <td class="p-3">
-                <div class="font-medium">{{ bill.room?.name || "Unknown" }}</div>
-                <div class="text-xs text-gray-500" v-if="bill.tenant?.name">
-                  {{ bill.tenant.name }}
-                </div>
-              </td>
-              <td class="p-3">
-                <div>{{ bill.meterEnd - bill.meterStart }} kWh</div>
-                <div class="text-xs text-gray-400 font-mono">
-                  {{ bill.meterStart }} → {{ bill.meterEnd }}
-                </div>
-              </td>
-              <td class="p-3 font-bold text-gray-900 dark:text-white">
-                {{ formatCurrency(bill.totalAmount) }}
-              </td>
-              <td class="p-3">
-                <UBadge
-                  :color="bill.isPaid ? 'success' : 'warning'"
-                  variant="subtle"
-                  size="xs"
-                >
-                  {{ bill.isPaid ? "Paid" : "Unpaid" }}
-                </UBadge>
-              </td>
-              <td class="p-3 text-right">
-                <div class="flex justify-end gap-1">
-                  <UTooltip text="Bayar Online" v-if="!bill.isPaid">
-                    <UButton
-                      size="xs"
-                      color="primary"
-                      variant="soft"
-                      icon="i-heroicons-credit-card"
-                      :loading="payingBillId === bill.id"
-                      @click="payOnline(bill.id, 'utility')"
-                    />
-                  </UTooltip>
-                  <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
-                    <UButton
-                      size="xs"
-                      color="success"
-                      variant="soft"
-                      icon="i-heroicons-check"
-                      @click="markUtilityPaid(bill.id)"
-                    />
-                  </UTooltip>
-                  <UTooltip text="Print">
-                    <UButton
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      icon="i-heroicons-printer"
-                      @click="printUtility(bill)"
-                    />
-                  </UTooltip>
-                  <UTooltip text="Delete">
-                    <UButton
-                      size="xs"
-                      color="error"
-                      variant="ghost"
-                      icon="i-heroicons-trash"
-                      @click="deleteUtility(bill.id)"
-                    />
-                  </UTooltip>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            Lebih Banyak
+          </span>
+          <span 
+            v-if="mobileLimits.utility > 5"
+            class="text-sm text-gray-500 dark:text-gray-400 font-medium cursor-pointer hover:underline"
+            @click="resetMobileLimit('utility')"
+          >
+            Tampilkan Lebih Sedikit
+          </span>
+        </div>
       </div>
-      <div v-else class="text-center py-16">
+      
+      <!-- Desktop View: UTable with Pagination -->
+      <div v-if="filteredUtilityBills.length > 0" class="hidden lg:block">
+        <!-- Search Filter -->
+        <div class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
+          <UInput v-model="utilityFilter" class="max-w-sm" placeholder="Cari tagihan..." icon="i-heroicons-magnifying-glass" />
+        </div>
+        
+        <UTable
+          ref="utilityTable"
+          v-model:pagination="utilityPagination"
+          v-model:global-filter="utilityFilter"
+          :data="filteredUtilityBills"
+          :columns="utilityColumns"
+          :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+        >
+          <!-- Period Cell -->
+          <template #period-cell="{ row }">
+            <span class="font-medium">{{ row.original.period }}</span>
+          </template>
+          
+          <!-- Room Cell -->
+          <template #room-cell="{ row }">
+            <div class="font-medium">{{ row.original.room?.name || 'Unknown' }}</div>
+            <div v-if="row.original.tenant?.name" class="text-xs text-gray-500">{{ row.original.tenant.name }}</div>
+          </template>
+          
+          <!-- Usage Cell -->
+          <template #usage-cell="{ row }">
+            <div>{{ (row.original.meterEnd || 0) - (row.original.meterStart || 0) }} kWh</div>
+            <div class="text-xs text-gray-400 font-mono">{{ row.original.meterStart }} → {{ row.original.meterEnd }}</div>
+          </template>
+          
+          <!-- Total Cell -->
+          <template #totalAmount-cell="{ row }">
+            <span class="font-bold text-gray-900 dark:text-white">{{ formatCurrency(row.original.totalAmount) }}</span>
+          </template>
+          
+          <!-- Status Cell -->
+          <template #status-cell="{ row }">
+            <UBadge :color="row.original.isPaid ? 'success' : 'warning'" variant="subtle" size="xs">
+              {{ row.original.isPaid ? 'Paid' : 'Unpaid' }}
+            </UBadge>
+          </template>
+          
+          <!-- Actions Cell -->
+          <template #actions-cell="{ row }">
+            <div class="flex justify-end gap-1">
+              <UTooltip text="Bayar Online" v-if="!row.original.isPaid">
+                <UButton
+                  size="xs"
+                  color="primary"
+                  variant="soft"
+                  icon="i-heroicons-credit-card"
+                  :loading="payingBillId === row.original.id"
+                  @click="payOnline(row.original.id, 'utility')"
+                />
+              </UTooltip>
+              <UTooltip text="Mark as Paid" v-if="!row.original.isPaid">
+                <UButton
+                  size="xs"
+                  color="success"
+                  variant="soft"
+                  icon="i-heroicons-check"
+                  @click="markUtilityPaid(row.original.id)"
+                />
+              </UTooltip>
+              <UTooltip text="Print">
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-heroicons-printer"
+                  @click="printUtility(row.original)"
+                />
+              </UTooltip>
+              <UTooltip text="Delete">
+                <UButton
+                  size="xs"
+                  color="error"
+                  variant="ghost"
+                  icon="i-heroicons-trash"
+                  @click="deleteUtility(row.original.id)"
+                />
+              </UTooltip>
+            </div>
+          </template>
+        </UTable>
+        
+        <!-- Pagination -->
+        <div class="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4 px-4 pb-4">
+          <span class="text-sm text-gray-500">
+            Showing {{ (utilityPagination.pageIndex * utilityPagination.pageSize) + 1 }} - 
+            {{ Math.min((utilityPagination.pageIndex + 1) * utilityPagination.pageSize, utilityTable?.tableApi?.getFilteredRowModel().rows.length || 0) }} 
+            of {{ utilityTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
+          </span>
+          <UPagination
+            :page="(utilityTable?.tableApi?.getState().pagination.pageIndex || 0) + 1"
+            :items-per-page="utilityTable?.tableApi?.getState().pagination.pageSize"
+            :total="utilityTable?.tableApi?.getFilteredRowModel().rows.length"
+            @update:page="(p) => utilityTable?.tableApi?.setPageIndex(p - 1)"
+          />
+        </div>
+      </div>
+      <div v-if="filteredUtilityBills.length === 0" class="text-center py-16">
         <p class="text-gray-500">No utility bills found.</p>
         <p class="text-gray-400 text-sm mt-1">
           Utility bills are auto-generated when you add meter readings.
@@ -1224,135 +1498,187 @@ const sendReminder = async (reminder: any) => {
 
     <!-- Combined Statements Table -->
     <UCard v-if="activeTab === 'summary'">
-      <div v-if="combinedBills.length > 0" class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
-          <thead
-            class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700"
+      <!-- Mobile View: Accordion Cards -->
+      <div v-if="combinedBills.length > 0" class="lg:hidden p-4 space-y-3">
+        <BillingSummaryCard
+          v-for="item in combinedBills.slice(0, mobileLimits.summary)"
+          :key="`${item.roomId}-${item.period}`"
+          :item="item"
+          :format-currency="formatCurrency"
+          @send-whats-app="sendToWhatsApp"
+          @print="printCombined"
+        />
+        
+        <!-- Loading Skeleton -->
+        <div v-if="mobileLoading.summary" class="space-y-3">
+          <div class="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-4 animate-pulse">
+            <div class="flex items-start gap-3">
+              <div class="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div class="flex-1 space-y-3">
+                <div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mt-3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Pagination Buttons -->
+        <div v-if="combinedBills.length > 5 && !mobileLoading.summary" class="flex justify-center gap-4 pt-2">
+          <span 
+            v-if="mobileLimits.summary < combinedBills.length"
+            class="text-sm text-primary-600 dark:text-primary-400 font-medium cursor-pointer hover:underline"
+            @click="loadMoreMobile('summary')"
           >
-            <tr>
-              <th class="p-3 font-medium">Period</th>
-              <th class="p-3 font-medium">Room</th>
-              <th class="p-3 font-medium text-right">Rent</th>
-              <th class="p-3 font-medium text-right">Utility</th>
-              <th class="p-3 font-medium text-right">Total</th>
-              <th class="p-3 font-medium text-center">Status</th>
-              <th class="p-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="item in combinedBills"
-              :key="`${item.roomId}-${item.period}`"
-              class="hover:bg-gray-50 dark:hover:bg-gray-800/30"
-            >
-              <td class="p-3 font-medium">{{ item.period }}</td>
-              <td class="p-3">
-                <div class="font-medium">
-                  {{
-                    item.rent?.room?.name || item.util?.room?.name || "Unknown"
-                  }}
-                </div>
-                <div class="text-xs text-gray-500">
-                  {{
-                    item.rent?.property?.name ||
-                    item.util?.property?.name ||
-                    "Unknown"
-                  }}
-                </div>
-                <div class="text-xs text-gray-500" v-if="item.rent?.tenant?.name || item.util?.tenant?.name">
-                  {{ item.rent?.tenant?.name || item.util?.tenant?.name }}
-                </div>
-              </td>
-              <td class="p-3 text-right">
-                <div v-if="item.rent">
-                  {{ formatCurrency(item.rent.totalAmount) }}
-                  <UIcon
-                    v-if="item.rent.isPaid"
-                    name="i-heroicons-check-circle"
-                    class="w-4 h-4 text-success-500 inline ml-1"
-                  />
-                  <UIcon
-                    v-else
-                    name="i-heroicons-clock"
-                    class="w-4 h-4 text-warning-500 inline ml-1"
-                  />
-                </div>
-                <div v-else class="text-gray-400">-</div>
-              </td>
-              <td class="p-3 text-right">
-                <div v-if="item.util">
-                  {{ formatCurrency(item.util.totalAmount) }}
-                  <UIcon
-                    v-if="item.util.isPaid"
-                    name="i-heroicons-check-circle"
-                    class="w-4 h-4 text-success-500 inline ml-1"
-                  />
-                  <UIcon
-                    v-else
-                    name="i-heroicons-clock"
-                    class="w-4 h-4 text-warning-500 inline ml-1"
-                  />
-                </div>
-                <div v-else class="text-gray-400">-</div>
-              </td>
-              <td class="p-3 text-right font-bold">
-                {{
-                  formatCurrency(
-                    Number(item.rent?.totalAmount || 0) +
-                      Number(item.util?.totalAmount || 0)
-                  )
-                }}
-              </td>
-              <td class="p-3 text-center">
-                <UBadge
-                  :color="
-                    item.rent?.isPaid !== false && item.util?.isPaid !== false
-                      ? 'success'
-                      : item.rent?.isPaid || item.util?.isPaid
-                        ? 'warning'
-                        : 'error'
-                  "
-                  variant="subtle"
-                  size="xs"
-                >
-                  {{
-                    item.rent?.isPaid !== false && item.util?.isPaid !== false
-                      ? "PAID"
-                      : item.rent?.isPaid || item.util?.isPaid
-                        ? "PARTIAL"
-                        : "UNPAID"
-                  }}
-                </UBadge>
-              </td>
-              <td class="p-3 text-right">
-                <div class="flex justify-end gap-1">
-                  <UTooltip text="Kirim ke WhatsApp">
-                    <UButton
-                      size="sm"
-                      color="success"
-                      variant="soft"
-                      icon="i-heroicons-chat-bubble-left-ellipsis"
-                      @click="sendToWhatsApp(item)"
-                      >WA</UButton
-                    >
-                  </UTooltip>
-                  <UTooltip text="Print Statement">
-                    <UButton
-                      size="sm"
-                      color="primary"
-                      variant="soft"
-                      icon="i-heroicons-printer"
-                      @click="printCombined(item)"
-                      >Print</UButton
-                    >
-                  </UTooltip>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            Lebih Banyak
+          </span>
+          <span 
+            v-if="mobileLimits.summary > 5"
+            class="text-sm text-gray-500 dark:text-gray-400 font-medium cursor-pointer hover:underline"
+            @click="resetMobileLimit('summary')"
+          >
+            Tampilkan Lebih Sedikit
+          </span>
+        </div>
       </div>
-      <div v-else class="text-center py-16">
+      
+      <!-- Desktop View: UTable with Pagination -->
+      <div v-if="combinedBills.length > 0" class="hidden lg:block">
+        <!-- Search Filter -->
+        <div class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
+          <UInput v-model="summaryFilter" class="max-w-sm" placeholder="Cari..." icon="i-heroicons-magnifying-glass" />
+        </div>
+        
+        <UTable
+          ref="summaryTable"
+          v-model:pagination="summaryPagination"
+          v-model:global-filter="summaryFilter"
+          :data="combinedBills"
+          :columns="summaryColumns"
+          :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+        >
+          <!-- Period Cell -->
+          <template #period-cell="{ row }">
+            <span class="font-medium">{{ row.original.period }}</span>
+          </template>
+          
+          <!-- Room Cell -->
+          <template #room-cell="{ row }">
+            <div class="font-medium">{{ row.original.rent?.room?.name || row.original.util?.room?.name || 'Unknown' }}</div>
+            <div class="text-xs text-gray-500">{{ row.original.rent?.property?.name || row.original.util?.property?.name || 'Unknown' }}</div>
+            <div v-if="row.original.rent?.tenant?.name || row.original.util?.tenant?.name" class="text-xs text-gray-500">
+              {{ row.original.rent?.tenant?.name || row.original.util?.tenant?.name }}
+            </div>
+          </template>
+          
+          <!-- Rent Cell -->
+          <template #rent-cell="{ row }">
+            <div v-if="row.original.rent">
+              {{ formatCurrency(row.original.rent.totalAmount) }}
+              <UIcon
+                v-if="row.original.rent.isPaid"
+                name="i-heroicons-check-circle"
+                class="w-4 h-4 text-success-500 inline ml-1"
+              />
+              <UIcon
+                v-else
+                name="i-heroicons-clock"
+                class="w-4 h-4 text-warning-500 inline ml-1"
+              />
+            </div>
+            <div v-else class="text-gray-400">-</div>
+          </template>
+          
+          <!-- Utility Cell -->
+          <template #utility-cell="{ row }">
+            <div v-if="row.original.util">
+              {{ formatCurrency(row.original.util.totalAmount) }}
+              <UIcon
+                v-if="row.original.util.isPaid"
+                name="i-heroicons-check-circle"
+                class="w-4 h-4 text-success-500 inline ml-1"
+              />
+              <UIcon
+                v-else
+                name="i-heroicons-clock"
+                class="w-4 h-4 text-warning-500 inline ml-1"
+              />
+            </div>
+            <div v-else class="text-gray-400">-</div>
+          </template>
+          
+          <!-- Total Cell -->
+          <template #total-cell="{ row }">
+            <span class="font-bold">
+              {{ formatCurrency(Number(row.original.rent?.totalAmount || 0) + Number(row.original.util?.totalAmount || 0)) }}
+            </span>
+          </template>
+          
+          <!-- Status Cell -->
+          <template #status-cell="{ row }">
+            <UBadge
+              :color="
+                row.original.rent?.isPaid !== false && row.original.util?.isPaid !== false
+                  ? 'success'
+                  : row.original.rent?.isPaid || row.original.util?.isPaid
+                    ? 'warning'
+                    : 'error'
+              "
+              variant="subtle"
+              size="xs"
+            >
+              {{
+                row.original.rent?.isPaid !== false && row.original.util?.isPaid !== false
+                  ? 'PAID'
+                  : row.original.rent?.isPaid || row.original.util?.isPaid
+                    ? 'PARTIAL'
+                    : 'UNPAID'
+              }}
+            </UBadge>
+          </template>
+          
+          <!-- Actions Cell -->
+          <template #actions-cell="{ row }">
+            <div class="flex justify-end gap-1">
+              <UTooltip text="Kirim ke WhatsApp">
+                <UButton
+                  size="sm"
+                  color="success"
+                  variant="soft"
+                  icon="i-heroicons-chat-bubble-left-ellipsis"
+                  @click="sendToWhatsApp(row.original)"
+                >WA</UButton>
+              </UTooltip>
+              <UTooltip text="Print Statement">
+                <UButton
+                  size="sm"
+                  color="primary"
+                  variant="soft"
+                  icon="i-heroicons-printer"
+                  @click="printCombined(row.original)"
+                >Print</UButton>
+              </UTooltip>
+            </div>
+          </template>
+        </UTable>
+        
+        <!-- Pagination -->
+        <div class="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4 px-4 pb-4">
+          <span class="text-sm text-gray-500">
+            Showing {{ (summaryPagination.pageIndex * summaryPagination.pageSize) + 1 }} - 
+            {{ Math.min((summaryPagination.pageIndex + 1) * summaryPagination.pageSize, summaryTable?.tableApi?.getFilteredRowModel().rows.length || 0) }} 
+            of {{ summaryTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
+          </span>
+          <UPagination
+            :page="(summaryTable?.tableApi?.getState().pagination.pageIndex || 0) + 1"
+            :items-per-page="summaryTable?.tableApi?.getState().pagination.pageSize"
+            :total="summaryTable?.tableApi?.getFilteredRowModel().rows.length"
+            @update:page="(p) => summaryTable?.tableApi?.setPageIndex(p - 1)"
+          />
+        </div>
+      </div>
+      <div v-if="combinedBills.length === 0" class="text-center py-16">
         <p class="text-gray-500">No data found for summary.</p>
       </div>
     </UCard>

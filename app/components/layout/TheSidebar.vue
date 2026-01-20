@@ -51,6 +51,11 @@ const defaultNavigation: NavItem[] = [
     to: '/tenants'
   },
   {
+    label: 'Reminders',
+    icon: 'i-heroicons-bell-alert',
+    to: '/reminders'
+  },
+  {
     label: 'Billing',
     icon: 'i-heroicons-banknotes',
     to: '/billing'
