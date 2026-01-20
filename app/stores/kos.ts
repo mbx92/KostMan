@@ -60,17 +60,17 @@ export interface RentBill {
     id: string
     roomId: string
     tenantId?: string | null
-    
+
     // Date-based billing (primary)
     periodStartDate: string // YYYY-MM-DD
     periodEndDate: string // YYYY-MM-DD
     dueDate: string // YYYY-MM-DD
     billingCycleDay?: number | null
-    
+
     // Legacy fields (for backward compatibility)
     period?: string | null // YYYY-MM
     periodEnd?: string | null
-    
+
     monthsCovered?: number
     roomPrice: number | string
     waterFee?: number | string
@@ -159,6 +159,16 @@ export const useKosStore = defineStore('kos', () => {
     })
     const settingsLoading = ref(false)
     const settingsError = ref<string | null>(null)
+
+    // Reminders
+    const reminders = ref<{
+        overdue: any[];
+        dueSoon: any[];
+        upcoming: any[];
+        counts: { total: number; overdue: number; dueSoon: number };
+    }>({ overdue: [], dueSoon: [], upcoming: [], counts: { total: 0, overdue: 0, dueSoon: 0 } })
+    const remindersLoading = ref(false)
+    const remindersError = ref<string | null>(null)
 
     // --- Actions ---
 
@@ -347,7 +357,7 @@ export const useKosStore = defineStore('kos', () => {
             if (params?.search) query.append('search', params.search)
             if (params?.page) query.append('page', params.page.toString())
             if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
-            
+
             const response = await $fetch<{ data: Room[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/api/rooms?${query.toString()}`)
             rooms.value = response.data.map(r => ({ ...r, price: Number(r.price) }))
             roomsMeta.value = response.meta
@@ -746,7 +756,7 @@ export const useKosStore = defineStore('kos', () => {
                 if (room) {
                     const property = properties.value.find(p => p.id === room.propertyId)
                     const effectiveSettings = property?.settings || settings.value
-                
+
                     if (effectiveSettings) {
                         // 1. Create utility bill for this meter reading
                         await createUtilityBill({
@@ -844,6 +854,20 @@ export const useKosStore = defineStore('kos', () => {
     )
 
 
+    async function fetchReminders() {
+        remindersLoading.value = true
+        remindersError.value = null
+        try {
+            const data = await $fetch<any>('/api/reminders')
+            reminders.value = data
+        } catch (err: any) {
+            remindersError.value = err?.data?.message || err?.message || 'Failed to fetch reminders'
+            console.error('fetchReminders error:', err)
+        } finally {
+            remindersLoading.value = false
+        }
+    }
+
     return {
         // State
         properties,
@@ -873,6 +897,9 @@ export const useKosStore = defineStore('kos', () => {
         settingsError,
         integrations,
         integrationsLoading,
+        reminders,
+        remindersLoading,
+        remindersError,
         // Actions
         fetchSettings,
         saveSettings,
@@ -909,6 +936,7 @@ export const useKosStore = defineStore('kos', () => {
         addTenant,
         updateTenant,
         deleteTenant,
+        fetchReminders,
         // Getters
         getPropertyById,
         getRoomsByPropertyId,
