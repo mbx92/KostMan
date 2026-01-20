@@ -23,20 +23,20 @@ const openEditCategory = (category: any) => {
 }
 
 const deleteCategory = async (id: string) => {
-  if (!confirm('Are you sure you want to delete this category?')) return
+  if (!confirm('Apakah Anda yakin ingin menghapus kategori ini?')) return
 
   try {
     await $fetch(`/api/expenses/categories/${id}`, { method: 'DELETE' })
     toast.add({
-      title: 'Category Deleted',
-      description: 'Category has been deleted successfully.',
+      title: 'Kategori Dihapus',
+      description: 'Kategori berhasil dihapus.',
       color: 'success'
     })
     await refreshCategories()
   } catch (e: any) {
     toast.add({
-      title: 'Error',
-      description: e?.data?.message || 'Failed to delete category',
+      title: 'Gagal',
+      description: e?.data?.message || 'Gagal menghapus kategori',
       color: 'error'
     })
   }
@@ -51,15 +51,15 @@ const toggleActive = async (category: any) => {
       }
     })
     toast.add({
-      title: 'Category Updated',
-      description: `Category ${category.isActive ? 'deactivated' : 'activated'} successfully.`,
+      title: 'Kategori Diperbarui',
+      description: `Kategori berhasil ${category.isActive ? 'dinonaktifkan' : 'diaktifkan'}.`,
       color: 'success'
     })
     await refreshCategories()
   } catch (e: any) {
     toast.add({
-      title: 'Error',
-      description: e?.data?.message || 'Failed to update category',
+      title: 'Gagal',
+      description: e?.data?.message || 'Gagal memperbarui kategori',
       color: 'error'
     })
   }
@@ -83,13 +83,13 @@ const onCategorySaved = async () => {
             to="/expenses"
           />
           <div>
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Expense Categories</h1>
-            <p class="text-gray-500 dark:text-gray-400 mt-1">Manage your custom expense categories</p>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Kategori Pengeluaran</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-1">Kelola kategori pengeluaran kustom Anda</p>
           </div>
         </div>
       </div>
       <UButton
-        label="Add Category"
+        label="Tambah Kategori"
         icon="i-heroicons-plus"
         color="primary"
         @click="openAddCategory"
@@ -99,8 +99,8 @@ const onCategorySaved = async () => {
     <!-- Default Categories -->
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Default Categories</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">System-provided categories that cannot be edited or deleted</p>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Kategori Bawaan</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Kategori bawaan sistem yang tidak dapat diedit atau dihapus</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -120,7 +120,7 @@ const onCategorySaved = async () => {
               </div>
             </div>
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-              Default
+              Bawaan
             </span>
           </div>
         </div>
@@ -130,8 +130,8 @@ const onCategorySaved = async () => {
     <!-- Custom Categories -->
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Custom Categories</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Your personalized expense categories</p>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Kategori Kustom</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Kategori pengeluaran pribadi Anda</p>
       </div>
 
       <div v-if="categoriesLoading" class="text-center py-8">
@@ -140,9 +140,9 @@ const onCategorySaved = async () => {
 
       <div v-else-if="customCategories.length === 0" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center">
         <UIcon name="i-heroicons-tag" class="w-12 h-12 mx-auto text-gray-400 mb-3" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-1">No custom categories yet</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-4">Create your first custom category to get started</p>
-        <UButton label="Add Category" icon="i-heroicons-plus" color="primary" @click="openAddCategory" />
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-1">Belum ada kategori kustom</h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-4">Buat kategori kustom pertama Anda untuk memulai</p>
+        <UButton label="Tambah Kategori" icon="i-heroicons-plus" color="primary" @click="openAddCategory" />
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -191,10 +191,10 @@ const onCategorySaved = async () => {
 
           <div class="flex items-center gap-2">
             <span v-if="category.isActive" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
-              Active
+              Aktif
             </span>
             <span v-else class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-              Inactive
+              Tidak Aktif
             </span>
           </div>
         </div>

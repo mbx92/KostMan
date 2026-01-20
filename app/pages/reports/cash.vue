@@ -16,7 +16,7 @@ const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: 'all' },
+  { label: 'Semua Properti', value: 'all' },
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
@@ -86,7 +86,7 @@ const formatCurrency = (value: number) => {
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  return new Date(dateString).toLocaleDateString('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
@@ -119,8 +119,8 @@ watch([selectedMonth, selectedPropertyId], () => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cash Report</h1>
-        <p class="text-gray-500 dark:text-gray-400">Real vs Expected Cash Flow Analysis</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Laporan Kas</h1>
+        <p class="text-gray-500 dark:text-gray-400">Analisis Arus Kas Riil vs Ekspektasi</p>
       </div>
       
       <!-- Filters -->
@@ -150,9 +150,9 @@ watch([selectedMonth, selectedPropertyId], () => {
             <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Expected Cash</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ekspektasi Kas</p>
             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(expectedTotal) }}</h3>
-            <p class="text-xs text-gray-400 mt-1">From {{ reportData?.expectedCash.roomsCount || 0 }} Occupied Rooms</p>
+            <p class="text-xs text-gray-400 mt-1">Dari {{ reportData?.expectedCash.roomsCount || 0 }} Kamar Terisi</p>
           </div>
         </div>
       </div>
@@ -164,9 +164,9 @@ watch([selectedMonth, selectedPropertyId], () => {
             <UIcon name="i-heroicons-check-circle" class="w-6 h-6 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Real Cash</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Kas Riil</p>
             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(realTotal) }}</h3>
-             <p class="text-xs text-gray-400 mt-1">From {{ reportData?.realCash.paidRoomsCount || 0 }} Paid Rooms</p>
+             <p class="text-xs text-gray-400 mt-1">Dari {{ reportData?.realCash.paidRoomsCount || 0 }} Kamar Lunas</p>
           </div>
         </div>
       </div>
@@ -180,7 +180,7 @@ watch([selectedMonth, selectedPropertyId], () => {
                    :class="varianceAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" />
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Variance</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Selisih</p>
              <h3 class="text-2xl font-bold mt-1" :class="varianceAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                 {{ formatCurrency(varianceAmount) }}
             </h3>
@@ -198,9 +198,9 @@ watch([selectedMonth, selectedPropertyId], () => {
             <UIcon name="i-heroicons-chart-pie" class="w-6 h-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Collection Rate</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tingkat Penagihan</p>
             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ collectionRate.toFixed(1) }}%</h3>
-            <p class="text-xs text-gray-400 mt-1">Of expected revenue</p>
+            <p class="text-xs text-gray-400 mt-1">Dari pendapatan yang diharapkan</p>
           </div>
         </div>
       </div>
@@ -213,22 +213,22 @@ watch([selectedMonth, selectedPropertyId], () => {
         <!-- Expected Breakdown -->
         <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <h3 class="font-semibold text-gray-900 dark:text-white">Expected Revenue by Room</h3>
-                 <UBadge color="primary" variant="subtle">{{ occupiedRooms.length }} Occupied</UBadge>
+                <h3 class="font-semibold text-gray-900 dark:text-white">Ekspektasi Pendapatan per Kamar</h3>
+                 <UBadge color="primary" variant="subtle">{{ occupiedRooms.length }} Terisi</UBadge>
             </div>
             <div class="overflow-x-auto max-h-[400px]">
                 <table class="w-full text-sm text-left">
                     <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50 sticky top-0">
                         <tr>
-                            <th class="px-4 py-3">Room</th>
-                            <th class="px-4 py-3 text-right">Rent</th>
-                            <th class="px-4 py-3 text-right">Est. Utility</th>
+                            <th class="px-4 py-3">Kamar</th>
+                            <th class="px-4 py-3 text-right">Sewa</th>
+                            <th class="px-4 py-3 text-right">Est. Listrik</th>
                             <th class="px-4 py-3 text-right">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="occupiedRooms.length === 0">
-                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">No occupied rooms found</td>
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">Tidak ada kamar terisi ditemukan</td>
                         </tr>
                         <tr v-for="room in occupiedRooms" :key="room.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                             <td class="px-4 py-3 font-medium">{{ room.roomName }}</td>
@@ -244,22 +244,22 @@ watch([selectedMonth, selectedPropertyId], () => {
         <!-- Real Payments -->
         <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
              <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <h3 class="font-semibold text-gray-900 dark:text-white">Real Payments by Room</h3>
-                <UBadge color="success" variant="subtle">{{ paidBills.length }} Paid</UBadge>
+                <h3 class="font-semibold text-gray-900 dark:text-white">Pembayaran Riil per Kamar</h3>
+                <UBadge color="success" variant="subtle">{{ paidBills.length }} Lunas</UBadge>
             </div>
              <div class="overflow-x-auto max-h-[400px]">
                 <table class="w-full text-sm text-left">
                     <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50 sticky top-0">
                         <tr>
-                            <th class="px-4 py-3">Room</th>
-                            <th class="px-4 py-3 text-right">Rent Paid</th>
-                            <th class="px-4 py-3 text-right">Utility Paid</th>
+                            <th class="px-4 py-3">Kamar</th>
+                            <th class="px-4 py-3 text-right">Sewa Dibayar</th>
+                            <th class="px-4 py-3 text-right">Listrik Dibayar</th>
                             <th class="px-4 py-3 text-right">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="paidBills.length === 0">
-                             <td colspan="4" class="px-4 py-8 text-center text-gray-500">No payments verified for this month</td>
+                             <td colspan="4" class="px-4 py-8 text-center text-gray-500">Tidak ada pembayaran terverifikasi bulan ini</td>
                         </tr>
                         <tr v-for="bill in paidBills" :key="bill.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                             <td class="px-4 py-3 font-medium">
@@ -281,25 +281,25 @@ watch([selectedMonth, selectedPropertyId], () => {
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
              <div class="flex items-center gap-2">
-                <h3 class="font-semibold text-gray-900 dark:text-white">Unpaid Bills</h3>
-                <UBadge color="error" variant="subtle">{{ unpaidBills.length }} Pending</UBadge>
+                <h3 class="font-semibold text-gray-900 dark:text-white">Tagihan Belum Lunas</h3>
+                <UBadge color="error" variant="subtle">{{ unpaidBills.length }} Tertunda</UBadge>
              </div>
         </div>
         <div class="overflow-x-auto">
              <table class="w-full text-sm text-left">
                 <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50">
                     <tr>
-                         <th class="px-6 py-3">Room</th>
-                         <th class="px-6 py-3">Due Date</th>
-                         <th class="px-6 py-3 text-right">Rent</th>
-                         <th class="px-6 py-3 text-right">Utility</th>
-                         <th class="px-6 py-3 text-right">Total Due</th>
-                         <th class="px-6 py-3 text-right">Action</th>
+                         <th class="px-6 py-3">Kamar</th>
+                         <th class="px-6 py-3">Jatuh Tempo</th>
+                         <th class="px-6 py-3 text-right">Sewa</th>
+                         <th class="px-6 py-3 text-right">Listrik</th>
+                         <th class="px-6 py-3 text-right">Total Tagihan</th>
+                         <th class="px-6 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="unpaidBills.length === 0">
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">No unpaid bills for this period</td>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">Tidak ada tagihan belum lunas untuk periode ini</td>
                     </tr>
                     <tr v-for="(bill, index) in unpaidBills" :key="index" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 font-medium">{{ bill.roomName }}</td>

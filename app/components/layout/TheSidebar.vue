@@ -36,21 +36,21 @@ const defaultNavigation: NavItem[] = [
     to: '/'
   },
   {
-    label: 'Property Management',
+    label: 'Kelola Properti',
     icon: 'i-heroicons-building-office-2',
     children: [
       {
-        label: 'Properties',
+        label: 'Properti',
         icon: 'i-heroicons-building-office',
         to: '/properties'
       },
       {
-        label: 'Rooms',
+        label: 'Kamar',
         icon: 'i-heroicons-home-modern',
         to: '/rooms'
       },
       {
-        label: 'Tenants',
+        label: 'Penyewa',
         icon: 'i-heroicons-users',
         to: '/tenants'
       }
@@ -61,48 +61,48 @@ const defaultNavigation: NavItem[] = [
     icon: 'i-heroicons-banknotes',
     children: [
       {
-        label: 'Reminders',
+        label: 'Pengingat',
         icon: 'i-heroicons-bell-alert',
         to: '/reminders'
       },
       {
-        label: 'Billing',
+        label: 'Kelola Tagihan',
         icon: 'i-heroicons-calculator',
         to: '/billing'
       },
       {
-        label: 'Expenses',
+        label: 'Pengeluaran',
         icon: 'i-heroicons-receipt-percent',
         to: '/expenses'
       }
     ]
   },
   {
-    label: 'Reports',
+    label: 'Laporan',
     icon: 'i-heroicons-chart-bar',
     children: [
       {
-        label: 'Cash Report',
+        label: 'Laporan Kas',
         to: '/reports/cash'
       },
       {
-        label: 'Payment Report',
+        label: 'Laporan Pembayaran',
         to: '/reports/payments'
       },
       {
-        label: 'Income Report',
+        label: 'Laporan Pendapatan',
         to: '/reports/income'
       },
       {
-        label: 'Tenant Report',
+        label: 'Laporan Penyewa',
         to: '/reports/tenants'
       },
       {
-        label: 'Electricity Report',
+        label: 'Laporan Listrik',
         to: '/reports/electricity'
       },
       {
-        label: 'Profit & Loss',
+        label: 'Laba Rugi',
         to: '/reports/profit-loss'
       }
     ]

@@ -19,18 +19,18 @@ const selectedBillType = ref('all')
 
 // -- Options --
 const paymentMethods = [
-  { label: 'All Methods', value: 'all' },
-  { label: 'Cash', value: 'cash' },
+  { label: 'Semua Metode', value: 'all' },
+  { label: 'Tunai', value: 'cash' },
   { label: 'Transfer', value: 'transfer' },
-  { label: 'Credit Card', value: 'credit_card' },
-  { label: 'Debit Card', value: 'debit_card' },
+  { label: 'Kartu Kredit', value: 'credit_card' },
+  { label: 'Kartu Debit', value: 'debit_card' },
   { label: 'E-Wallet', value: 'e_wallet' }
 ]
 
 const billTypes = [
-  { label: 'All Types', value: 'all' },
-  { label: 'Rent', value: 'rent' },
-  { label: 'Utility', value: 'utility' }
+  { label: 'Semua Tipe', value: 'all' },
+  { label: 'Sewa', value: 'rent' },
+  { label: 'Listrik', value: 'utility' }
 ]
 
 // -- Fetch Properties --
@@ -38,7 +38,7 @@ const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: 'all' },
+  { label: 'Semua Properti', value: 'all' },
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
@@ -105,7 +105,7 @@ const formatCurrency = (value: number) => {
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  return new Date(dateString).toLocaleDateString('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
@@ -124,23 +124,23 @@ const getPaymentMethodLabel = (value: string) => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Payment Report</h1>
-        <p class="text-gray-500 dark:text-gray-400">Analyze incoming payments and trends</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Laporan Pembayaran</h1>
+        <p class="text-gray-500 dark:text-gray-400">Analisis pembayaran masuk dan tren</p>
       </div>
       
       <!-- Filters -->
       <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-auto">
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-                 <label class="block text-xs font-medium text-gray-500 mb-1">Start Date</label>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Mulai</label>
                  <UInput type="date" v-model="startDate" class="w-full" />
             </div>
             <div>
-                 <label class="block text-xs font-medium text-gray-500 mb-1">End Date</label>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Akhir</label>
                  <UInput type="date" v-model="endDate" class="w-full" />
             </div>
             <div>
-                 <label class="block text-xs font-medium text-gray-500 mb-1">Property</label>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
                  <USelect 
                     v-model="selectedPropertyId" 
                     :items="propertyOptions"
@@ -150,7 +150,7 @@ const getPaymentMethodLabel = (value: string) => {
                 />
             </div>
             <div>
-                 <label class="block text-xs font-medium text-gray-500 mb-1">Method</label>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Metode</label>
                  <USelect 
                     v-model="selectedPaymentMethod" 
                     :items="paymentMethods"
@@ -171,7 +171,7 @@ const getPaymentMethodLabel = (value: string) => {
              <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pendapatan</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalAmount || 0) }}</h3>
            </div>
         </div>
@@ -183,7 +183,7 @@ const getPaymentMethodLabel = (value: string) => {
              <UIcon name="i-heroicons-document-check" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Payments</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pembayaran</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.totalPayments || 0 }}</h3>
            </div>
         </div>
@@ -195,7 +195,7 @@ const getPaymentMethodLabel = (value: string) => {
              <UIcon name="i-heroicons-home" class="w-6 h-6 text-green-600 dark:text-green-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Rent Payments</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pembayaran Sewa</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.rentPaymentsCount || 0 }}</h3>
            </div>
         </div>
@@ -207,7 +207,7 @@ const getPaymentMethodLabel = (value: string) => {
              <UIcon name="i-heroicons-bolt" class="w-6 h-6 text-orange-600 dark:text-orange-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Utility Payments</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pembayaran Listrik</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.utilityPaymentsCount || 0 }}</h3>
            </div>
         </div>
@@ -219,7 +219,7 @@ const getPaymentMethodLabel = (value: string) => {
         
         <!-- By Payment Method -->
         <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Metode Pembayaran</h3>
              <div class="space-y-4">
                 <div v-for="item in reportData?.byPaymentMethod" :key="item.method" class="space-y-1">
                     <div class="flex justify-between text-sm">
@@ -231,21 +231,21 @@ const getPaymentMethodLabel = (value: string) => {
                     </div>
                 </div>
                 <div v-if="!reportData?.byPaymentMethod.length" class="text-center text-gray-500 py-4">
-                    No data available
+                    Tidak ada data
                 </div>
              </div>
         </div>
 
         <!-- By Property -->
         <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Revenue by Property</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Pendapatan per Properti</h3>
              <div class="space-y-4">
                 <div v-for="item in reportData?.byProperty" :key="item.propertyId" class="flex items-center justify-between border-b last:border-0 border-gray-100 dark:border-gray-800 py-3">
                     <div class="flex items-center gap-3">
                         <UIcon name="i-heroicons-building-office-2" class="w-5 h-5 text-gray-400" />
                         <div>
                             <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.propertyName }}</div>
-                            <div class="text-xs text-gray-500">{{ item.paymentsCount }} payments</div>
+                            <div class="text-xs text-gray-500">{{ item.paymentsCount }} pembayaran</div>
                         </div>
                     </div>
                     <div class="text-sm font-bold text-gray-900 dark:text-white">
@@ -253,7 +253,7 @@ const getPaymentMethodLabel = (value: string) => {
                     </div>
                 </div>
                 <div v-if="!reportData?.byProperty.length" class="text-center text-gray-500 py-4">
-                    No data available
+                    Tidak ada data
                 </div>
              </div>
         </div>
@@ -263,22 +263,22 @@ const getPaymentMethodLabel = (value: string) => {
     <!-- Detailed Table -->
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-             <h3 class="font-semibold text-gray-900 dark:text-white">Recent Payments</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white">Pembayaran Terkini</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
                 <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50">
                     <tr>
-                        <th class="px-6 py-3">Date</th>
-                        <th class="px-6 py-3">Tenant / Room</th>
-                        <th class="px-6 py-3">Type</th>
-                        <th class="px-6 py-3">Method</th>
-                        <th class="px-6 py-3 text-right">Amount</th>
+                        <th class="px-6 py-3">Tanggal</th>
+                        <th class="px-6 py-3">Penyewa / Kamar</th>
+                        <th class="px-6 py-3">Tipe</th>
+                        <th class="px-6 py-3">Metode</th>
+                        <th class="px-6 py-3 text-right">Jumlah</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="reportData?.payments.length === 0">
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">No payments found in this period</td>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada pembayaran ditemukan untuk periode ini</td>
                     </tr>
                     <tr v-for="payment in reportData?.payments" :key="payment.id" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 whitespace-nowrap text-gray-500">
@@ -290,7 +290,7 @@ const getPaymentMethodLabel = (value: string) => {
                         </td>
                         <td class="px-6 py-3">
                             <UBadge :color="payment.billType === 'rent' ? 'success' : 'warning'" variant="subtle" size="xs">
-                                {{ payment.billType }}
+                                {{ payment.billType === 'rent' ? 'Sewa' : 'Listrik' }}
                             </UBadge>
                         </td>
                          <td class="px-6 py-3">

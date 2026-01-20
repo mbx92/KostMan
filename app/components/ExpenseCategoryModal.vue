@@ -29,9 +29,9 @@ const state = reactive({
 
 // Validation Schema
 const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(100),
+  name: z.string().min(1, 'Nama wajib diisi').max(100),
   description: z.string().max(500).optional(),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format'),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Format warna tidak valid'),
   isActive: z.boolean()
 })
 
@@ -39,15 +39,15 @@ type Schema = z.output<typeof schema>
 
 // Predefined colors
 const colorOptions = [
-  { value: '#ef4444', label: 'Red' },
-  { value: '#f59e0b', label: 'Orange' },
-  { value: '#eab308', label: 'Yellow' },
-  { value: '#10b981', label: 'Green' },
-  { value: '#3b82f6', label: 'Blue' },
-  { value: '#6366f1', label: 'Indigo' },
-  { value: '#8b5cf6', label: 'Purple' },
-  { value: '#ec4899', label: 'Pink' },
-  { value: '#6b7280', label: 'Gray' }
+  { value: '#ef4444', label: 'Merah' },
+  { value: '#f59e0b', label: 'Oranye' },
+  { value: '#eab308', label: 'Kuning' },
+  { value: '#10b981', label: 'Hijau' },
+  { value: '#3b82f6', label: 'Biru' },
+  { value: '#6366f1', label: 'Nila' },
+  { value: '#8b5cf6', label: 'Ungu' },
+  { value: '#ec4899', label: 'Merah Muda' },
+  { value: '#6b7280', label: 'Abu-abu' }
 ]
 
 // Sync with prop for Edit Mode
@@ -88,8 +88,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         body: payload
       })
       toast.add({
-        title: 'Category Updated',
-        description: 'Category has been updated successfully.',
+        title: 'Kategori Diperbarui',
+        description: 'Kategori berhasil diperbarui.',
         color: 'success',
       })
     } else {
@@ -98,8 +98,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         body: payload
       })
       toast.add({
-        title: 'Category Created',
-        description: 'New category has been added successfully.',
+        title: 'Kategori Dibuat',
+        description: 'Kategori baru berhasil ditambahkan.',
         color: 'success',
       })
     }
@@ -108,8 +108,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     isOpen.value = false
   } catch (err: any) {
     toast.add({
-      title: 'Error',
-      description: err?.data?.message || err?.message || 'Failed to save category',
+      title: 'Gagal',
+      description: err?.data?.message || err?.message || 'Gagal menyimpan kategori',
       color: 'error',
     })
   } finally {
@@ -119,7 +119,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" :title="category ? 'Edit Category' : 'Add New Category'">
+  <UModal v-model:open="isOpen" :title="category ? 'Edit Kategori' : 'Tambah Kategori Baru'">
     <template #default />
     
     <template #content>
@@ -128,17 +128,17 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           
           <div class="space-y-4">
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Category Name</label>
-              <UInput v-model="state.name" placeholder="e.g. Pool Maintenance" autofocus class="w-full" />
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Kategori</label>
+              <UInput v-model="state.name" placeholder="contoh: Perawatan Kolam Renang" autofocus class="w-full" />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-              <UTextarea v-model="state.description" placeholder="Optional description..." class="w-full" />
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi</label>
+              <UTextarea v-model="state.description" placeholder="Deskripsi opsional..." class="w-full" />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Warna</label>
               <div class="grid grid-cols-9 gap-2">
                 <button
                   v-for="colorOption in colorOptions"
@@ -152,7 +152,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
                 />
               </div>
               <div class="flex items-center gap-2 mt-2">
-                <span class="text-sm text-gray-500">Custom:</span>
+                <span class="text-sm text-gray-500">Kustom:</span>
                 <input v-model="state.color" type="color" class="h-8 w-16 rounded cursor-pointer" />
                 <span class="text-xs text-gray-400 font-mono">{{ state.color }}</span>
               </div>
@@ -160,26 +160,26 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 
             <div class="flex items-center justify-between">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Active Status</label>
-                <p class="text-xs text-gray-500 mt-1">Inactive categories won't appear in expense forms</p>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status Aktif</label>
+                <p class="text-xs text-gray-500 mt-1">Kategori tidak aktif tidak akan muncul di formulir pengeluaran</p>
               </div>
               <USwitch v-model="state.isActive" />
             </div>
 
             <!-- Preview -->
             <div class="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-              <p class="text-xs text-gray-500 mb-2">Preview:</p>
+              <p class="text-xs text-gray-500 mb-2">Pratinjau:</p>
               <div class="flex items-center gap-2">
                 <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: state.color }" />
-                <span class="font-medium">{{ state.name || 'Category Name' }}</span>
+                <span class="font-medium">{{ state.name || 'Nama Kategori' }}</span>
                 <span v-if="state.description" class="text-sm text-gray-500">- {{ state.description }}</span>
               </div>
             </div>
           </div>
 
           <div class="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
-            <UButton type="submit" label="Save Category" color="primary" :loading="isSaving" />
+            <UButton label="Batal" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
+            <UButton type="submit" label="Simpan Kategori" color="primary" :loading="isSaving" />
           </div>
         </UForm>
       </div>

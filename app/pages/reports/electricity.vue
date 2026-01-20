@@ -23,7 +23,7 @@ const selectedPropertyId = ref('all')
 const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: 'all' },
+  { label: 'Semua Properti', value: 'all' },
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
@@ -89,6 +89,19 @@ const maxUsage = computed(() => {
     return Math.max(...reportData.value.byPeriod.map(p => p.totalUsage))
 })
 
+// Transform English trend to Indonesian
+const translateTrend = (trend: string): string => {
+    switch (trend) {
+        case 'increasing':
+            return 'meningkat';
+        case 'decreasing':
+            return 'menurun';
+        case 'stable':
+            return 'stabil';
+        default:
+            return trend;
+    }
+}
 </script>
 
 <template>
@@ -96,8 +109,8 @@ const maxUsage = computed(() => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Electricity Usage</h1>
-        <p class="text-gray-500 dark:text-gray-400">Monitor power consumption and costs</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Penggunaan Listrik</h1>
+        <p class="text-gray-500 dark:text-gray-400">Pantau konsumsi daya dan biaya</p>
       </div>
       
       <!-- Filters -->
@@ -128,7 +141,7 @@ const maxUsage = computed(() => {
              <UIcon name="i-heroicons-bolt" class="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Usage</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Penggunaan</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatNumber(reportData?.summary.totalUsage || 0) }} <span class="text-sm font-normal text-gray-500">kWh</span></h3>
            </div>
         </div>
@@ -140,7 +153,7 @@ const maxUsage = computed(() => {
              <UIcon name="i-heroicons-currency-dollar" class="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Cost</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Biaya</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalCost || 0) }}</h3>
            </div>
         </div>
@@ -152,7 +165,7 @@ const maxUsage = computed(() => {
              <UIcon name="i-heroicons-chart-bar" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg / Room</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Rata-rata / Kamar</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatNumber(Math.round(reportData?.summary.averageUsagePerRoom || 0)) }} <span class="text-sm font-normal text-gray-500">kWh</span></h3>
            </div>
         </div>
@@ -164,9 +177,9 @@ const maxUsage = computed(() => {
              <UIcon name="i-heroicons-exclamation-triangle" class="w-6 h-6 text-red-600 dark:text-red-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Alerts</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Peringatan</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.unusualUsage.length || 0 }}</h3>
-             <p class="text-xs text-gray-400 mt-1">Unusual deviations</p>
+             <p class="text-xs text-gray-400 mt-1">Penyimpangan tidak wajar</p>
            </div>
         </div>
       </div>
@@ -174,7 +187,7 @@ const maxUsage = computed(() => {
 
     <!-- Usage Trend Chart -->
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-         <h3 class="font-semibold text-gray-900 dark:text-white mb-6">Usage Trend (kWh)</h3>
+         <h3 class="font-semibold text-gray-900 dark:text-white mb-6">Tren Penggunaan (kWh)</h3>
          <div class="h-64 flex items-end justify-between gap-2 overflow-x-auto pb-2">
              <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[40px] flex-1">
                  <div class="w-full bg-yellow-100 dark:bg-yellow-900/30 rounded-t-lg relative flex items-end justify-center group-hover:bg-yellow-200 transition-colors" 
@@ -186,7 +199,7 @@ const maxUsage = computed(() => {
                  <span class="text-xs text-gray-500 rotate-0 truncate max-w-full">{{ item.period }}</span>
              </div>
              <div v-if="!reportData?.byPeriod.length" class="w-full h-full flex items-center justify-center text-gray-400">
-                 No usage data available for this period
+                 Tidak ada data penggunaan untuk periode ini
              </div>
          </div>
     </div>
@@ -194,23 +207,23 @@ const maxUsage = computed(() => {
     <!-- Detail Table -->
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-             <h3 class="font-semibold text-gray-900 dark:text-white">Room Usage Details</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white">Detail Penggunaan Kamar</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
                 <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50">
                     <tr>
-                        <th class="px-6 py-3">Room</th>
-                        <th class="px-6 py-3">Property</th>
-                        <th class="px-6 py-3 text-right">Total Usage</th>
-                        <th class="px-6 py-3 text-right">Avg Usage</th>
-                         <th class="px-6 py-3 text-center">Trend</th>
-                        <th class="px-6 py-3 text-right">Total Cost</th>
+                        <th class="px-6 py-3">Kamar</th>
+                        <th class="px-6 py-3">Properti</th>
+                        <th class="px-6 py-3 text-right">Total Penggunaan</th>
+                        <th class="px-6 py-3 text-right">Rata-rata Penggunaan</th>
+                         <th class="px-6 py-3 text-center">Tren</th>
+                        <th class="px-6 py-3 text-right">Total Biaya</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="reportData?.byRoom.length === 0">
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">No data found</td>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">Tidak ada data ditemukan</td>
                     </tr>
                     <tr v-for="room in reportData?.byRoom" :key="room.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 font-medium text-gray-900 dark:text-white">{{ room.roomName }}</td>
@@ -221,7 +234,7 @@ const maxUsage = computed(() => {
                             <UBadge 
                                 :color="room.trend === 'increasing' ? 'warning' : (room.trend === 'decreasing' ? 'success' : 'neutral')" 
                                 variant="subtle" size="xs">
-                                {{ room.trend }}
+                                {{ translateTrend(room.trend) }}
                             </UBadge>
                         </td>
                         <td class="px-6 py-3 text-right font-medium text-gray-900 dark:text-white">{{ formatCurrency(room.totalCost) }}</td>
@@ -235,7 +248,7 @@ const maxUsage = computed(() => {
     <div v-if="reportData?.unusualUsage.length" class="bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20 p-6">
         <h3 class="font-semibold text-red-700 dark:text-red-400 mb-4 flex items-center gap-2">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-5 h-5" />
-            High Usage Alerts
+            Peringatan Penggunaan Tinggi
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div v-for="(alert, idx) in reportData.unusualUsage" :key="idx" class="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-red-100 dark:border-red-900/30">
@@ -244,15 +257,15 @@ const maxUsage = computed(() => {
                         <div class="font-medium text-gray-900 dark:text-white">{{ alert.roomName }}</div>
                         <div class="text-xs text-gray-500">{{ alert.period }}</div>
                     </div>
-                    <UBadge color="error" variant="subtle">{{ Math.round(alert.deviation) }}% deviation</UBadge>
+                    <UBadge color="error" variant="subtle">{{ Math.round(alert.deviation) }}% penyimpangan</UBadge>
                 </div>
                 <div class="mt-2 text-sm">
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Usage:</span>
+                        <span class="text-gray-500">Penggunaan:</span>
                         <span class="font-medium">{{ formatNumber(alert.usage) }} kWh</span>
                     </div>
                      <div class="flex justify-between">
-                        <span class="text-gray-500">Avg:</span>
+                        <span class="text-gray-500">Rata-rata:</span>
                         <span class="font-medium">{{ formatNumber(Math.round(alert.averageUsage)) }} kWh</span>
                     </div>
                 </div>

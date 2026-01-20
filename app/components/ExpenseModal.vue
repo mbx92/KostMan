@@ -44,6 +44,8 @@ const state = reactive({
   notes: ''
 })
 
+
+
 // Computed options for USelect (mapping to label/value for reliability)
 const propertyOptions = computed(() => {
   return props.properties.map(p => ({
@@ -63,15 +65,15 @@ const categoryOptions = computed(() => {
 // Validation Schema
 const schema = z.object({
   propertyId: z.string().optional(),
-  category: z.string().min(1, 'Category is required'),
-  description: z.string().min(3, 'Description is too short'),
-  amount: z.number().positive('Amount must be positive'),
+  category: z.string().min(1, 'Kategori wajib diisi'),
+  description: z.string().min(3, 'Deskripsi terlalu pendek'),
+  amount: z.number().positive('Jumlah harus positif'),
   type: z.enum(['property', 'global']),
-  expenseDate: z.string().min(1, 'Expense date is required'),
+  expenseDate: z.string().min(1, 'Tanggal pengeluaran wajib diisi'),
   paidDate: z.string().optional(),
   isPaid: z.boolean(),
   paymentMethod: z.string().optional(),
-  receiptUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  receiptUrl: z.string().url('Harus berupa URL yang valid').optional().or(z.literal('')),
   notes: z.string().optional()
 }).refine(data => {
   if (data.type === 'property' && !data.propertyId) {
@@ -79,7 +81,7 @@ const schema = z.object({
   }
   return true
 }, {
-  message: 'Property is required for property expenses',
+  message: 'Properti wajib dipilih untuk pengeluaran properti',
   path: ['propertyId']
 })
 
@@ -128,15 +130,15 @@ const isOpen = computed({
 })
 
 const typeOptions = [
-  { value: 'property', label: 'Property Expense' },
-  { value: 'global', label: 'Global Expense' }
+  { value: 'property', label: 'Pengeluaran Properti' },
+  { value: 'global', label: 'Pengeluaran Global' }
 ]
 
 const paymentMethods = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'transfer', label: 'Bank Transfer' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'debit_card', label: 'Debit Card' },
+  { value: 'cash', label: 'Tunai' },
+  { value: 'transfer', label: 'Transfer Bank' },
+  { value: 'credit_card', label: 'Kartu Kredit' },
+  { value: 'debit_card', label: 'Kartu Debit' },
   { value: 'e_wallet', label: 'E-Wallet' }
 ]
 
@@ -161,8 +163,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         body: payload
       })
       toast.add({
-        title: 'Expense Updated',
-        description: 'Expense has been updated successfully.',
+        title: 'Pengeluaran Diperbarui',
+        description: 'Pengeluaran berhasil diperbarui.',
         color: 'success',
       })
     } else {
@@ -171,8 +173,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         body: payload
       })
       toast.add({
-        title: 'Expense Created',
-        description: 'New expense has been added successfully.',
+        title: 'Pengeluaran Dibuat',
+        description: 'Pengeluaran baru berhasil ditambahkan.',
         color: 'success',
       })
     }
@@ -181,8 +183,8 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     isOpen.value = false
   } catch (err: any) {
     toast.add({
-      title: 'Error',
-      description: err?.data?.message || err?.message || 'Failed to save expense',
+      title: 'Gagal',
+      description: err?.data?.message || err?.message || 'Gagal menyimpan pengeluaran',
       color: 'error',
     })
   } finally {
@@ -192,7 +194,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" :title="expense ? 'Edit Expense' : 'Add New Expense'">
+  <UModal v-model:open="isOpen" :title="expense ? 'Edit Pengeluaran' : 'Tambah Pengeluaran'">
     <template #default />
     
     <template #content>
@@ -200,10 +202,10 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         <UForm :schema="schema" :state="state" class="space-y-6" @submit="onSubmit">
           
           <div class="space-y-4">
-            <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Expense Details</h3>
+            <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Rincian Pengeluaran</h3>
             
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipe</label>
               <USelect 
                 v-model="state.type" 
                 :items="typeOptions" 
@@ -214,71 +216,71 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
             </div>
 
             <div v-if="state.type === 'property'" class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Property</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Properti</label>
               <USelect 
                 v-model="state.propertyId" 
                 :items="propertyOptions" 
                 value-key="value" 
                 label-key="label"
-                placeholder="Select property"
+                placeholder="Pilih properti"
                 class="w-full"
               />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Kategori</label>
               <USelect 
                 v-model="state.category" 
                 :items="categoryOptions" 
                 value-key="value" 
                 label-key="label"
-                placeholder="Select category"
+                placeholder="Pilih kategori"
                 class="w-full"
               />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-              <UTextarea v-model="state.description" placeholder="e.g. AC repair in Room 101" class="w-full" />
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi</label>
+              <UTextarea v-model="state.description" placeholder="contoh: Perbaikan AC di Kamar 101" class="w-full" />
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah</label>
               <UInput v-model="state.amount" type="number" step="0.01" placeholder="0.00" class="w-full">
                 <template #leading>Rp</template>
               </UInput>
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Expense Date</label>
-              <UInput v-model="state.expenseDate" type="date" class="w-full" />
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Pengeluaran</label>
+              <DatePicker v-model="state.expenseDate" granularity="day" class="w-full" />
             </div>
           </div>
 
           <!-- Payment Details -->
           <div class="space-y-4">
             <div class="flex items-center justify-between border-b pb-2 border-gray-100 dark:border-gray-800">
-              <h3 class="font-medium text-gray-900 dark:text-white">Payment Details</h3>
+              <h3 class="font-medium text-gray-900 dark:text-white">Rincian Pembayaran</h3>
               <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500">Paid</span>
+                <span class="text-xs text-gray-500">Lunas</span>
                 <USwitch v-model="state.isPaid" />
               </div>
             </div>
 
             <div v-if="state.isPaid" class="space-y-4 animate-fade-in">
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Paid Date</label>
-                <UInput v-model="state.paidDate" type="date" class="w-full" />
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Bayar</label>
+                <DatePicker v-model="state.paidDate" granularity="day" class="w-full" />
               </div>
 
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Metode Pembayaran</label>
                 <USelect 
                   v-model="state.paymentMethod" 
                   :items="paymentMethods" 
                   value-key="value" 
                   label-key="label"
-                  placeholder="Select payment method"
+                  placeholder="Pilih metode pembayaran"
                   class="w-full"
                 />
               </div>
@@ -287,23 +289,23 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 
           <!-- Additional Info -->
           <div class="space-y-4">
-            <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Additional Information</h3>
+            <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Informasi Tambahan</h3>
             
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Receipt URL</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">URL Kuitansi</label>
               <UInput v-model="state.receiptUrl" placeholder="https://..." class="w-full" />
-              <p class="text-xs text-gray-500 mt-1">Link to receipt image or PDF</p>
+              <p class="text-xs text-gray-500 mt-1">Tautan ke gambar atau PDF kuitansi</p>
             </div>
 
             <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notes</label>
-              <UTextarea v-model="state.notes" placeholder="Additional notes..." class="w-full" />
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Catatan</label>
+              <UTextarea v-model="state.notes" placeholder="Catatan tambahan..." class="w-full" />
             </div>
           </div>
 
           <div class="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
-            <UButton type="submit" label="Save Expense" color="primary" :loading="isSaving" />
+            <UButton label="Batal" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
+            <UButton type="submit" label="Simpan Pengeluaran" color="primary" :loading="isSaving" />
           </div>
         </UForm>
       </div>

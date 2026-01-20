@@ -57,11 +57,11 @@ export default defineEventHandler(async (event) => {
     const expenseQuery = db.select({
         amount: expenses.amount,
         date: expenses.paidDate, // Using paidDate for Cash Basis
-        categoryName: expenseCategories.name,
+        categoryName: expenses.category,
         propertyId: expenses.propertyId
     })
         .from(expenses)
-        .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+        // .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id)) // expenses schema uses 'category' string
         .where(and(
             gte(expenses.paidDate, startDateStr), // expenses.paidDate is date/string usually? Schema check: expenseDate is string YYYY-MM-DD? check previous turns. paidDate is string in schema?
             lte(expenses.paidDate, endDateStr),

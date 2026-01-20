@@ -24,20 +24,20 @@ const groupBy = ref('month')
 
 // -- Options --
 const groupByOptions = [
-    { label: 'Monthly', value: 'month' },
-    { label: 'Yearly', value: 'year' }
+    { label: 'Bulanan', value: 'month' },
+    { label: 'Tahunan', value: 'year' }
 ]
 
 const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: 'all' },
+  { label: 'Semua Properti', value: 'all' },
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
 const presetRanges = [
-  { label: 'This Month', getValue: () => [getStartOfMonth(new Date()), getEndOfMonth(new Date())] },
-  { label: 'This Year', getValue: () => [getStartOfYear(new Date()), getEndOfYear(new Date())] }
+  { label: 'Bulan Ini', getValue: () => [getStartOfMonth(new Date()), getEndOfMonth(new Date())] },
+  { label: 'Tahun Ini', getValue: () => [getStartOfYear(new Date()), getEndOfYear(new Date())] }
 ]
 
 const applyPreset = (range: { getValue: () => Date[] }) => {
@@ -117,8 +117,8 @@ const maxVal = computed(() => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Profit & Loss</h1>
-        <p class="text-gray-500 dark:text-gray-400">Financial performance overview</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Laba Rugi</h1>
+        <p class="text-gray-500 dark:text-gray-400">Ringkasan kinerja keuangan</p>
       </div>
       
       <!-- Quick Filters -->
@@ -127,7 +127,7 @@ const maxVal = computed(() => {
             v-for="preset in presetRanges" 
             :key="preset.label"
             size="xs"
-            color="gray"
+            color="neutral"
             variant="ghost"
             @click="applyPreset(preset)"
           >
@@ -162,7 +162,7 @@ const maxVal = computed(() => {
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border-l-4 border-green-500">
          <div class="flex justify-between items-start">
              <div>
-                 <p class="text-sm font-medium text-gray-500">Total Revenue</p>
+                 <p class="text-sm font-medium text-gray-500">Total Pendapatan</p>
                  <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalRevenue || 0) }}</h3>
              </div>
              <div class="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -170,9 +170,9 @@ const maxVal = computed(() => {
              </div>
          </div>
          <div class="mt-4 flex gap-3 text-xs text-gray-500">
-             <span>Rent: {{ formatCurrency(reportData?.summary.revenueBreakdown.rentIncome || 0) }}</span>
+             <span>Sewa: {{ formatCurrency(reportData?.summary.revenueBreakdown.rentIncome || 0) }}</span>
              <span>•</span>
-             <span>Utility: {{ formatCurrency(reportData?.summary.revenueBreakdown.utilityIncome || 0) }}</span>
+             <span>Listrik: {{ formatCurrency(reportData?.summary.revenueBreakdown.utilityIncome || 0) }}</span>
          </div>
       </div>
 
@@ -180,7 +180,7 @@ const maxVal = computed(() => {
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border-l-4 border-red-500">
          <div class="flex justify-between items-start">
              <div>
-                 <p class="text-sm font-medium text-gray-500">Total Expenses</p>
+                 <p class="text-sm font-medium text-gray-500">Total Pengeluaran</p>
                  <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalExpenses || 0) }}</h3>
              </div>
              <div class="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
@@ -188,7 +188,7 @@ const maxVal = computed(() => {
              </div>
          </div>
          <div class="mt-4 text-xs text-gray-500">
-             Top: {{ reportData?.summary.expenseBreakdown[0]?.category || 'None' }} 
+             Terbesar: {{ reportData?.summary.expenseBreakdown[0]?.category || 'Tidak ada' }} 
              ({{ formatPercent(reportData?.summary.expenseBreakdown[0]?.percentage || 0) }})
          </div>
       </div>
@@ -197,7 +197,7 @@ const maxVal = computed(() => {
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border-l-4 border-blue-500">
          <div class="flex justify-between items-start">
              <div>
-                 <p class="text-sm font-medium text-gray-500">Net Profit</p>
+                 <p class="text-sm font-medium text-gray-500">Laba Bersih</p>
                  <h3 class="text-2xl font-bold mt-1" :class="(reportData?.summary.netProfit || 0) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-500'">
                      {{ formatCurrency(reportData?.summary.netProfit || 0) }}
                  </h3>
@@ -217,7 +217,7 @@ const maxVal = computed(() => {
         
         <!-- P&L Trend -->
         <div class="lg:col-span-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-             <h3 class="font-semibold text-gray-900 dark:text-white mb-6">Financial Trend</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white mb-6">Tren Keuangan</h3>
              <div class="h-64 flex items-end justify-between gap-4 overflow-x-auto pb-4">
                  <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[50px] flex-1">
                      
@@ -234,18 +234,18 @@ const maxVal = computed(() => {
                      <span class="text-xs text-gray-500">{{ item.period }}</span>
                  </div>
                  <div v-if="!reportData?.byPeriod.length" class="w-full h-full flex items-center justify-center text-gray-400">
-                     No trend data
+                     Tidak ada data tren
                  </div>
              </div>
              <div class="flex justify-center gap-4 mt-2">
-                 <div class="flex items-center gap-2 text-xs"><span class="w-3 h-3 bg-green-500 rounded-sm"></span> Revenue</div>
-                 <div class="flex items-center gap-2 text-xs"><span class="w-3 h-3 bg-red-500 rounded-sm"></span> Expenses</div>
+                 <div class="flex items-center gap-2 text-xs"><span class="w-3 h-3 bg-green-500 rounded-sm"></span> Pendapatan</div>
+                 <div class="flex items-center gap-2 text-xs"><span class="w-3 h-3 bg-red-500 rounded-sm"></span> Pengeluaran</div>
              </div>
         </div>
 
         <!-- Expense Composition -->
         <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Expense Breakdown</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Rincian Pengeluaran</h3>
              <div class="space-y-4 max-h-[300px] overflow-y-auto pr-2">
                 <div v-for="item in reportData?.summary.expenseBreakdown" :key="item.category" class="space-y-1">
                     <div class="flex justify-between text-sm">
@@ -257,7 +257,7 @@ const maxVal = computed(() => {
                     </div>
                 </div>
                 <div v-if="!reportData?.summary.expenseBreakdown.length" class="text-center text-gray-500 py-4">
-                    No expenses
+                    Tidak ada pengeluaran
                 </div>
              </div>
         </div>
@@ -266,22 +266,22 @@ const maxVal = computed(() => {
     <!-- Property Performance Table -->
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-             <h3 class="font-semibold text-gray-900 dark:text-white">Performance by Property</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white">Kinerja per Properti</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
                 <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50">
                     <tr>
-                        <th class="px-6 py-3">Property</th>
-                        <th class="px-6 py-3 text-right">Revenue</th>
-                        <th class="px-6 py-3 text-right">Expenses</th>
-                        <th class="px-6 py-3 text-right">Net Profit</th>
+                        <th class="px-6 py-3">Properti</th>
+                        <th class="px-6 py-3 text-right">Pendapatan</th>
+                        <th class="px-6 py-3 text-right">Pengeluaran</th>
+                        <th class="px-6 py-3 text-right">Laba Bersih</th>
                         <th class="px-6 py-3 text-right">Margin</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="reportData?.byProperty.length === 0">
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">No data found</td>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada data ditemukan</td>
                     </tr>
                     <tr v-for="prop in reportData?.byProperty" :key="prop.propertyId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 font-medium text-gray-900 dark:text-white">{{ prop.propertyName }}</td>

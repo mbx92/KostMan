@@ -34,13 +34,13 @@ const allCategories = computed(() => {
 })
 
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: 'all' },
-  { label: 'Global Expenses', value: 'global' },
+  { label: 'Semua Properti', value: 'all' },
+  { label: 'Pengeluaran Global', value: 'global' },
   ...properties.value.map((p: any) => ({ label: p.name, value: p.id }))
 ])
 
 const categoryOptions = computed(() => [
-  { label: 'All Categories', value: 'all' },
+  { label: 'Semua Kategori', value: 'all' },
   ...allCategories.value.map((c: any) => ({ label: c.name, value: c.name }))
 ])
 
@@ -102,20 +102,20 @@ const openEditExpense = (expense: any) => {
 }
 
 const deleteExpense = async (id: string) => {
-  if (!confirm('Are you sure you want to delete this expense?')) return
+  if (!confirm('Apakah Anda yakin ingin menghapus pengeluaran ini?')) return
 
   try {
     await $fetch(`/api/expenses/${id}`, { method: 'DELETE' })
     toast.add({
-      title: 'Expense Deleted',
-      description: 'Expense has been deleted successfully.',
+      title: 'Pengeluaran Dihapus',
+      description: 'Pengeluaran berhasil dihapus.',
       color: 'success'
     })
     await refreshExpenses()
   } catch (e: any) {
     toast.add({
-      title: 'Error',
-      description: e?.data?.message || 'Failed to delete expense',
+      title: 'Gagal',
+      description: e?.data?.message || 'Gagal menghapus pengeluaran',
       color: 'error'
     })
   }
@@ -131,15 +131,15 @@ const markAsPaid = async (id: string) => {
       }
     })
     toast.add({
-      title: 'Marked as Paid',
-      description: 'Expense has been marked as paid.',
+      title: 'Ditandai Lunas',
+      description: 'Pengeluaran telah ditandai sebagai lunas.',
       color: 'success'
     })
     await refreshExpenses()
   } catch (e: any) {
     toast.add({
-      title: 'Error',
-      description: e?.data?.message || 'Failed to update expense',
+      title: 'Gagal',
+      description: e?.data?.message || 'Gagal memperbarui pengeluaran',
       color: 'error'
     })
   }
@@ -176,19 +176,19 @@ const onExpenseSaved = async () => {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Expenses</h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-1">Track and manage your business expenses</p>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Pengeluaran</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Pantau dan kelola pengeluaran bisnis Anda</p>
       </div>
       <div class="flex gap-3">
         <UButton
-          label="Manage Categories"
+          label="Kelola Kategori"
           icon="i-heroicons-tag"
           color="neutral"
           variant="outline"
           to="/expenses/categories"
         />
         <UButton
-          label="Add Expense"
+          label="Tambah Pengeluaran"
           icon="i-heroicons-plus"
           color="primary"
           @click="openAddExpense"
@@ -201,7 +201,7 @@ const onExpenseSaved = async () => {
       <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Total Expenses</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Pengeluaran</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(totalExpenses) }}</p>
           </div>
           <div class="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
@@ -213,7 +213,7 @@ const onExpenseSaved = async () => {
       <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Paid</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Sudah Dibayar</p>
             <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{{ formatCurrency(totalPaid) }}</p>
           </div>
           <div class="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
@@ -225,7 +225,7 @@ const onExpenseSaved = async () => {
       <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Unpaid</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Belum Dibayar</p>
             <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{{ formatCurrency(totalUnpaid) }}</p>
           </div>
           <div class="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
@@ -239,7 +239,7 @@ const onExpenseSaved = async () => {
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Property</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Properti</label>
           <USelect 
             v-model="selectedPropertyId" 
             :items="propertyOptions" 
@@ -249,7 +249,7 @@ const onExpenseSaved = async () => {
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kategori</label>
           <USelect 
             v-model="selectedCategory" 
             :items="categoryOptions" 
@@ -259,12 +259,12 @@ const onExpenseSaved = async () => {
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipe</label>
           <USelect 
             v-model="selectedType" 
             :items="[
-              { label: 'All Types', value: 'all' },
-              { label: 'Property', value: 'property' },
+              { label: 'Semua Tipe', value: 'all' },
+              { label: 'Properti', value: 'property' },
               { label: 'Global', value: 'global' }
             ]" 
             value-key="value" 
@@ -277,9 +277,9 @@ const onExpenseSaved = async () => {
           <USelect 
             v-model="selectedStatus" 
             :items="[
-              { label: 'All Status', value: 'all' },
-              { label: 'Paid', value: 'paid' },
-              { label: 'Unpaid', value: 'unpaid' }
+              { label: 'Semua Status', value: 'all' },
+              { label: 'Lunas', value: 'paid' },
+              { label: 'Belum Dibayar', value: 'unpaid' }
             ]" 
             value-key="value" 
             label-key="label"
@@ -295,13 +295,13 @@ const onExpenseSaved = async () => {
         <table class="w-full">
           <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Property</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tanggal</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kategori</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Deskripsi</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Properti</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jumlah</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -312,7 +312,7 @@ const onExpenseSaved = async () => {
             </tr>
             <tr v-else-if="filteredExpenses.length === 0">
               <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                No expenses found
+                Tidak ada pengeluaran ditemukan
               </td>
             </tr>
             <template v-else>
@@ -340,10 +340,10 @@ const onExpenseSaved = async () => {
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span v-if="expense.isPaid" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
-                  Paid
+                  Lunas
                 </span>
                 <span v-else class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-                  Unpaid
+                  Belum Dibayar
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

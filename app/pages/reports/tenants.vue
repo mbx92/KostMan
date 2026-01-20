@@ -8,16 +8,16 @@ const selectedStatus = ref('all')
 
 // -- Options --
 const statusOptions = [
-    { label: 'All Status', value: 'all' },
-    { label: 'Active', value: 'active' },
-    { label: 'Inactive', value: 'inactive' }
+    { label: 'Semua Status', value: 'all' },
+    { label: 'Aktif', value: 'active' },
+    { label: 'Tidak Aktif', value: 'inactive' }
 ]
 
 // -- Fetch Properties --
 const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: 'all' },
+  { label: 'Semua Properti', value: 'all' },
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
@@ -78,7 +78,7 @@ const formatCurrency = (value: number) => {
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-GB')
+  return new Date(dateString).toLocaleDateString('id-ID')
 }
 
 // Compute total outstanding from loaded tenants
@@ -93,14 +93,14 @@ const totalOutstanding = computed(() => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Tenant Report</h1>
-        <p class="text-gray-500 dark:text-gray-400">Occupancy and payment behavior analysis</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Laporan Penyewa</h1>
+        <p class="text-gray-500 dark:text-gray-400">Analisis hunian dan perilaku pembayaran</p>
       </div>
       
       <!-- Filters -->
       <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-auto flex gap-3">
             <div class="min-w-[200px]">
-                 <label class="block text-xs font-medium text-gray-500 mb-1">Property</label>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
                  <USelect 
                     v-model="selectedPropertyId" 
                     :items="propertyOptions"
@@ -130,9 +130,9 @@ const totalOutstanding = computed(() => {
              <UIcon name="i-heroicons-users" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tenants</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Penyewa</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.totalTenants || 0 }}</h3>
-             <p class="text-xs text-green-500 mt-1">{{ reportData?.summary.activeTenants || 0 }} Active</p>
+             <p class="text-xs text-green-500 mt-1">{{ reportData?.summary.activeTenants || 0 }} Aktif</p>
            </div>
         </div>
       </div>
@@ -143,9 +143,9 @@ const totalOutstanding = computed(() => {
              <UIcon name="i-heroicons-building-office" class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Occupancy Rate</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tingkat Hunian</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ (reportData?.summary.occupancyRate || 0).toFixed(1) }}%</h3>
-             <p class="text-xs text-gray-400 mt-1">Based on rooms</p>
+             <p class="text-xs text-gray-400 mt-1">Berdasarkan kamar</p>
            </div>
         </div>
       </div>
@@ -156,9 +156,9 @@ const totalOutstanding = computed(() => {
              <UIcon name="i-heroicons-clock" class="w-6 h-6 text-purple-600 dark:text-purple-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Duration</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Rata-rata Durasi</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ (reportData?.summary.averageTenancyDuration || 0).toFixed(1) }}</h3>
-             <p class="text-xs text-gray-400 mt-1">Months</p>
+             <p class="text-xs text-gray-400 mt-1">Bulan</p>
            </div>
         </div>
       </div>
@@ -169,9 +169,9 @@ const totalOutstanding = computed(() => {
              <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-600 dark:text-red-400" />
            </div>
            <div>
-             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Outstanding</p>
+             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tunggakan</p>
              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(totalOutstanding) }}</h3>
-             <p class="text-xs text-gray-400 mt-1">Unpaid bills</p>
+             <p class="text-xs text-gray-400 mt-1">Tagihan belum dibayar</p>
            </div>
         </div>
       </div>
@@ -180,24 +180,24 @@ const totalOutstanding = computed(() => {
     <!-- Tenants List -->
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-             <h3 class="font-semibold text-gray-900 dark:text-white">Tenant Details</h3>
+             <h3 class="font-semibold text-gray-900 dark:text-white">Detail Penyewa</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
                 <thead class="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50">
                     <tr>
-                        <th class="px-6 py-3">Tenant</th>
-                        <th class="px-6 py-3">Property / Room</th>
+                        <th class="px-6 py-3">Penyewa</th>
+                        <th class="px-6 py-3">Properti / Kamar</th>
                         <th class="px-6 py-3">Status</th>
-                        <th class="px-6 py-3 text-right">Bills</th>
-                        <th class="px-6 py-3 text-right">Total Paid</th>
-                         <th class="px-6 py-3 text-right">Outstanding</th>
-                        <th class="px-6 py-3 text-right">Action</th>
+                        <th class="px-6 py-3 text-right">Tagihan</th>
+                        <th class="px-6 py-3 text-right">Total Dibayar</th>
+                         <th class="px-6 py-3 text-right">Tunggakan</th>
+                        <th class="px-6 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="reportData?.tenants.length === 0">
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">No tenants found</td>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">Tidak ada penyewa ditemukan</td>
                     </tr>
                     <tr v-for="tenant in reportData?.tenants" :key="tenant.id" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3">
@@ -207,17 +207,17 @@ const totalOutstanding = computed(() => {
                         <td class="px-6 py-3">
                             <div class="text-gray-900 dark:text-white">{{ tenant.propertyName }}</div>
                             <div class="text-xs text-gray-500">{{ tenant.roomName }}</div>
-                             <div class="text-xs text-gray-400 text-[10px]">Since {{ formatDate(tenant.moveInDate) }}</div>
+                             <div class="text-xs text-gray-400 text-[10px]">Sejak {{ formatDate(tenant.moveInDate) }}</div>
                         </td>
                         <td class="px-6 py-3">
                             <UBadge :color="tenant.status === 'active' ? 'success' : 'neutral'" variant="subtle" size="xs">
-                                {{ tenant.status }}
+                                {{ tenant.status === 'active' ? 'Aktif' : 'Tidak Aktif' }}
                             </UBadge>
                         </td>
                          <td class="px-6 py-3 text-right text-gray-500">
                              <div>{{ tenant.paymentHistory.totalBills }} Total</div>
                              <div class="text-xs" :class="tenant.paymentHistory.latePayments > 0 ? 'text-red-500' : 'text-green-500'">
-                                 {{ tenant.paymentHistory.latePayments }} Late
+                                 {{ tenant.paymentHistory.latePayments }} Terlambat
                              </div>
                         </td>
                         <td class="px-6 py-3 text-right text-gray-900 dark:text-white font-medium">
