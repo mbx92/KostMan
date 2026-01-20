@@ -240,27 +240,51 @@ const onExpenseSaved = async () => {
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Property</label>
-          <USelect v-model="selectedPropertyId" :options="propertyOptions" option-attribute="label" value-attribute="value" />
+          <USelect 
+            v-model="selectedPropertyId" 
+            :items="propertyOptions" 
+            value-key="value" 
+            label-key="label"
+            class="w-full"
+          />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-          <USelect v-model="selectedCategory" :options="categoryOptions" option-attribute="label" value-attribute="value" />
+          <USelect 
+            v-model="selectedCategory" 
+            :items="categoryOptions" 
+            value-key="value" 
+            label-key="label"
+            class="w-full"
+          />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
-          <USelect v-model="selectedType" :options="[
-            { label: 'All Types', value: 'all' },
-            { label: 'Property', value: 'property' },
-            { label: 'Global', value: 'global' }
-          ]" option-attribute="label" value-attribute="value" />
+          <USelect 
+            v-model="selectedType" 
+            :items="[
+              { label: 'All Types', value: 'all' },
+              { label: 'Property', value: 'property' },
+              { label: 'Global', value: 'global' }
+            ]" 
+            value-key="value" 
+            label-key="label"
+            class="w-full"
+          />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-          <USelect v-model="selectedStatus" :options="[
-            { label: 'All Status', value: 'all' },
-            { label: 'Paid', value: 'paid' },
-            { label: 'Unpaid', value: 'unpaid' }
-          ]" option-attribute="label" value-attribute="value" />
+          <USelect 
+            v-model="selectedStatus" 
+            :items="[
+              { label: 'All Status', value: 'all' },
+              { label: 'Paid', value: 'paid' },
+              { label: 'Unpaid', value: 'unpaid' }
+            ]" 
+            value-key="value" 
+            label-key="label"
+            class="w-full"
+          />
         </div>
       </div>
     </div>
