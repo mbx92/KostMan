@@ -1,0 +1,367 @@
+<script setup lang="ts">
+const toast = useToast()
+
+// Modals
+const expenseModalOpen = ref(false)
+const selectedExpense = ref<any>(null)
+
+// Fetch expenses
+const { data: expensesData, pending: expensesLoading, refresh: refreshExpenses } = useFetch('/api/expenses', {
+  query: {
+    page: 1,
+    limit: 100
+  }
+})
+
+const expenses = computed(() => expensesData.value?.expenses || [])
+
+// Fetch properties for filter
+const { data: propertiesData } = useFetch('/api/properties')
+const properties = computed(() => propertiesData.value || [])
+
+// Filters
+const selectedPropertyId = ref('all')
+const selectedType = ref<'all' | 'property' | 'global'>('all')
+const selectedCategory = ref('all')
+const selectedStatus = ref<'all' | 'paid' | 'unpaid'>('all')
+
+// Fetch categories
+const { data: categoriesData } = useFetch('/api/expenses/categories')
+const allCategories = computed(() => {
+  const defaults = categoriesData.value?.categories?.default || []
+  const custom = categoriesData.value?.categories?.custom || []
+  return [...defaults, ...custom]
+})
+
+const propertyOptions = computed(() => [
+  { label: 'All Properties', value: 'all' },
+  { label: 'Global Expenses', value: 'global' },
+  ...properties.value.map((p: any) => ({ label: p.name, value: p.id }))
+])
+
+const categoryOptions = computed(() => [
+  { label: 'All Categories', value: 'all' },
+  ...allCategories.value.map((c: any) => ({ label: c.name, value: c.name }))
+])
+
+// Filtered expenses
+const filteredExpenses = computed(() => {
+  let result = [...expenses.value]
+
+  if (selectedPropertyId.value === 'global') {
+    result = result.filter((e: any) => e.type === 'global')
+  } else if (selectedPropertyId.value !== 'all') {
+    result = result.filter((e: any) => e.propertyId === selectedPropertyId.value)
+  }
+
+  if (selectedType.value !== 'all') {
+    result = result.filter((e: any) => e.type === selectedType.value)
+  }
+
+  if (selectedCategory.value !== 'all') {
+    result = result.filter((e: any) => e.category === selectedCategory.value)
+  }
+
+  if (selectedStatus.value === 'paid') {
+    result = result.filter((e: any) => e.isPaid)
+  } else if (selectedStatus.value === 'unpaid') {
+    result = result.filter((e: any) => !e.isPaid)
+  }
+
+  return result.sort((a: any, b: any) => 
+    new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()
+  )
+})
+
+// Stats
+const totalExpenses = computed(() => 
+  filteredExpenses.value.reduce((sum: number, e: any) => sum + Number(e.amount), 0)
+)
+
+const totalPaid = computed(() =>
+  filteredExpenses.value
+    .filter((e: any) => e.isPaid)
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0)
+)
+
+const totalUnpaid = computed(() =>
+  filteredExpenses.value
+    .filter((e: any) => !e.isPaid)
+    .reduce((sum: number, e: any) => sum + Number(e.amount), 0)
+)
+
+// Actions
+const openAddExpense = () => {
+  selectedExpense.value = null
+  expenseModalOpen.value = true
+}
+
+const openEditExpense = (expense: any) => {
+  selectedExpense.value = expense
+  expenseModalOpen.value = true
+}
+
+const deleteExpense = async (id: string) => {
+  if (!confirm('Are you sure you want to delete this expense?')) return
+
+  try {
+    await $fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+    toast.add({
+      title: 'Expense Deleted',
+      description: 'Expense has been deleted successfully.',
+      color: 'success'
+    })
+    await refreshExpenses()
+  } catch (e: any) {
+    toast.add({
+      title: 'Error',
+      description: e?.data?.message || 'Failed to delete expense',
+      color: 'error'
+    })
+  }
+}
+
+const markAsPaid = async (id: string) => {
+  try {
+    await $fetch(`/api/expenses/${id}`, {
+      method: 'PATCH',
+      body: {
+        isPaid: true,
+        paidDate: new Date().toISOString().split('T')[0]
+      }
+    })
+    toast.add({
+      title: 'Marked as Paid',
+      description: 'Expense has been marked as paid.',
+      color: 'success'
+    })
+    await refreshExpenses()
+  } catch (e: any) {
+    toast.add({
+      title: 'Error',
+      description: e?.data?.message || 'Failed to update expense',
+      color: 'error'
+    })
+  }
+}
+
+const formatCurrency = (val: number | string) =>
+  new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0
+  }).format(Number(val))
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+const getCategoryColor = (categoryName: string) => {
+  const category = allCategories.value.find((c: any) => c.name === categoryName)
+  return category?.color || '#6b7280'
+}
+
+const onExpenseSaved = async () => {
+  await refreshExpenses()
+}
+</script>
+
+<template>
+  <div class="p-6 space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Expenses</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Track and manage your business expenses</p>
+      </div>
+      <div class="flex gap-3">
+        <UButton
+          label="Manage Categories"
+          icon="i-heroicons-tag"
+          color="neutral"
+          variant="outline"
+          to="/expenses/categories"
+        />
+        <UButton
+          label="Add Expense"
+          icon="i-heroicons-plus"
+          color="primary"
+          @click="openAddExpense"
+        />
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Expenses</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(totalExpenses) }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+            <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Paid</p>
+            <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{{ formatCurrency(totalPaid) }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+            <UIcon name="i-heroicons-check-circle" class="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Unpaid</p>
+            <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{{ formatCurrency(totalUnpaid) }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+            <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-600 dark:text-red-400" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Property</label>
+          <USelect v-model="selectedPropertyId" :options="propertyOptions" option-attribute="label" value-attribute="value" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+          <USelect v-model="selectedCategory" :options="categoryOptions" option-attribute="label" value-attribute="value" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+          <USelect v-model="selectedType" :options="[
+            { label: 'All Types', value: 'all' },
+            { label: 'Property', value: 'property' },
+            { label: 'Global', value: 'global' }
+          ]" option-attribute="label" value-attribute="value" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+          <USelect v-model="selectedStatus" :options="[
+            { label: 'All Status', value: 'all' },
+            { label: 'Paid', value: 'paid' },
+            { label: 'Unpaid', value: 'unpaid' }
+          ]" option-attribute="label" value-attribute="value" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Expenses Table -->
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Property</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            <tr v-if="expensesLoading">
+              <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto" />
+              </td>
+            </tr>
+            <tr v-else-if="filteredExpenses.length === 0">
+              <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                No expenses found
+              </td>
+            </tr>
+            <template v-else>
+              <tr v-for="expense in filteredExpenses" :key="expense.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                {{ formatDate(expense.expenseDate) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getCategoryColor(expense.category) }" />
+                  <span class="text-sm text-gray-900 dark:text-white">{{ expense.category }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-900 dark:text-white max-w-xs truncate">
+                {{ expense.description }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                <span v-if="expense.type === 'global'" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                  Global
+                </span>
+                <span v-else>{{ expense.propertyName || '-' }}</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                {{ formatCurrency(expense.amount) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span v-if="expense.isPaid" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+                  Paid
+                </span>
+                <span v-else class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+                  Unpaid
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <div class="flex items-center justify-end gap-2">
+                  <UButton 
+                    icon="i-heroicons-pencil" 
+                    size="sm"
+                    color="neutral" 
+                    variant="ghost"
+                    @click="openEditExpense(expense)"
+                  />
+                  <UButton 
+                    v-if="!expense.isPaid"
+                    icon="i-heroicons-check" 
+                    size="sm"
+                    color="success" 
+                    variant="ghost"
+                    @click="markAsPaid(expense.id)"
+                  />
+                  <UButton 
+                    icon="i-heroicons-trash" 
+                    size="sm"
+                    color="error" 
+                    variant="ghost"
+                    @click="deleteExpense(expense.id)"
+                  />
+                </div>
+              </td>
+            </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Expense Modal -->
+    <ExpenseModal
+      v-model="expenseModalOpen"
+      :expense="selectedExpense"
+      :properties="properties"
+      :categories="allCategories"
+      @saved="onExpenseSaved"
+    />
+  </div>
+</template>

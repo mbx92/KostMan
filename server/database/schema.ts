@@ -9,6 +9,7 @@ import {
   unique,
   date,
   integer,
+  text,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["owner", "admin", "staff"]);
@@ -16,6 +17,22 @@ export const roomStatusEnum = pgEnum("room_status", [
   "available",
   "occupied",
   "maintenance",
+]);
+export const expenseCategoryEnum = pgEnum("expense_category", [
+  "maintenance",
+  "utilities",
+  "supplies",
+  "salary",
+  "tax",
+  "other",
+]);
+export const expenseTypeEnum = pgEnum("expense_type", ["property", "global"]);
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "cash",
+  "transfer",
+  "credit_card",
+  "debit_card",
+  "e_wallet",
 ]);
 
 export const users = pgTable("users", {
@@ -97,17 +114,17 @@ export const rentBills = pgTable("rent_bills", {
     .references(() => rooms.id)
     .notNull(),
   tenantId: uuid("tenant_id").references(() => tenants.id),
-  
+
   // Date-based billing (primary)
   periodStartDate: date("period_start_date").notNull(),
   periodEndDate: date("period_end_date").notNull(),
   dueDate: date("due_date").notNull(),
   billingCycleDay: integer("billing_cycle_day"), // Day of month from moveInDate (1-31)
-  
+
   // Legacy fields (for backward compatibility & reporting)
   period: varchar("period", { length: 7 }), // YYYY-MM (nullable now)
   periodEnd: varchar("period_end", { length: 7 }), // For multi-month payments
-  
+
   monthsCovered: integer("months_covered").default(1),
   roomPrice: decimal("room_price", { precision: 12, scale: 2 }).notNull(),
   waterFee: decimal("water_fee", { precision: 12, scale: 2 }).default("0"),
@@ -205,3 +222,56 @@ export const integrationSettings = pgTable(
     unq: unique().on(t.userId, t.provider), // One config per provider per user
   }),
 );
+
+// Expense Categories - Custom categories per user
+export const expenseCategories = pgTable("expense_categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }).default("#6366f1"), // hex color for UI
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+// Expenses - Track all business expenses
+export const expenses = pgTable("expenses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  propertyId: uuid("property_id").references(() => properties.id, {
+    onDelete: "cascade",
+  }),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+
+  // Expense Details
+  category: varchar("category", { length: 50 }).notNull(), // Can be default category or custom category name
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+
+  // Classification
+  type: expenseTypeEnum("type").notNull().default("property"), // 'property' or 'global'
+
+  // Date & Payment
+  expenseDate: date("expense_date").notNull(), // when expense occurred
+  paidDate: date("paid_date"), // when actually paid
+  isPaid: boolean("is_paid").notNull().default(false),
+  paymentMethod: paymentMethodEnum("payment_method"), // 'cash', 'transfer', etc.
+
+  // Supporting Documents
+  receiptUrl: text("receipt_url"), // path to uploaded receipt image/PDF
+  notes: text("notes"),
+
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+

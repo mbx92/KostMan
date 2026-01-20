@@ -56,6 +56,11 @@ const defaultNavigation: NavItem[] = [
     to: '/billing'
   },
   {
+    label: 'Expenses',
+    icon: 'i-heroicons-receipt-percent',
+    to: '/expenses'
+  },
+  {
     label: 'Settings',
     icon: 'i-heroicons-cog-6-tooth',
     to: '/settings'
