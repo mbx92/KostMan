@@ -36,44 +36,46 @@ const defaultNavigation: NavItem[] = [
     to: '/'
   },
   {
-    label: 'Properties',
-    icon: 'i-heroicons-building-office',
-    to: '/properties'
+    label: 'Property Management',
+    icon: 'i-heroicons-building-office-2',
+    children: [
+      {
+        label: 'Properties',
+        icon: 'i-heroicons-building-office',
+        to: '/properties'
+      },
+      {
+        label: 'Rooms',
+        icon: 'i-heroicons-home-modern',
+        to: '/rooms'
+      },
+      {
+        label: 'Tenants',
+        icon: 'i-heroicons-users',
+        to: '/tenants'
+      }
+    ]
   },
   {
-    label: 'Rooms',
-    icon: 'i-heroicons-home-modern',
-    to: '/rooms'
-  },
-  {
-    label: 'Tenants',
-    icon: 'i-heroicons-users',
-    to: '/tenants'
-  },
-  {
-    label: 'Reminders',
-    icon: 'i-heroicons-bell-alert',
-    to: '/reminders'
-  },
-  {
-    label: 'Billing',
+    label: 'Tagihan dan Pengeluaran',
     icon: 'i-heroicons-banknotes',
-    to: '/billing'
-  },
-  {
-    label: 'Expenses',
-    icon: 'i-heroicons-receipt-percent',
-    to: '/expenses'
-  },
-  {
-    label: 'Settings',
-    icon: 'i-heroicons-cog-6-tooth',
-    to: '/settings'
-  },
-  {
-    label: 'Pricing',
-    icon: 'i-heroicons-tag',
-    to: '/pricing'
+    children: [
+      {
+        label: 'Reminders',
+        icon: 'i-heroicons-bell-alert',
+        to: '/reminders'
+      },
+      {
+        label: 'Billing',
+        icon: 'i-heroicons-calculator',
+        to: '/billing'
+      },
+      {
+        label: 'Expenses',
+        icon: 'i-heroicons-receipt-percent',
+        to: '/expenses'
+      }
+    ]
   },
   {
     label: 'Reports',
@@ -105,6 +107,11 @@ const defaultNavigation: NavItem[] = [
       }
     ]
   },
+  {
+    label: 'Settings',
+    icon: 'i-heroicons-cog-6-tooth',
+    to: '/settings'
+  }
 ]
 
 // Navigation items from app config with fallback
