@@ -130,14 +130,14 @@ const getPaymentMethodLabel = (value: string) => {
       
       <!-- Filters -->
       <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-auto">
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3">
             <div>
                  <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Mulai</label>
-                 <UInput type="date" v-model="startDate" class="w-full" />
+                 <DatePicker v-model="startDate" granularity="day" class="w-full" />
             </div>
             <div>
                  <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Akhir</label>
-                 <UInput type="date" v-model="endDate" class="w-full" />
+                 <DatePicker v-model="endDate" granularity="day" class="w-full" />
             </div>
             <div>
                  <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
@@ -164,51 +164,51 @@ const getPaymentMethodLabel = (value: string) => {
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
            <div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
              <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pendapatan</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalAmount || 0) }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.totalAmount || 0) }}</h3>
            </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
              <UIcon name="i-heroicons-document-check" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pembayaran</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.totalPayments || 0 }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.totalPayments || 0 }}</h3>
            </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
              <UIcon name="i-heroicons-home" class="w-6 h-6 text-green-600 dark:text-green-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pembayaran Sewa</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.rentPaymentsCount || 0 }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.rentPaymentsCount || 0 }}</h3>
            </div>
         </div>
       </div>
 
-       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
              <UIcon name="i-heroicons-bolt" class="w-6 h-6 text-orange-600 dark:text-orange-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pembayaran Listrik</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.utilityPaymentsCount || 0 }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.summary.utilityPaymentsCount || 0 }}</h3>
            </div>
         </div>
       </div>

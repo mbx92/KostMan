@@ -100,6 +100,12 @@ const applyPreset = (range: { getValue: () => Date[] }) => {
     endDate.value = formatDateForInput(end)
 }
 
+const isPresetSelected = (range: { getValue: () => Date[] }) => {
+    const [start, end] = range.getValue()
+    return startDate.value === formatDateForInput(start) && 
+           endDate.value === formatDateForInput(end)
+}
+
 // -- Helpers --
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -135,8 +141,8 @@ const maxIncome = computed(() => {
             v-for="preset in presetRanges" 
             :key="preset.label"
             size="xs"
-            color="neutral"
-            variant="ghost"
+            :color="isPresetSelected(preset) ? 'primary' : 'neutral'"
+            :variant="isPresetSelected(preset) ? 'solid' : 'ghost'"
             @click="applyPreset(preset)"
           >
             {{ preset.label }}
@@ -146,14 +152,14 @@ const maxIncome = computed(() => {
       
     <!-- Filters Bar -->
     <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full">
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3">
             <div>
                  <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Mulai</label>
-                 <UInput type="date" v-model="startDate" class="w-full" />
+                 <DatePicker v-model="startDate" granularity="day" class="w-full" />
             </div>
             <div>
                  <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Akhir</label>
-                 <UInput type="date" v-model="endDate" class="w-full" />
+                 <DatePicker v-model="endDate" granularity="day" class="w-full" />
             </div>
             <div>
                  <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
@@ -179,44 +185,44 @@ const maxIncome = computed(() => {
       </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
            <div class="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
              <UIcon name="i-heroicons-currency-dollar" class="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pendapatan</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalIncome || 0) }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.totalIncome || 0) }}</h3>
            </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
              <UIcon name="i-heroicons-home" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pendapatan Sewa</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.rentIncome || 0) }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.rentIncome || 0) }}</h3>
            </div>
         </div>
       </div>
 
-       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
              <UIcon name="i-heroicons-bolt" class="w-6 h-6 text-orange-600 dark:text-orange-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pendapatan Listrik</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.utilityIncome || 0) }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.utilityIncome || 0) }}</h3>
            </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 rounded-lg" :class="(reportData?.summary.growthRate || 0) >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'">
              <UIcon name="i-heroicons-arrow-trending-up" class="w-6 h-6" 
@@ -224,7 +230,7 @@ const maxIncome = computed(() => {
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tingkat Pertumbuhan</p>
-             <h3 class="text-2xl font-bold mt-1" :class="(reportData?.summary.growthRate || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+             <h3 class="text-xl font-bold mt-1 whitespace-nowrap" :class="(reportData?.summary.growthRate || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                  {{ formatPercent(reportData?.summary.growthRate || 0) }}
              </h3>
              <p class="text-xs text-gray-400 mt-1">vs periode sebelumnya</p>

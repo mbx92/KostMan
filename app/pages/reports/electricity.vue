@@ -114,71 +114,76 @@ const translateTrend = (trend: string): string => {
       </div>
       
       <!-- Filters -->
-      <div class="flex gap-3 bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
-           <div>
-               <UInput type="date" v-model="startDate" />
-           </div>
-           <div>
-               <UInput type="date" v-model="endDate" />
-           </div>
-           <div>
-                <USelect 
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-auto">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Mulai</label>
+                 <DatePicker v-model="startDate" granularity="day" class="w-full" />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Akhir</label>
+                 <DatePicker v-model="endDate" granularity="day" class="w-full" />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
+                 <USelect 
                     v-model="selectedPropertyId" 
                     :items="propertyOptions"
                     value-key="value"
                     label-key="label"
-                    class="min-w-[150px]"
+                    class="w-full"
                 />
-           </div>
+            </div>
+          </div>
       </div>
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
            <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
              <UIcon name="i-heroicons-bolt" class="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Penggunaan</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatNumber(reportData?.summary.totalUsage || 0) }} <span class="text-sm font-normal text-gray-500">kWh</span></h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatNumber(reportData?.summary.totalUsage || 0) }} <span class="text-sm font-normal text-gray-500">kWh</span></h3>
            </div>
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
              <UIcon name="i-heroicons-currency-dollar" class="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Biaya</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalCost || 0) }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.totalCost || 0) }}</h3>
            </div>
         </div>
       </div>
 
-       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
              <UIcon name="i-heroicons-chart-bar" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Rata-rata / Kamar</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatNumber(Math.round(reportData?.summary.averageUsagePerRoom || 0)) }} <span class="text-sm font-normal text-gray-500">kWh</span></h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatNumber(Math.round(reportData?.summary.averageUsagePerRoom || 0)) }} <span class="text-sm font-normal text-gray-500">kWh</span></h3>
            </div>
         </div>
       </div>
       
-       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
          <div class="flex items-center gap-4">
            <div class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
              <UIcon name="i-heroicons-exclamation-triangle" class="w-6 h-6 text-red-600 dark:text-red-400" />
            </div>
            <div>
              <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Peringatan</p>
-             <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ reportData?.unusualUsage.length || 0 }}</h3>
+             <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ reportData?.unusualUsage.length || 0 }}</h3>
              <p class="text-xs text-gray-400 mt-1">Penyimpangan tidak wajar</p>
            </div>
         </div>

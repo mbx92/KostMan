@@ -46,6 +46,12 @@ const applyPreset = (range: { getValue: () => Date[] }) => {
     endDate.value = formatDateForInput(end)
 }
 
+const isPresetSelected = (range: { getValue: () => Date[] }) => {
+    const [start, end] = range.getValue()
+    return startDate.value === formatDateForInput(start) && 
+           endDate.value === formatDateForInput(end)
+}
+
 // -- Interfaces --
 interface PLReportData {
   summary: {
@@ -127,8 +133,8 @@ const maxVal = computed(() => {
             v-for="preset in presetRanges" 
             :key="preset.label"
             size="xs"
-            color="neutral"
-            variant="ghost"
+            :color="isPresetSelected(preset) ? 'primary' : 'neutral'"
+            :variant="isPresetSelected(preset) ? 'solid' : 'ghost'"
             @click="applyPreset(preset)"
           >
             {{ preset.label }}
@@ -136,78 +142,89 @@ const maxVal = computed(() => {
       </div>
     </div>
     
-    <!-- Filter Bar -->
-    <div class="flex flex-wrap gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-           <UInput type="date" v-model="startDate" />
-           <UInput type="date" v-model="endDate" />
-           <USelect 
-                v-model="selectedPropertyId" 
-                :items="propertyOptions"
-                value-key="value"
-                label-key="label"
-                class="min-w-[150px]"
-            />
-            <USelect 
-                v-model="groupBy" 
-                :items="groupByOptions"
-                value-key="value"
-                label-key="label"
-                class="min-w-[120px]"
-            />
-    </div>
+    <!-- Filters Bar -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Mulai</label>
+                 <DatePicker v-model="startDate" granularity="day" class="w-full" />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Akhir</label>
+                 <DatePicker v-model="endDate" granularity="day" class="w-full" />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
+                 <USelect 
+                    v-model="selectedPropertyId" 
+                    :items="propertyOptions"
+                    value-key="value"
+                    label-key="label"
+                    class="w-full"
+                />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Kelompokkan</label>
+                 <USelect 
+                    v-model="groupBy" 
+                    :items="groupByOptions"
+                    value-key="value"
+                    label-key="label"
+                    class="w-full"
+                />
+            </div>
+          </div>
+      </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <!-- Revenue -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border-l-4 border-green-500">
-         <div class="flex justify-between items-start">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+         <div class="flex items-center gap-4">
+             <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                 <UIcon name="i-heroicons-arrow-trending-up" class="w-6 h-6 text-green-600 dark:text-green-400" />
+             </div>
              <div>
-                 <p class="text-sm font-medium text-gray-500">Total Pendapatan</p>
-                 <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalRevenue || 0) }}</h3>
+                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pendapatan</p>
+                 <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.totalRevenue || 0) }}</h3>
+                 <p class="text-xs text-gray-400 mt-1">
+                     Sewa: {{ formatCurrency(reportData?.summary.revenueBreakdown.rentIncome || 0) }}
+                 </p>
              </div>
-             <div class="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                 <UIcon name="i-heroicons-arrow-trending-up" class="w-6 h-6 text-green-600" />
-             </div>
-         </div>
-         <div class="mt-4 flex gap-3 text-xs text-gray-500">
-             <span>Sewa: {{ formatCurrency(reportData?.summary.revenueBreakdown.rentIncome || 0) }}</span>
-             <span>•</span>
-             <span>Listrik: {{ formatCurrency(reportData?.summary.revenueBreakdown.utilityIncome || 0) }}</span>
          </div>
       </div>
 
        <!-- Expenses -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border-l-4 border-red-500">
-         <div class="flex justify-between items-start">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+         <div class="flex items-center gap-4">
+             <div class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                 <UIcon name="i-heroicons-arrow-trending-down" class="w-6 h-6 text-red-600 dark:text-red-400" />
+             </div>
              <div>
-                 <p class="text-sm font-medium text-gray-500">Total Pengeluaran</p>
-                 <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(reportData?.summary.totalExpenses || 0) }}</h3>
+                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pengeluaran</p>
+                 <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(reportData?.summary.totalExpenses || 0) }}</h3>
+                 <p class="text-xs text-gray-400 mt-1 truncate max-w-[150px]" :title="reportData?.summary.expenseBreakdown[0]?.category">
+                    Top: {{ reportData?.summary.expenseBreakdown[0]?.category || '-' }}
+                 </p>
              </div>
-             <div class="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                 <UIcon name="i-heroicons-arrow-trending-down" class="w-6 h-6 text-red-600" />
-             </div>
-         </div>
-         <div class="mt-4 text-xs text-gray-500">
-             Terbesar: {{ reportData?.summary.expenseBreakdown[0]?.category || 'Tidak ada' }} 
-             ({{ formatPercent(reportData?.summary.expenseBreakdown[0]?.percentage || 0) }})
          </div>
       </div>
 
        <!-- Net Profit -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border-l-4 border-blue-500">
-         <div class="flex justify-between items-start">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+         <div class="flex items-center gap-4">
+             <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                 <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+             </div>
              <div>
-                 <p class="text-sm font-medium text-gray-500">Laba Bersih</p>
-                 <h3 class="text-2xl font-bold mt-1" :class="(reportData?.summary.netProfit || 0) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-500'">
+                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Laba Bersih</p>
+                 <h3 class="text-xl font-bold mt-1 whitespace-nowrap" :class="(reportData?.summary.netProfit || 0) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-500'">
                      {{ formatCurrency(reportData?.summary.netProfit || 0) }}
                  </h3>
+                 <p class="text-xs font-medium mt-1" :class="(reportData?.summary.profitMargin || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                     {{ formatPercent(reportData?.summary.profitMargin || 0) }} Margin
+                 </p>
              </div>
-             <div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                 <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-blue-600" />
-             </div>
-         </div>
-         <div class="mt-4 text-xs font-medium" :class="(reportData?.summary.profitMargin || 0) >= 0 ? 'text-green-600' : 'text-red-600'">
-             {{ formatPercent(reportData?.summary.profitMargin || 0) }} Margin
          </div>
       </div>
     </div>

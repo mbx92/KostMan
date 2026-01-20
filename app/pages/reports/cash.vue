@@ -141,38 +141,38 @@ watch([selectedMonth, selectedPropertyId], () => {
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
       
       <!-- Expected -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
           <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ekspektasi Kas</p>
-            <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(expectedTotal) }}</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(expectedTotal) }}</h3>
             <p class="text-xs text-gray-400 mt-1">Dari {{ reportData?.expectedCash.roomsCount || 0 }} Kamar Terisi</p>
           </div>
         </div>
       </div>
 
       <!-- Real -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
           <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
             <UIcon name="i-heroicons-check-circle" class="w-6 h-6 text-green-600 dark:text-green-400" />
           </div>
           <div>
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Kas Riil</p>
-            <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(realTotal) }}</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ formatCurrency(realTotal) }}</h3>
              <p class="text-xs text-gray-400 mt-1">Dari {{ reportData?.realCash.paidRoomsCount || 0 }} Kamar Lunas</p>
           </div>
         </div>
       </div>
 
       <!-- Variance -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
           <div class="p-3 rounded-lg" :class="varianceAmount >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'">
             <UIcon :name="varianceAmount >= 0 ? 'i-heroicons-arrow-trending-up' : 'i-heroicons-arrow-trending-down'" 
@@ -181,7 +181,7 @@ watch([selectedMonth, selectedPropertyId], () => {
           </div>
           <div>
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Selisih</p>
-             <h3 class="text-2xl font-bold mt-1" :class="varianceAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+             <h3 class="text-xl font-bold mt-1 whitespace-nowrap" :class="varianceAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                 {{ formatCurrency(varianceAmount) }}
             </h3>
             <p class="text-xs mt-1" :class="varianceAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
@@ -192,14 +192,14 @@ watch([selectedMonth, selectedPropertyId], () => {
       </div>
 
        <!-- Collection Rate -->
-       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex items-center gap-4">
           <div class="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
             <UIcon name="i-heroicons-chart-pie" class="w-6 h-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tingkat Penagihan</p>
-            <h3 class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ collectionRate.toFixed(1) }}%</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mt-1 whitespace-nowrap">{{ collectionRate.toFixed(1) }}%</h3>
             <p class="text-xs text-gray-400 mt-1">Dari pendapatan yang diharapkan</p>
           </div>
         </div>
