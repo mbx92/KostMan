@@ -131,6 +131,7 @@ export const rentBills = pgTable("rent_bills", {
   trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).default("0"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   isPaid: boolean("is_paid").default(false),
+  paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
   generatedAt: timestamp("generated_at").notNull(),
 });
@@ -155,6 +156,7 @@ export const utilityBills = pgTable("utility_bills", {
   }).default("0"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   isPaid: boolean("is_paid").default(false),
+  paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
   generatedAt: timestamp("generated_at").notNull(),
 });

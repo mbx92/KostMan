@@ -75,6 +75,36 @@ const defaultNavigation: NavItem[] = [
     icon: 'i-heroicons-tag',
     to: '/pricing'
   },
+  {
+    label: 'Reports',
+    icon: 'i-heroicons-chart-bar',
+    children: [
+      {
+        label: 'Cash Report',
+        to: '/reports/cash'
+      },
+      {
+        label: 'Payment Report',
+        to: '/reports/payments'
+      },
+      {
+        label: 'Income Report',
+        to: '/reports/income'
+      },
+      {
+        label: 'Tenant Report',
+        to: '/reports/tenants'
+      },
+      {
+        label: 'Electricity Report',
+        to: '/reports/electricity'
+      },
+      {
+        label: 'Profit & Loss',
+        to: '/reports/profit-loss'
+      }
+    ]
+  },
 ]
 
 // Navigation items from app config with fallback
