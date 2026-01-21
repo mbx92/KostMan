@@ -2,10 +2,12 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '#ui/types'
 import { useKosStore } from '~/stores/kos'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 
 const store = useKosStore()
 const { settings, integrations, settingsLoading, integrationsLoading } = storeToRefs(store)
 const toast = useToast()
+const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 // --- Global Settings ---
 const state = reactive({
@@ -14,6 +16,17 @@ const state = reactive({
   waterFee: 0,
   trashFee: 0
 })
+
+// --- WhatsApp Template State ---
+const whatsappTemplates = ref<any[]>([])
+const templateFormOpen = ref(false)
+const editingTemplate = ref<any>(null)
+const templateForm = reactive({
+  name: '',
+  message: '',
+  isDefault: false
+})
+const templateLoading = ref(false)
 
 const schema = z.object({
   appName: z.string().min(1, 'App Name is required'),
@@ -74,6 +87,253 @@ const onSaveMidtrans = async () => {
     toast.add({ title: 'Error', description: 'Failed to save integration.', color: 'error' })
   }
 }
+
+// --- Backup Functions ---
+const backupLoading = ref(false)
+const backupHistory = ref<any[]>([])
+const showHistory = ref(false)
+
+async function createBackup() {
+  backupLoading.value = true
+  try {
+    const response = await $fetch('/api/backup/database', {
+      method: 'POST',
+      responseType: 'blob',
+    })
+    
+    // Trigger download
+    const url = window.URL.createObjectURL(response as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `kostman-backup-${new Date().toISOString().split('T')[0]}.sql`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    
+    toast.add({
+      title: 'Backup Berhasil',
+      description: 'Database berhasil di-backup dan diunduh.',
+      color: 'success',
+    })
+    
+    // Refresh history
+    await loadBackupHistory()
+  } catch (error: any) {
+    toast.add({
+      title: 'Backup Gagal',
+      description: error.data?.message || 'Gagal membuat backup',
+      color: 'error',
+    })
+  } finally {
+    backupLoading.value = false
+  }
+}
+
+async function loadBackupHistory() {
+  try {
+    const data = await $fetch('/api/backup/history')
+    backupHistory.value = data.backups
+  } catch (error) {
+    console.error('Failed to load backup history', error)
+  }
+}
+
+async function cleanupOldBackups() {
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Backup Lama?',
+    message: 'Hapus backup yang lebih lama dari 30 hari?',
+    confirmText: 'Ya, Hapus',
+    confirmColor: 'warning',
+  })
+  
+  if (!confirmed) return
+  
+  try {
+    const result = await $fetch('/api/backup/cleanup', { method: 'POST' })
+    toast.add({
+      title: 'Berhasil',
+      description: result.message,
+      color: 'success',
+    })
+    await loadBackupHistory()
+  } catch (error) {
+    toast.add({
+      title: 'Gagal',
+      description: 'Gagal membersihkan backup lama',
+      color: 'error',
+    })
+  }
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+// --- WhatsApp Template Functions ---
+async function loadWhatsAppTemplates() {
+  try {
+    const data = await $fetch('/api/whatsapp-templates')
+    whatsappTemplates.value = data.templates
+  } catch (error) {
+    console.error('Failed to load WhatsApp templates', error)
+  }
+}
+
+function openTemplateForm(template?: any) {
+  if (template) {
+    editingTemplate.value = template
+    templateForm.name = template.name
+    templateForm.message = template.message
+    templateForm.isDefault = template.isDefault
+  } else {
+    editingTemplate.value = null
+    templateForm.name = ''
+    templateForm.message = getDefaultTemplate()
+    templateForm.isDefault = false
+  }
+  templateFormOpen.value = true
+}
+
+function getDefaultTemplate() {
+  return `Halo {nama_penyewa},
+
+Ini adalah pengingat untuk pembayaran kost Anda:
+
+🏠 Properti: {nama_properti}
+🚪 Kamar: {nama_kamar}
+💰 Jumlah: Rp {jumlah_tagihan}
+📅 Jatuh Tempo: {tanggal_jatuh_tempo}
+
+Status: {status_tagihan}
+
+Silakan lakukan pembayaran sebelum tanggal jatuh tempo. Terima kasih!
+
+---
+Variabel yang tersedia:
+{nama_penyewa} - Nama penghuni
+{nama_properti} - Nama properti
+{nama_kamar} - Nama kamar
+{jumlah_tagihan} - Total tagihan
+{tanggal_jatuh_tempo} - Tanggal jatuh tempo
+{status_tagihan} - Status tagihan
+{periode} - Periode tagihan`
+}
+
+async function saveTemplate() {
+  if (!templateForm.name || !templateForm.message) {
+    toast.add({
+      title: 'Validasi Gagal',
+      description: 'Nama dan pesan template harus diisi',
+      color: 'error',
+    })
+    return
+  }
+
+  templateLoading.value = true
+  try {
+    if (editingTemplate.value) {
+      // Update existing
+      await $fetch(`/api/whatsapp-templates/${editingTemplate.value.id}`, {
+        method: 'PUT',
+        body: {
+          name: templateForm.name,
+          message: templateForm.message,
+          isDefault: templateForm.isDefault,
+        }
+      })
+      toast.add({
+        title: 'Berhasil',
+        description: 'Template berhasil diperbarui',
+        color: 'success',
+      })
+    } else {
+      // Create new
+      await $fetch('/api/whatsapp-templates', {
+        method: 'POST',
+        body: {
+          name: templateForm.name,
+          message: templateForm.message,
+          isDefault: templateForm.isDefault,
+        }
+      })
+      toast.add({
+        title: 'Berhasil',
+        description: 'Template berhasil dibuat',
+        color: 'success',
+      })
+    }
+    
+    templateFormOpen.value = false
+    await loadWhatsAppTemplates()
+  } catch (error: any) {
+    toast.add({
+      title: 'Gagal',
+      description: error.data?.message || 'Gagal menyimpan template',
+      color: 'error',
+    })
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+async function deleteTemplate(template: any) {
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Template?',
+    message: `Hapus template "${template.name}"?`,
+    confirmText: 'Ya, Hapus',
+    confirmColor: 'error',
+  })
+  
+  if (!confirmed) return
+  
+  try {
+    await $fetch(`/api/whatsapp-templates/${template.id}`, {
+      method: 'DELETE'
+    })
+    toast.add({
+      title: 'Berhasil',
+      description: 'Template berhasil dihapus',
+      color: 'success',
+    })
+    await loadWhatsAppTemplates()
+  } catch (error) {
+    toast.add({
+      title: 'Gagal',
+      description: 'Gagal menghapus template',
+      color: 'error',
+    })
+  }
+}
+
+function insertVariable(variable: string) {
+  templateForm.message += variable
+}
+
+onMounted(async () => {
+  await Promise.all([
+    store.fetchSettings(),
+    store.fetchIntegrations(),
+    loadBackupHistory()
+  ])
+  
+  // Sync state with store
+  if (settings.value) {
+    state.appName = settings.value.appName
+    state.costPerKwh = Number(settings.value.costPerKwh)
+    state.waterFee = Number(settings.value.waterFee)
+    state.trashFee = Number(settings.value.trashFee)
+  }
+
+  // Sync integration state
+  if (integrations.value?.midtrans) {
+    const m = integrations.value.midtrans
+    midtransState.isEnabled = m.isEnabled
+    midtransState.serverKey = m.serverKey || '' // Will be masked if saved
+    midtransState.clientKey = m.clientKey || ''
+    midtransState.isProduction = m.isProduction
+  }
+})
 </script>
 
 <template>
@@ -216,6 +476,92 @@ const onSaveMidtrans = async () => {
       </div>
     </section>
 
+    <!-- WhatsApp Template Section -->
+    <section class="space-y-6">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Template WhatsApp</h2>
+          <p class="text-sm text-gray-500">Kelola template pesan untuk reminder pembayaran via WhatsApp.</p>
+        </div>
+        <UButton icon="i-heroicons-plus" color="primary" @click="openTemplateForm()">
+          Buat Template
+        </UButton>
+      </div>
+
+      <UCard v-if="whatsappTemplates.length === 0">
+        <div class="text-center py-8">
+          <UIcon name="i-heroicons-chat-bubble-left-right" class="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p class="text-gray-500 dark:text-gray-400 mb-4">Belum ada template WhatsApp</p>
+          <UButton icon="i-heroicons-plus" @click="openTemplateForm()">
+            Buat Template Pertama
+          </UButton>
+        </div>
+      </UCard>
+
+      <div v-else class="grid grid-cols-1 gap-4">
+        <UCard 
+          v-for="template in whatsappTemplates" 
+          :key="template.id"
+          class="hover:shadow-md transition-shadow"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <h3 class="font-semibold text-gray-900 dark:text-white">
+                  {{ template.name }}
+                </h3>
+                <UBadge v-if="template.isDefault" color="primary" size="xs">
+                  Default
+                </UBadge>
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto">
+                {{ template.message }}
+              </div>
+              <p class="text-xs text-gray-500 mt-2">
+                Dibuat: {{ new Date(template.createdAt).toLocaleString('id-ID') }}
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <UButton 
+                icon="i-heroicons-pencil" 
+                size="sm" 
+                color="neutral" 
+                variant="soft"
+                @click="openTemplateForm(template)"
+              />
+              <UButton 
+                icon="i-heroicons-trash" 
+                size="sm" 
+                color="error" 
+                variant="soft"
+                @click="deleteTemplate(template)"
+              />
+            </div>
+          </div>
+        </UCard>
+      </div>
+
+      <!-- Info Card -->
+      <UCard class="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+        <div class="flex gap-3">
+          <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div class="text-sm text-blue-700 dark:text-blue-300 space-y-2">
+            <p><strong>Variabel yang Tersedia:</strong></p>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs">
+              <div><code>{nama_penyewa}</code> - Nama penghuni</div>
+              <div><code>{nama_properti}</code> - Nama properti</div>
+              <div><code>{nama_kamar}</code> - Nama kamar</div>
+              <div><code>{jumlah_tagihan}</code> - Total tagihan</div>
+              <div><code>{tanggal_jatuh_tempo}</code> - Tgl jatuh tempo</div>
+              <div><code>{status_tagihan}</code> - Status tagihan</div>
+              <div><code>{periode}</code> - Periode billing</div>
+            </div>
+            <p class="pt-2">Gunakan variabel di atas dalam template untuk data yang dinamis.</p>
+          </div>
+        </div>
+      </UCard>
+    </section>
+
     <!-- System Logs Section -->
     <section class="space-y-6">
       <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
@@ -236,9 +582,201 @@ const onSaveMidtrans = async () => {
       </UCard>
     </section>
 
+    <!-- Database Backup Section -->
+    <section class="space-y-6">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Database Backup</h2>
+          <p class="text-sm text-gray-500">Backup dan restore data aplikasi Anda.</p>
+        </div>
+      </div>
+
+      <UCard>
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Backup seluruh data aplikasi termasuk properti, kamar, penghuni, tagihan, dan pembayaran.
+            File backup akan diunduh dalam format SQL.
+          </p>
+          
+          <div class="flex flex-wrap gap-3">
+            <UButton 
+              color="primary" 
+              icon="i-heroicons-arrow-down-tray"
+              :loading="backupLoading"
+              @click="createBackup"
+            >
+              Backup Sekarang
+            </UButton>
+            
+            <UButton 
+              v-if="backupHistory.length > 0"
+              variant="soft"
+              icon="i-heroicons-clock"
+              @click="showHistory = !showHistory"
+            >
+              {{ showHistory ? 'Sembunyikan' : 'Lihat' }} Riwayat ({{ backupHistory.length }})
+            </UButton>
+            
+            <UButton 
+              v-if="backupHistory.length > 0"
+              variant="soft"
+              color="warning"
+              icon="i-heroicons-trash"
+              @click="cleanupOldBackups"
+            >
+              Bersihkan Lama
+            </UButton>
+          </div>
+          
+          <!-- Backup History -->
+          <div v-if="showHistory && backupHistory.length > 0" class="mt-6">
+            <div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+              <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                Riwayat Backup
+              </h4>
+              
+              <div class="space-y-2">
+                <div 
+                  v-for="backup in backupHistory" 
+                  :key="backup.id"
+                  class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                >
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <UIcon 
+                        :name="backup.type === 'manual' ? 'i-heroicons-hand-raised' : 'i-heroicons-clock'" 
+                        class="w-4 h-4 text-gray-400"
+                      />
+                      <span class="text-sm font-medium text-gray-900 dark:text-white">
+                        {{ backup.filename }}
+                      </span>
+                      <UBadge 
+                        :color="backup.type === 'manual' ? 'primary' : 'neutral'" 
+                        size="xs"
+                      >
+                        {{ backup.type }}
+                      </UBadge>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">
+                      {{ formatFileSize(backup.size) }} • 
+                      {{ new Date(backup.createdAt).toLocaleString('id-ID') }}
+                      <span v-if="backup.duration"> • {{ (backup.duration / 1000).toFixed(2) }}s</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <div class="flex gap-2">
+              <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 flex-shrink-0" />
+              <div class="text-sm text-blue-700 dark:text-blue-300">
+                <strong>Tips:</strong> Simpan backup secara berkala di tempat yang aman. 
+                File SQL dapat di-restore menggunakan tools seperti pgAdmin atau psql.
+              </div>
+            </div>
+          </div>
+        </div>
+      </UCard>
+    </section>
+
     <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 flex items-center gap-4 text-sm text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-900/30">
         <UIcon name="i-heroicons-information-circle" class="w-5 h-5 shrink-0" />
         <p>Global billing rates are used as defaults when creating new properties. You can override these rates in specific property settings.</p>
     </div>
+    
+    <ConfirmDialog ref="confirmDialog" />
+    
+    <!-- WhatsApp Template Modal -->
+    <UModal v-model="templateFormOpen" :ui="{ width: 'max-w-3xl' }">
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">
+              {{ editingTemplate ? 'Edit Template' : 'Buat Template Baru' }}
+            </h3>
+            <UButton 
+              color="neutral" 
+              variant="ghost" 
+              icon="i-heroicons-x-mark" 
+              @click="templateFormOpen = false"
+            />
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <UFormField label="Nama Template" required>
+            <UInput 
+              v-model="templateForm.name" 
+              placeholder="Contoh: Reminder Pembayaran Bulanan"
+            />
+          </UFormField>
+
+          <UFormField label="Pesan Template" required>
+            <UTextarea 
+              v-model="templateForm.message" 
+              :rows="12"
+              placeholder="Tulis template pesan di sini..."
+              class="font-mono text-sm"
+            />
+          </UFormField>
+
+          <!-- Quick Insert Variables -->
+          <div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
+            <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Sisipkan Variabel:
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <UButton 
+                v-for="variable in [
+                  '{nama_penyewa}',
+                  '{nama_properti}',
+                  '{nama_kamar}',
+                  '{jumlah_tagihan}',
+                  '{tanggal_jatuh_tempo}',
+                  '{status_tagihan}',
+                  '{periode}'
+                ]"
+                :key="variable"
+                size="xs"
+                color="neutral"
+                variant="soft"
+                @click="insertVariable(variable)"
+              >
+                {{ variable }}
+              </UButton>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Jadikan Template Default</p>
+              <p class="text-xs text-gray-500">Template ini akan digunakan secara otomatis</p>
+            </div>
+            <USwitch v-model="templateForm.isDefault" />
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end gap-3">
+            <UButton 
+              color="neutral" 
+              variant="soft" 
+              @click="templateFormOpen = false"
+            >
+              Batal
+            </UButton>
+            <UButton 
+              color="primary" 
+              :loading="templateLoading"
+              @click="saveTemplate"
+            >
+              {{ editingTemplate ? 'Perbarui' : 'Simpan' }} Template
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </UModal>
   </div>
 </template>

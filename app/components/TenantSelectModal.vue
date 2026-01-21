@@ -48,7 +48,7 @@ watch(isOpen, (open) => {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" title="Select Tenant">
+  <UModal v-model:open="isOpen" title="Pilih Penghuni">
     <template #default />
     
     <template #content>
@@ -57,7 +57,7 @@ watch(isOpen, (open) => {
         <div class="relative">
           <UInput 
             v-model="searchQuery" 
-            placeholder="Search tenant by name or contact..." 
+            placeholder="Cari penghuni berdasarkan nama atau kontak..." 
             autofocus
             class="w-full"
           >
@@ -70,7 +70,7 @@ watch(isOpen, (open) => {
         <!-- Loading State -->
         <div v-if="tenantsLoading" class="py-8 text-center">
           <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin text-primary-500 mx-auto" />
-          <p class="text-sm text-gray-500 mt-2">Loading tenants...</p>
+          <p class="text-sm text-gray-500 mt-2">Memuat penghuni...</p>
         </div>
 
         <!-- Tenant List -->
@@ -93,7 +93,7 @@ watch(isOpen, (open) => {
           <div v-if="filteredTenants.length === 0" class="py-8 text-center">
             <UIcon name="i-heroicons-user-group" class="w-10 h-10 text-gray-300 mx-auto" />
             <p class="text-sm text-gray-500 mt-2">
-              {{ searchQuery ? 'No tenants match your search.' : 'No active tenants available.' }}
+              {{ searchQuery ? 'Tidak ada penghuni yang cocok.' : 'Tidak ada penghuni aktif.' }}
             </p>
           </div>
         </div>
@@ -107,7 +107,7 @@ watch(isOpen, (open) => {
             icon="i-heroicons-user-plus"
             @click="createNewTenant"
           >
-            Create New Tenant
+            Buat Penghuni Baru
           </UButton>
         </div>
       </div>

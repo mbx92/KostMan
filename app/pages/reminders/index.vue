@@ -19,7 +19,7 @@ const searchQuery = ref('');
 const selectedPropertyId = ref('all');
 
 const propertyItems = computed(() => [
-    { label: 'All Properties', value: 'all' },
+    { label: 'Semua Properti', value: 'all' },
     ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ]);
 
@@ -253,15 +253,15 @@ const openDetails = (group: any) => {
     <!-- Header with Search & Filter -->
     <div class="mb-6 flex flex-col md:flex-row md:justify-between md:items-start gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Bill Reminders</h1>
-        <p class="text-gray-600 dark:text-gray-400">Manage unpaid bills and send reminders.</p>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Pengingat Tagihan</h1>
+        <p class="text-gray-600 dark:text-gray-400">Kelola tagihan belum lunas dan kirim pengingat.</p>
       </div>
       
       <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
         <UInput
           v-model="searchQuery"
           icon="i-heroicons-magnifying-glass"
-          placeholder="Search tenant or room..."
+          placeholder="Cari penghuni atau kamar..."
           class="w-full sm:w-64"
         />
         <USelect
@@ -285,8 +285,8 @@ const openDetails = (group: any) => {
     <!-- Empty State -->
     <div v-else-if="displayCounts.total === 0" class="py-12 text-center bg-gray-50 dark:bg-gray-800/50 rounded-lg">
        <UIcon name="i-heroicons-check-circle" class="w-16 h-16 text-green-500 mx-auto mb-4" />
-       <h3 class="text-xl font-semibold text-gray-900 dark:text-white">All Caught Up!</h3>
-       <p class="text-gray-500">There are no unpaid bills matching your filter.</p>
+       <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Semua Beres!</h3>
+       <p class="text-gray-500">Tidak ada tagihan belum lunas yang sesuai filter.</p>
     </div>
 
     <div v-else class="space-y-8">
@@ -298,7 +298,7 @@ const openDetails = (group: any) => {
           @click="toggleCollapse('overdue')"
         >
            <div class="w-2 h-8 bg-red-500 rounded-full"></div>
-           <h2 class="text-xl font-bold text-red-600 dark:text-red-400">Overdue ({{ filteredReminders.overdue.length }})</h2>
+           <h2 class="text-xl font-bold text-red-600 dark:text-red-400">Lewat Jatuh Tempo ({{ filteredReminders.overdue.length }})</h2>
            <UIcon 
              :name="collapsed.overdue ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-down'" 
              class="w-5 h-5 text-gray-400 transition-transform"
@@ -322,9 +322,9 @@ const openDetails = (group: any) => {
                             <p class="text-sm text-gray-500 truncate">{{ group.roomName }} • {{ group.propertyName }}</p>
                             <div class="mt-1 flex items-center gap-2 flex-wrap">
                                  <UBadge color="red" variant="subtle" size="xs">
-                                    Overdue {{ Math.abs(group.daysUntilDue) }} days
+                                    Lewat {{ Math.abs(group.daysUntilDue) }} hari
                                  </UBadge>
-                                 <span class="text-xs text-gray-400 hidden sm:inline">Since: {{ formatDate(group.dueDate) }}</span>
+                                 <span class="text-xs text-gray-400 hidden sm:inline">Sejak: {{ formatDate(group.dueDate) }}</span>
                             </div>
                         </div>
                     </div>
@@ -332,7 +332,7 @@ const openDetails = (group: any) => {
                     <div class="flex items-center gap-2 shrink-0">
                         <div class="text-right hidden sm:block">
                             <div class="text-lg font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
-                            <div class="text-xs text-gray-500 uppercase">{{ group.bills.length }} Bills</div>
+                            <div class="text-xs text-gray-500 uppercase">{{ group.bills.length }} Tagihan</div>
                         </div>
                         <div class="text-right sm:hidden">
                             <div class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
@@ -384,7 +384,7 @@ const openDetails = (group: any) => {
           @click="toggleCollapse('dueSoon')"
         >
            <div class="w-2 h-8 bg-orange-500 rounded-full"></div>
-           <h2 class="text-xl font-bold text-orange-600 dark:text-orange-400">Due Soon ({{ filteredReminders.dueSoon.length }})</h2>
+           <h2 class="text-xl font-bold text-orange-600 dark:text-orange-400">Segera Jatuh Tempo ({{ filteredReminders.dueSoon.length }})</h2>
            <UIcon 
              :name="collapsed.dueSoon ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-down'" 
              class="w-5 h-5 text-gray-400 transition-transform"
@@ -408,9 +408,9 @@ const openDetails = (group: any) => {
                             <p class="text-sm text-gray-500 truncate">{{ group.roomName }} • {{ group.propertyName }}</p>
                             <div class="mt-1 flex items-center gap-2 flex-wrap">
                                  <UBadge color="orange" variant="subtle" size="xs">
-                                    Due in {{ group.daysUntilDue }} days
+                                    Jatuh tempo dalam {{ group.daysUntilDue }} hari
                                  </UBadge>
-                                 <span class="text-xs text-gray-400 hidden sm:inline">Due: {{ formatDate(group.dueDate) }}</span>
+                                 <span class="text-xs text-gray-400 hidden sm:inline">Jatuh tempo: {{ formatDate(group.dueDate) }}</span>
                             </div>
                         </div>
                     </div>
@@ -418,7 +418,7 @@ const openDetails = (group: any) => {
                     <div class="flex items-center gap-2 shrink-0">
                         <div class="text-right hidden sm:block">
                             <div class="text-lg font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
-                            <div class="text-xs text-gray-500 uppercase">{{ group.bills.length }} Bills</div>
+                            <div class="text-xs text-gray-500 uppercase">{{ group.bills.length }} Tagihan</div>
                         </div>
                         <div class="text-right sm:hidden">
                             <div class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
@@ -470,7 +470,7 @@ const openDetails = (group: any) => {
           @click="toggleCollapse('upcoming')"
         >
            <div class="w-2 h-8 bg-gray-500 rounded-full"></div>
-           <h2 class="text-xl font-bold text-gray-600 dark:text-gray-400">Upcoming ({{ filteredReminders.upcoming.length }})</h2>
+           <h2 class="text-xl font-bold text-gray-600 dark:text-gray-400">Mendatang ({{ filteredReminders.upcoming.length }})</h2>
            <UIcon 
              :name="collapsed.upcoming ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-down'" 
              class="w-5 h-5 text-gray-400 transition-transform"
@@ -494,9 +494,9 @@ const openDetails = (group: any) => {
                             <p class="text-sm text-gray-500 truncate">{{ group.roomName }} • {{ group.propertyName }}</p>
                             <div class="mt-1 flex items-center gap-2 flex-wrap">
                                  <UBadge color="gray" variant="subtle" size="xs">
-                                    {{ group.daysUntilDue }} days left
+                                    {{ group.daysUntilDue }} hari lagi
                                  </UBadge>
-                                 <span class="text-xs text-gray-400 hidden sm:inline">Due: {{ formatDate(group.dueDate) }}</span>
+                                 <span class="text-xs text-gray-400 hidden sm:inline">Jatuh tempo: {{ formatDate(group.dueDate) }}</span>
                             </div>
                         </div>
                     </div>
@@ -504,7 +504,7 @@ const openDetails = (group: any) => {
                     <div class="flex items-center gap-2 shrink-0">
                         <div class="text-right hidden sm:block">
                             <div class="text-lg font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
-                            <div class="text-xs text-gray-500 uppercase">{{ group.bills.length }} Bills</div>
+                            <div class="text-xs text-gray-500 uppercase">{{ group.bills.length }} Tagihan</div>
                         </div>
                         <div class="text-right sm:hidden">
                             <div class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(group.totalAmount) }}</div>
@@ -553,8 +553,8 @@ const openDetails = (group: any) => {
     
     <!-- Details Modal -->
     <UModal 
-      v-model:open="showDetails" 
-      title="Bill Details"
+      v-model:open="showDetails"
+      title="Detail Tagihan"
       :description="selectedGroup ? `${selectedGroup.tenantName} • ${selectedGroup.roomName}` : ''"
       :ui="{ footer: 'justify-end' }"
     >
@@ -562,14 +562,14 @@ const openDetails = (group: any) => {
         <div v-if="selectedGroup" class="space-y-4">
             <div v-for="bill in selectedGroup.bills" :key="bill.id" class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
                 <div class="flex justify-between mb-2">
-                    <span class="text-xs font-bold uppercase text-gray-500">{{ bill.type }} Bill</span>
+                    <span class="text-xs font-bold uppercase text-gray-500">Tagihan {{ bill.type === 'rent' ? 'SEWA' : 'UTILITAS' }}</span>
                     <span class="text-xs font-semibold">{{ bill.period }}</span>
                 </div>
                 
                 <!-- Rent Details -->
                 <div v-if="bill.type === 'rent'" class="space-y-1 text-sm">
                     <div class="flex justify-between">
-                        <span>Room Price (x{{ bill.monthsCovered || 1 }})</span>
+                        <span>Harga Kamar (x{{ bill.monthsCovered || 1 }})</span>
                         <span>{{ formatCurrency(bill.roomPrice) }}</span>
                     </div>
                 </div>
@@ -577,15 +577,15 @@ const openDetails = (group: any) => {
                 <!-- Utility Details -->
                 <div v-else class="space-y-1 text-sm">
                    <div class="flex justify-between text-gray-600 dark:text-gray-400">
-                       <span>Electricity ({{ bill.meterStart }} -> {{ bill.meterEnd }})</span>
+                       <span>Listrik ({{ bill.meterStart }} -> {{ bill.meterEnd }})</span>
                        <span>{{ formatCurrency(bill.usageCost) }}</span>
                    </div>
                    <div class="flex justify-between text-gray-600 dark:text-gray-400">
-                       <span>Water</span>
+                       <span>Air</span>
                        <span>{{ formatCurrency(bill.waterFee) }}</span>
                    </div>
                    <div v-if="bill.trashFee > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
-                       <span>Trash</span>
+                       <span>Sampah</span>
                        <span>{{ formatCurrency(bill.trashFee) }}</span>
                    </div>
                 </div>
@@ -595,17 +595,16 @@ const openDetails = (group: any) => {
                     <span>{{ formatCurrency(bill.amount) }}</span>
                 </div>
             </div>
-            
              <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span>Grand Total</span>
+                <span>Total Keseluruhan</span>
                 <span>{{ formatCurrency(selectedGroup.totalAmount) }}</span>
             </div>
         </div>
       </template>
 
       <template #footer="{ close }">
-        <UButton label="Close" size="lg" color="neutral" variant="outline" @click="close" />
-        <UButton label="Send WhatsApp" size="lg" icon="i-simple-icons-whatsapp" class="bg-[#25D366] hover:bg-[#128C7E] text-white" @click="sendWhatsApp(selectedGroup); close()" />
+        <UButton label="Tutup" size="lg" color="neutral" variant="outline" @click="close" />
+        <UButton label="Kirim WhatsApp" size="lg" icon="i-simple-icons-whatsapp" class="bg-[#25D366] hover:bg-[#128C7E] text-white" @click="sendWhatsApp(selectedGroup); close()" />
       </template>
     </UModal>
   </div>

@@ -43,7 +43,7 @@ watch([selectedPropertyId, searchQuery], () => {
 
 // Property options for filter
 const propertyOptions = computed(() => [
-  { label: 'All Properties', value: '__all__' },
+  { label: 'Semua Properti', value: '__all__' },
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
@@ -107,11 +107,11 @@ const deleteRoom = async (room: Room) => {
     
 try {
             await store.deleteRoom(room.id)
-            toast.add({ title: 'Room Deleted', color: 'success' })
+            toast.add({ title: 'Kamar Dihapus', color: 'success' })
         } catch (err: any) {
             toast.add({ 
                 title: 'Error', 
-                description: err?.data?.message || err?.message || 'Failed to delete room',
+                description: err?.data?.message || err?.message || 'Gagal menghapus kamar',
                 color: 'error' 
             })
         }
@@ -129,13 +129,13 @@ const onModalClose = () => {
       <div>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <UIcon name="i-heroicons-home-modern" class="w-8 h-8 text-primary-500" />
-            Rooms
+            Kamar
         </h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-1">Manage occupancy and room details.</p>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Kelola hunian dan detail kamar.</p>
       </div>
       
       <UButton icon="i-heroicons-plus" size="lg" @click="openAddRoomModal" :disabled="properties.length === 0">
-          Add Room
+          Tambah Kamar
       </UButton>
     </div>
 
@@ -143,7 +143,7 @@ const onModalClose = () => {
     <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
         <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-funnel" class="text-gray-400" />
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Filter by Property:</span>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Filter Properti:</span>
             <USelect 
                 v-model="selectedPropertyId" 
                 :items="propertyOptions" 
@@ -159,11 +159,11 @@ const onModalClose = () => {
       <div class="flex items-center gap-3">
         <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-500" />
         <div>
-          <h3 class="font-medium text-red-800 dark:text-red-200">Error loading rooms</h3>
+          <h3 class="font-medium text-red-800 dark:text-red-200">Gagal memuat kamar</h3>
           <p class="text-sm text-red-600 dark:text-red-400">{{ roomsError }}</p>
         </div>
         <UButton size="sm" color="error" variant="soft" class="ml-auto" @click="loadRooms()">
-          Retry
+          Coba Lagi
         </UButton>
       </div>
     </div>
@@ -195,9 +195,9 @@ const onModalClose = () => {
     <!-- No Properties Warning -->
     <div v-else-if="properties.length === 0 && !roomsLoading" class="text-center py-12 bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800">
       <UIcon name="i-heroicons-exclamation-triangle" class="w-12 h-12 text-orange-500 mb-3" />
-      <h3 class="text-lg font-medium text-gray-900 dark:text-white">No Properties Found</h3>
-      <p class="text-gray-500 mt-1 mb-4">You need to create a property first before adding rooms.</p>
-      <UButton to="/properties" icon="i-heroicons-building-office-2">Go to Properties</UButton>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white">Properti Tidak Ditemukan</h3>
+      <p class="text-gray-500 mt-1 mb-4">Anda perlu membuat properti terlebih dahulu sebelum menambah kamar.</p>
+      <UButton to="/properties" icon="i-heroicons-building-office-2">Ke Properti</UButton>
     </div>
 
     <!-- Room Grid -->
@@ -237,7 +237,7 @@ const onModalClose = () => {
                 <!-- Price -->
                 <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ formatCurrency(room.price) }}
-                    <span class="text-xs font-normal text-gray-500">/mo</span>
+                    <span class="text-xs font-normal text-gray-500">/bulan</span>
                 </div>
 
                 <!-- Tenant Info -->
@@ -245,7 +245,7 @@ const onModalClose = () => {
                     <div v-if="room.status === 'occupied'" class="flex items-center gap-3">
                         <UAvatar :alt="room.tenantName" size="sm" class="bg-primary-100 text-primary-600 ring-2 ring-white dark:ring-gray-900" />
                         <div>
-                            <div class="text-xs text-gray-500">Occupied by</div>
+                            <div class="text-xs text-gray-500">Ditempati oleh</div>
                             <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[150px]">
                                 {{ room.tenantName }}
                             </div>
@@ -253,11 +253,11 @@ const onModalClose = () => {
                     </div>
                     <div v-else-if="room.status === 'available'" class="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <UIcon name="i-heroicons-check-circle" class="w-5 h-5" />
-                        <span class="text-sm font-medium">Ready for tenant</span>
+                        <span class="text-sm font-medium">Siap untuk penghuni</span>
                     </div>
                     <div v-else class="flex items-center gap-2 text-orange-500">
                         <UIcon name="i-heroicons-wrench-screwdriver" class="w-5 h-5" />
-                        <span class="text-sm font-medium">Under maintenance</span>
+                        <span class="text-sm font-medium">Dalam perbaikan</span>
                     </div>
                 </div>
             </div>
@@ -265,7 +265,7 @@ const onModalClose = () => {
             <!-- Footer Actions -->
             <div class="p-2 bg-gray-50 dark:bg-gray-800/50 flex gap-2">
                 <UButton :to="`/rooms/${room.id}`" class="flex-1" color="neutral" variant="outline" icon="i-heroicons-adjustments-horizontal">
-                    Manage
+                    Kelola
                 </UButton>
                 <UButton icon="i-heroicons-pencil-square" color="neutral" variant="ghost" @click.stop="openEditRoomModal(room)" />
                 <UButton icon="i-heroicons-trash" color="error" variant="ghost" @click.stop="deleteRoom(room)" />
@@ -276,11 +276,11 @@ const onModalClose = () => {
     <!-- Empty State -->
     <div v-else class="text-center py-20 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
         <UIcon name="i-heroicons-home" class="w-16 h-16 text-gray-300 mb-4" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">No rooms found</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Kamar tidak ditemukan</h3>
         <p class="text-gray-500 mt-2 mb-4">
-          {{ selectedPropertyId === '__all__' ? 'Start by adding your first room.' : 'No rooms for this property filter.' }}
+          {{ selectedPropertyId === '__all__' ? 'Mulai dengan menambah kamar pertama Anda.' : 'Tidak ada kamar untuk filter properti ini.' }}
         </p>
-        <UButton icon="i-heroicons-plus" @click="openAddRoomModal">Add Room</UButton>
+        <UButton icon="i-heroicons-plus" @click="openAddRoomModal">Tambah Kamar</UButton>
     </div>
 
     <!-- Room Modal -->

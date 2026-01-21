@@ -58,9 +58,9 @@ onMounted(async () => {
 
 // ============ Room Status & Tenant Management ============
 const statusOptions = [
-  { label: 'Available', value: 'available' },
-  { label: 'Occupied', value: 'occupied' },
-  { label: 'Maintenance', value: 'maintenance' }
+  { label: 'Tersedia', value: 'available' },
+  { label: 'Terisi', value: 'occupied' },
+  { label: 'Perbaikan', value: 'maintenance' }
 ]
 
 const roomStatus = ref<'available' | 'occupied' | 'maintenance'>('available')
@@ -126,12 +126,12 @@ const updateRoomStatus = async () => {
       if (isCreatingNewTenant.value && newTenantName.value) {
         // Validation for new tenant
         if (!newTenantContact.value || !newTenantIdCard.value) {
-          toast.add({ title: 'Validation Error', description: 'Please fill in contact and KTP number.', color: 'error' })
+          toast.add({ title: 'Validasi Error', description: 'Mohon isi kontak dan nomor KTP.', color: 'error' })
           isSaving.value = false
           return
         }
         if (newTenantIdCard.value.length !== 16) {
-          toast.add({ title: 'Validation Error', description: 'KTP number must be 16 digits.', color: 'error' })
+          toast.add({ title: 'Validasi Error', description: 'Nomor KTP harus 16 digit.', color: 'error' })
           isSaving.value = false
           return
         }
@@ -153,14 +153,14 @@ const updateRoomStatus = async () => {
         isCreatingNewTenant.value = false
         selectedTenantId.value = tenantId
         
-        toast.add({ title: 'Tenant Created', description: 'New tenant has been created and assigned.', color: 'success' })
+        toast.add({ title: 'Penghuni Dibuat', description: 'Penghuni baru telah dibuat dan ditetapkan.', color: 'success' })
       } else if (selectedTenantId.value && selectedTenantId.value !== '__new__') {
         tenantId = selectedTenantId.value
         const tenant = tenants.value.find(t => t.id === selectedTenantId.value)
         tenantName = tenant?.name || ''
       } else {
         // No tenant selected for occupied - validation error
-        toast.add({ title: 'Validation Error', description: 'Please select or create a tenant for occupied room.', color: 'error' })
+        toast.add({ title: 'Validasi Error', description: 'Mohon pilih atau buat penghuni untuk kamar terisi.', color: 'error' })
         isSaving.value = false
         return
       }
@@ -178,11 +178,11 @@ const updateRoomStatus = async () => {
     // Reload room to get updated data
     await loadRoom()
     
-    toast.add({ title: 'Room Updated', description: 'Room settings have been saved.', color: 'success' })
+    toast.add({ title: 'Kamar Diperbarui', description: 'Pengaturan kamar telah disimpan.', color: 'success' })
   } catch (err: any) {
     toast.add({
       title: 'Error',
-      description: err?.data?.message || err?.message || 'Failed to update room',
+      description: err?.data?.message || err?.message || 'Gagal memperbarui kamar',
       color: 'error',
     })
   } finally {
@@ -225,7 +225,7 @@ const removeTenant = async () => {
   } catch (err: any) {
     toast.add({
       title: 'Error',
-      description: err?.data?.message || err?.message || 'Failed to checkout tenant',
+      description: err?.data?.message || err?.message || 'Gagal checkout penghuni',
       color: 'error',
     })
   } finally {
@@ -250,11 +250,11 @@ const usage = computed(() => Math.max(0, meterEnd.value - meterStart.value))
 
 const addReading = async () => {
   if (!newPeriod.value) {
-    toast.add({ title: 'Invalid Period', description: 'Please select a billing period.', color: 'error' })
+    toast.add({ title: 'Periode Tidak Valid', description: 'Mohon pilih periode tagihan.', color: 'error' })
     return
   }
   if (meterEnd.value < meterStart.value) {
-    toast.add({ title: 'Invalid Reading', description: 'End reading cannot be less than start reading.', color: 'error' })
+    toast.add({ title: 'Pembacaan Tidak Valid', description: 'Pembacaan akhir tidak boleh kurang dari pembacaan awal.', color: 'error' })
     return
   }
   try {
@@ -264,10 +264,10 @@ const addReading = async () => {
       meterStart: meterStart.value,
       meterEnd: meterEnd.value
     })
-    toast.add({ title: 'Reading Saved', description: `Meter reading for ${newPeriod.value} recorded.`, color: 'success' })
+    toast.add({ title: 'Pembacaan Tersimpan', description: `Pembacaan meter untuk ${newPeriod.value} tercatat.`, color: 'success' })
     meterStart.value = meterEnd.value // Next period starts where this one ended
   } catch (e: any) {
-    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to add reading', color: 'error' })
+    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Gagal menambah pembacaan', color: 'error' })
   }
 }
 
@@ -281,9 +281,9 @@ const deleteReading = async (id: string) => {
   if (confirmed) {
     try {
       await store.deleteMeterReading(id)
-      toast.add({ title: 'Reading Deleted', description: 'Meter reading has been deleted.', color: 'success' })
+      toast.add({ title: 'Pembacaan Dihapus', description: 'Pembacaan meter telah dihapus.', color: 'success' })
     } catch (e: any) {
-      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to delete reading', color: 'error' })
+      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Gagal menghapus pembacaan', color: 'error' })
     }
   }
 }
@@ -309,9 +309,9 @@ const deleteBill = async (bill: any) => {
       } else {
          await store.deleteUtilityBill(bill.id)
       }
-      toast.add({ title: 'Bill Deleted', description: 'Bill has been deleted.', color: 'success' })
+      toast.add({ title: 'Tagihan Dihapus', description: 'Tagihan telah dihapus.', color: 'success' })
     } catch (e: any) {
-      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to delete bill', color: 'error' })
+      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Gagal menghapus tagihan', color: 'error' })
     }
   }
 }
@@ -323,9 +323,9 @@ const markPaid = async (bill: any) => {
     } else {
         await store.markUtilityBillAsPaid(bill.id)
     }
-    toast.add({ title: 'Bill Paid', description: 'Bill has been marked as paid.', color: 'success' })
+    toast.add({ title: 'Tagihan Lunas', description: 'Tagihan telah ditandai lunas.', color: 'success' })
   } catch (e: any) {
-    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Failed to mark as paid', color: 'error' })
+    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Gagal menandai lunas', color: 'error' })
   }
 }
 
@@ -370,14 +370,14 @@ const goBack = () => {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-6">
         <div>
             <UButton @click="goBack" variant="link" color="neutral" icon="i-heroicons-arrow-left" class="p-0 mb-2">
-                Back
+                Kembali
             </UButton>
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ room.name }}</h1>
-            <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Manage room details and meter readings.</p>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Kelola detail kamar dan pencatatan meter.</p>
         </div>
         <div class="flex items-center gap-3">
              <div class="text-right hidden sm:block">
-                <div class="text-sm text-gray-500">Monthly Rent</div>
+                <div class="text-sm text-gray-500">Sewa Bulanan</div>
                 <div class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ formatCurrency(Number(room.price)) }}</div>
              </div>
              <UBadge :color="getStatusColor(room.status)" size="lg" variant="solid" class="capitalize px-3 py-1.5">
@@ -391,7 +391,7 @@ const goBack = () => {
         <div class="lg:col-span-8 space-y-6">
             
             <!-- Meter Reading Tabs -->
-            <UTabs :items="[{ label: 'Record kWh', slot: 'record' }, { label: 'Billing History', slot: 'history' }]" class="w-full">
+            <UTabs :items="[{ label: 'Catat kWh', slot: 'record' }, { label: 'Riwayat Tagihan', slot: 'history' }]" class="w-full">
                 
                 <!-- Record kWh Tab -->
                 <template #record>
@@ -399,47 +399,46 @@ const goBack = () => {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <form @submit.prevent="addReading" class="space-y-5">
                                 <div class="space-y-1">
-                                    <label class="text-sm font-medium">Billing Period</label>
+                                    <label class="text-sm font-medium">Periode Tagihan</label>
                                     <DatePicker v-model="newPeriod" granularity="month" class="w-full" />
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">
-                                        <label class="text-sm font-medium">Start (kWh)</label>
+                                        <label class="text-sm font-medium">Awal (kWh)</label>
                                         <UInput v-model="meterStart" type="number" class="w-full" />
                                     </div>
                                     <div class="space-y-1">
-                                        <label class="text-sm font-medium">End (kWh)</label>
+                                        <label class="text-sm font-medium">Akhir (kWh)</label>
                                         <UInput v-model="meterEnd" type="number" class="w-full" />
                                     </div>
                                 </div>
 
                                 <div class="bg-primary-50 dark:bg-primary-950/30 p-3 rounded-lg text-sm">
                                     <div class="flex justify-between text-primary-700 dark:text-primary-400">
-                                        <span>Usage:</span>
+                                        <span>Pemakaian:</span>
                                         <span class="font-bold">{{ usage }} kWh</span>
                                     </div>
                                 </div>
                                 
                                 <UButton type="submit" block color="primary" size="lg" class="mt-6" icon="i-heroicons-plus">
-                                    Save Reading
+                                    Simpan Pembacaan
                                 </UButton>
                             </form>
 
-                            <!-- Reading History -->
                             <div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6">
-                                <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Reading History</h4>
+                                <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Riwayat Pembacaan</h4>
                                 <div v-if="meterReadings.length > 0" class="space-y-2 max-h-64 overflow-y-auto">
                                     <div v-for="reading in meterReadings" :key="reading.id" class="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800">
                                         <div>
                                             <div class="font-medium">{{ reading.meterEnd - reading.meterStart }} kWh</div>
                                             <div class="text-xs text-gray-500">{{ reading.period }} • {{ reading.meterStart }} → {{ reading.meterEnd }}</div>
-                                        </div>
+                                    </div>
                                         <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteReading(reading.id)" />
                                     </div>
                                 </div>
                                 <div v-else class="text-center text-gray-500 text-sm py-8">
-                                    No readings recorded yet.
+                                    Belum ada pembacaan meter.
                                 </div>
                             </div>
                         </div>
@@ -450,28 +449,28 @@ const goBack = () => {
                 <template #history>
                      <UCard class="mt-4">
                         <div class="flex items-center justify-between mb-4">
-                            <h4 class="font-semibold text-gray-900 dark:text-white">Billing History</h4>
+                            <h4 class="font-semibold text-gray-900 dark:text-white">Riwayat Tagihan</h4>
                             <UButton to="/billing" size="sm" color="primary" variant="soft" icon="i-heroicons-arrow-top-right-on-square">
-                                Go to Billing
+                                Ke Tagihan
                             </UButton>
                         </div>
                         <div v-if="billingHistory.length > 0">
                             <table class="w-full text-sm text-left">
                                 <thead class="bg-gray-50 dark:bg-gray-800 text-gray-500 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
-                                        <th class="p-3 font-medium">Type</th>
-                                        <th class="p-3 font-medium">Period</th>
-                                        <th class="p-3 font-medium">Details</th>
+                                        <th class="p-3 font-medium">Tipe</th>
+                                        <th class="p-3 font-medium">Periode</th>
+                                        <th class="p-3 font-medium">Detail</th>
                                         <th class="p-3 font-medium">Total</th>
                                         <th class="p-3 font-medium">Status</th>
-                                        <th class="p-3 font-medium text-right">Action</th>
+                                        <th class="p-3 font-medium text-right">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                                     <tr v-for="bill in billingHistory" :key="bill.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
                                         <td class="p-3">
                                             <UBadge :color="bill.type === 'rent' ? 'primary' : 'warning'" variant="subtle" size="xs">
-                                                {{ bill.type === 'rent' ? 'Rent' : 'Utility' }}
+                                                {{ bill.type === 'rent' ? 'Sewa' : 'Utilitas' }}
                                             </UBadge>
                                         </td>
                                         <td class="p-3 font-medium">{{ bill.period }}</td>
@@ -481,23 +480,23 @@ const goBack = () => {
                                                 <div class="text-xs text-gray-400 font-mono">{{ bill.meterStart }} -> {{ bill.meterEnd }}</div>
                                             </div>
                                             <div v-else>
-                                                <div>{{ bill.monthsCovered }} Month(s)</div>
+                                                <div>{{ bill.monthsCovered }} Bulan</div>
                                             </div>
                                         </td>
                                         <td class="p-3 font-bold text-gray-900 dark:text-white">{{ formatCurrency(Number(bill.totalAmount)) }}</td>
                                         <td class="p-3">
                                             <UBadge :color="bill.isPaid ? 'success' : 'neutral'" variant="subtle" size="xs">
-                                                {{ bill.isPaid ? 'Paid' : 'Unpaid' }}
+                                                {{ bill.isPaid ? 'Lunas' : 'Belum Lunas' }}
                                             </UBadge>
                                         </td>
                                         <td class="p-3 text-right flex justify-end gap-1">
-                                            <UTooltip text="Mark as Paid" v-if="!bill.isPaid">
+                                            <UTooltip text="Tandai Lunas" v-if="!bill.isPaid">
                                                 <UButton size="xs" color="success" variant="soft" icon="i-heroicons-check" @click="markPaid(bill)" />
                                             </UTooltip>
-                                            <UTooltip text="Print">
+                                            <UTooltip text="Cetak">
                                                 <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-printer" @click="downloadReceipt(bill)" />
                                             </UTooltip>
-                                            <UTooltip text="Delete">
+                                            <UTooltip text="Hapus">
                                                 <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteBill(bill)" />
                                             </UTooltip>
                                         </td>
@@ -509,9 +508,9 @@ const goBack = () => {
                             <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 mb-3">
                                 <UIcon name="i-heroicons-document-text" class="w-6 h-6 text-gray-400" />
                             </div>
-                            <p class="text-gray-500 text-sm">No billing history recorded yet.</p>
+                            <p class="text-gray-500 text-sm">Belum ada riwayat tagihan.</p>
                             <UButton to="/billing" class="mt-4" size="sm" color="primary" variant="soft">
-                                Create Bill in Billing Page
+                                Buat Tagihan di Halaman Billing
                             </UButton>
                         </div>
                     </UCard>
@@ -526,7 +525,7 @@ const goBack = () => {
                 <template #header>
                     <div class="flex items-center gap-2">
                         <UIcon name="i-heroicons-cog-6-tooth" class="w-5 h-5 text-gray-500" />
-                        <h3 class="font-semibold text-gray-900 dark:text-white">Room Settings</h3>
+                        <h3 class="font-semibold text-gray-900 dark:text-white">Pengaturan Kamar</h3>
                     </div>
                 </template>
 
@@ -545,7 +544,7 @@ const goBack = () => {
                     <!-- Tenant Management -->
                     <div v-if="roomStatus === 'occupied'" class="space-y-4 pt-2 border-t border-gray-100 dark:border-gray-800">
                          <div class="space-y-1">
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tenant</label>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Penghuni</label>
                             
                             <!-- Selected Tenant Display -->
                             <div v-if="selectedTenantId && selectedTenantId !== '__new__'" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md space-y-3">
@@ -562,7 +561,7 @@ const goBack = () => {
                                 </div>
                                 <div class="flex gap-2">
                                     <UButton variant="soft" color="neutral" icon="i-heroicons-arrow-path" size="xs" @click="isTenantModalOpen = true" class="flex-1">
-                                        Ganti Tenant
+                                        Ganti Penghuni
                                     </UButton>
                                     <UButton variant="soft" color="warning" icon="i-heroicons-arrow-right-start-on-rectangle" size="xs" @click="removeTenant" class="flex-1">
                                         Checkout
@@ -579,27 +578,27 @@ const goBack = () => {
                                     icon="i-heroicons-user-plus"
                                     @click="isTenantModalOpen = true"
                                 >
-                                    Select Tenant
+                                    Pilih Penghuni
                                 </UButton>
-                                <p class="text-xs text-gray-500 mt-1">{{ tenants.filter(t => t.status === 'active').length }} active tenant(s) available</p>
+                                <p class="text-xs text-gray-500 mt-1">{{ tenants.filter(t => t.status === 'active').length }} penghuni aktif tersedia</p>
                             </div>
                         </div>
 
                         <!-- New Tenant Form -->
                         <div v-if="isCreatingNewTenant" class="p-4 bg-primary-50 dark:bg-primary-950/30 rounded-lg space-y-3 border border-primary-100 dark:border-primary-900/50">
                             <div class="flex items-center justify-between text-sm font-medium text-primary-700 dark:text-primary-400 mb-2">
-                                <span class="flex items-center gap-1"><UIcon name="i-heroicons-user-plus" /> New Tenant</span>
+                                <span class="flex items-center gap-1"><UIcon name="i-heroicons-user-plus" /> Penghuni Baru</span>
                                 <UButton variant="ghost" color="neutral" icon="i-heroicons-x-mark" size="xs" @click="isCreatingNewTenant = false; selectedTenantId = null" />
                             </div>
                             
-                            <UFormField label="Full Name">
-                                <UInput v-model="newTenantName" placeholder="e.g. Budi Santoso" size="sm" class="w-full" />
+                            <UFormField label="Nama Lengkap">
+                                <UInput v-model="newTenantName" placeholder="cth. Budi Santoso" size="sm" class="w-full" />
                             </UFormField>
-                            <UFormField label="Contact">
+                            <UFormField label="Kontak">
                                 <UInput v-model="newTenantContact" placeholder="08..." size="sm" class="w-full" />
                             </UFormField>
-                            <UFormField label="KTP Number">
-                                <UInput v-model="newTenantIdCard" placeholder="16 digits" maxlength="16" size="sm" class="w-full" />
+                            <UFormField label="Nomor KTP">
+                                <UInput v-model="newTenantIdCard" placeholder="16 digit" maxlength="16" size="sm" class="w-full" />
                             </UFormField>
                         </div>
 
@@ -618,19 +617,18 @@ const goBack = () => {
                         </div>
                     </div>
 
-                    <!-- Trash Service Toggle -->
                     <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
                         <div class="flex items-center justify-between">
                             <div>
-                                <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Trash Service</div>
-                                <div class="text-xs text-gray-500">Include trash fee ({{ formatCurrency(Number(effectiveSettings.trashFee)) }}/mo)</div>
+                                <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Layanan Sampah</div>
+                                <div class="text-xs text-gray-500">Termasuk biaya sampah ({{ formatCurrency(Number(effectiveSettings.trashFee)) }}/bulan)</div>
                             </div>
                             <USwitch v-model="useTrashService" />
                         </div>
                     </div>
 
                     <UButton @click="updateRoomStatus" block color="primary" class="mt-4" :loading="isSaving">
-                        Save Changes
+                        Simpan Perubahan
                     </UButton>
                 </div>
             </UCard>

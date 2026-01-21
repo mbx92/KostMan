@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
     // 1. Get Room ID
     const id = getRouterParam(event, 'id');
     if (!id) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing ID' });
+        throw createError({ statusCode: 400, statusMessage: 'ID tidak ditemukan' });
     }
 
     // 2. Role Check
@@ -27,19 +27,19 @@ export default defineEventHandler(async (event) => {
     if (roomResult.length === 0) {
         // Idempotency: if already deleted, return success or 404? 
         // 404 is standard for REST if resource is gone.
-        throw createError({ statusCode: 404, statusMessage: 'Room not found' });
+        throw createError({ statusCode: 404, statusMessage: 'Kamar tidak ditemukan' });
     }
 
     const { property } = roomResult[0];
 
     if (user.role !== Role.ADMIN) {
         if (property.userId !== user.id) {
-            throw createError({ statusCode: 403, statusMessage: 'Forbidden' });
+            throw createError({ statusCode: 403, statusMessage: 'Akses ditolak' });
         }
     }
 
     // 4. Delete
     await db.delete(rooms).where(eq(rooms.id, id));
 
-    return { message: 'Room deleted successfully' };
+    return { message: 'Kamar berhasil dihapus' };
 });

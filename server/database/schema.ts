@@ -306,3 +306,33 @@ export const systemSettings = pgTable("system_settings", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+// WhatsApp Templates - Message templates for billing reminders
+export const whatsappTemplates = pgTable("whatsapp_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  message: text("message").notNull(),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+// Backup Type Enum
+export const backupTypeEnum = pgEnum("backup_type", ["manual", "scheduled"]);
+
+// Database Backups - Track backup history
+export const backups = pgTable("backups", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  size: integer("size").notNull(), // bytes
+  type: backupTypeEnum("type").notNull().default("manual"),
+  storagePath: varchar("storage_path", { length: 512 }),
+  duration: integer("duration"), // milliseconds
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

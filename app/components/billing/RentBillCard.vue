@@ -57,7 +57,7 @@ const dueDateFormatted = computed(() => {
             </span>
             <span class="text-gray-400">•</span>
             <span class="text-sm text-gray-500">
-              {{ bill.tenant?.name || 'No Tenant' }}
+              {{ bill.tenant?.name || 'Belum Ada Penghuni' }}
             </span>
           </div>
           
@@ -73,9 +73,9 @@ const dueDateFormatted = computed(() => {
               variant="subtle" 
               size="xs"
             >
-              {{ bill.isPaid ? 'PAID' : 'UNPAID' }}
+              {{ bill.isPaid ? 'LUNAS' : 'BELUM LUNAS' }}
             </UBadge>
-            <span class="text-xs text-gray-400">Due: {{ dueDateFormatted }}</span>
+            <span class="text-xs text-gray-400">Jatuh Tempo: {{ dueDateFormatted }}</span>
           </div>
           
           <!-- Amount (below) -->
@@ -155,7 +155,7 @@ const dueDateFormatted = computed(() => {
           icon="i-heroicons-check"
           @click.stop="emit('markPaid', bill.id)"
         >
-          Mark Paid
+          Tandai Lunas
         </UButton>
         <UButton 
           size="sm" 
@@ -164,7 +164,7 @@ const dueDateFormatted = computed(() => {
           icon="i-heroicons-printer"
           @click.stop="emit('print', bill)"
         >
-          Print
+          Cetak
         </UButton>
         <UButton 
           v-if="!bill.isPaid"
