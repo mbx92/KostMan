@@ -134,7 +134,7 @@ const handleSubmit = async () => {
             <UInput
               v-model.number="form.amount"
               type="number"
-              :min="1"
+              :min="0"
               :max="remainingAmount"
               :step="1000"
               icon="i-heroicons-banknotes"
