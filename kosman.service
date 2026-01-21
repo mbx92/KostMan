@@ -1,31 +1,42 @@
 [Unit]
 Description=KosMan Nuxt Application
-After=network.target
+After=network.target postgresql.service
+Wants=postgresql.service
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/var/www/kosman
-ExecStart=/usr/bin/node .output/server/index.mjs
-Restart=on-failure
-RestartSec=10
+User=mbx
+Group=mbx
+WorkingDirectory=/home/mbx/projects/kosMan
 
-# Environment variables
+# Load environment variables from .env file
+EnvironmentFile=/home/mbx/projects/kosMan/.env
+
+# Override/add specific values
 Environment=NODE_ENV=production
 Environment=NUXT_HOST=0.0.0.0
 Environment=NUXT_PORT=3004
+Environment=HOST=0.0.0.0
+Environment=PORT=3004
+
+# Execute the application
+ExecStart=/root/.nvm/versions/node/v22.19.0/bin/node .output/server/index.mjs
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 # Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=kosman
 
-# Security
+# Security & Resource Limits
 NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/www/kosman/data
+PrivateTmp=true
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
