@@ -478,22 +478,28 @@ onMounted(async () => {
 
     <!-- WhatsApp Template Section -->
     <section class="space-y-6">
-      <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
         <div>
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Template WhatsApp</h2>
           <p class="text-sm text-gray-500">Kelola template pesan untuk reminder pembayaran via WhatsApp.</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-col sm:flex-row gap-2">
           <UButton 
             icon="i-heroicons-arrow-down-tray" 
             color="gray" 
             variant="soft"
             :loading="importingTemplates"
             @click="importTemplates"
+            class="w-full sm:w-auto justify-center"
           >
             Import Template
           </UButton>
-          <UButton icon="i-heroicons-plus" color="primary" @click="openTemplateForm()">
+          <UButton 
+            icon="i-heroicons-plus" 
+            color="primary" 
+            @click="openTemplateForm()"
+            class="w-full sm:w-auto justify-center"
+          >
             Buat Template
           </UButton>
         </div>
@@ -525,38 +531,46 @@ onMounted(async () => {
           :key="template.id"
           class="hover:shadow-md transition-shadow"
         >
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-2">
-                <h3 class="font-semibold text-gray-900 dark:text-white">
-                  {{ template.name }}
-                </h3>
-                <UBadge v-if="template.isDefault" color="primary" size="xs">
-                  Default
-                </UBadge>
+          <div class="flex flex-col gap-4">
+            <!-- Header with Title and Badge -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                  <h3 class="font-semibold text-gray-900 dark:text-white truncate">
+                    {{ template.name }}
+                  </h3>
+                  <UBadge v-if="template.isDefault" color="primary" size="xs">
+                    Default
+                  </UBadge>
+                </div>
+                <p class="text-xs text-gray-500">
+                  Dibuat: {{ new Date(template.createdAt).toLocaleString('id-ID') }}
+                </p>
               </div>
-              <div class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto">
-                {{ template.message }}
+              <!-- Action buttons - horizontal on mobile -->
+              <div class="flex gap-2 flex-shrink-0">
+                <UButton 
+                  icon="i-heroicons-pencil" 
+                  size="sm" 
+                  color="neutral" 
+                  variant="soft"
+                  @click="openTemplateForm(template)"
+                  square
+                />
+                <UButton 
+                  icon="i-heroicons-trash" 
+                  size="sm" 
+                  color="error" 
+                  variant="soft"
+                  @click="deleteTemplate(template)"
+                  square
+                />
               </div>
-              <p class="text-xs text-gray-500 mt-2">
-                Dibuat: {{ new Date(template.createdAt).toLocaleString('id-ID') }}
-              </p>
             </div>
-            <div class="flex gap-2">
-              <UButton 
-                icon="i-heroicons-pencil" 
-                size="sm" 
-                color="neutral" 
-                variant="soft"
-                @click="openTemplateForm(template)"
-              />
-              <UButton 
-                icon="i-heroicons-trash" 
-                size="sm" 
-                color="error" 
-                variant="soft"
-                @click="deleteTemplate(template)"
-              />
+            
+            <!-- Message Preview -->
+            <div class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto">
+              {{ template.message }}
             </div>
           </div>
         </UCard>
@@ -564,11 +578,11 @@ onMounted(async () => {
 
       <!-- Info Card -->
       <UCard class="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-        <div class="flex gap-3">
+        <div class="flex flex-col sm:flex-row gap-3">
           <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <div class="text-sm text-blue-700 dark:text-blue-300 space-y-2">
             <p><strong>Variabel yang Tersedia:</strong></p>
-            <div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs">
               <div><code>{nama_penyewa}</code> - Nama penghuni</div>
               <div><code>{nama_properti}</code> - Nama properti</div>
               <div><code>{nama_kamar}</code> - Nama kamar</div>

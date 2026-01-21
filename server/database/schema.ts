@@ -33,7 +33,11 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "credit_card",
   "debit_card",
   "e_wallet",
+  "other",
 ]);
+
+export const billTypeEnum = pgEnum("bill_type", ["rent", "utility"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "completed", "cancelled"]);
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -130,6 +134,7 @@ export const rentBills = pgTable("rent_bills", {
   waterFee: decimal("water_fee", { precision: 12, scale: 2 }).default("0"),
   trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).default("0"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).default("0"),
   isPaid: boolean("is_paid").default(false),
   paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
@@ -155,6 +160,7 @@ export const utilityBills = pgTable("utility_bills", {
     scale: 2,
   }).default("0"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).default("0"),
   isPaid: boolean("is_paid").default(false),
   paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
@@ -339,4 +345,22 @@ export const backups = pgTable("backups", {
   duration: integer("duration"), // milliseconds
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Payments - Track all payments made for bills
+export const payments = pgTable("payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  billId: uuid("bill_id").notNull(), // References either rentBills or utilityBills
+  billType: billTypeEnum("bill_type").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: paymentMethodEnum("payment_method").notNull(),
+  paymentDate: timestamp("payment_date").notNull(),
+  status: paymentStatusEnum("status").default("completed"),
+  notes: text("notes"),
+  recordedBy: uuid("recorded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 });

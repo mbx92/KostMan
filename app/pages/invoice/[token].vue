@@ -41,22 +41,22 @@ const payOnline = async () => {
   payingBill.value = true
 
   try {
-    // Determine billId based on type
-    let billId = ''
-    let billType: 'rent' | 'utility' = 'rent'
+    // Determine payment parameters based on type
+    let requestBody: any
     
     if (billData.value.billType === 'combined') {
-      // For combined, use the first available bill
-      if (billData.value.rentBill) {
-        billId = billData.value.rentBill.id
-        billType = 'rent'
-      } else if (billData.value.utilityBill) {
-        billId = billData.value.utilityBill.id
-        billType = 'utility'
+      // For combined, send roomId and period
+      requestBody = {
+        billType: 'combined',
+        roomId: billData.value.room?.id,
+        period: billData.value.rentBill?.period || billData.value.utilityBill?.period,
       }
     } else {
-      billId = billData.value.bill.id
-      billType = billData.value.billType
+      // For single bill
+      requestBody = {
+        billId: billData.value.bill.id,
+        billType: billData.value.billType,
+      }
     }
 
     const response = await $fetch<{
@@ -65,10 +65,7 @@ const payOnline = async () => {
       clientKey: string
     }>('/api/payments/midtrans/create-public', {
       method: 'POST',
-      body: {
-        billId,
-        billType,
-      },
+      body: requestBody,
     })
 
     if (response.success && response.snapToken) {

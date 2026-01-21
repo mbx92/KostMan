@@ -13,9 +13,31 @@ const emit = defineEmits<{
   payOnline: [id: string];
   print: [bill: UtilityBill];
   delete: [id: string];
+  recordPayment: [id: string];
+  viewPayments: [id: string];
 }>();
 
 const isExpanded = ref(false);
+
+const billStatus = computed(() => {
+  const total = Number(props.bill.totalAmount)
+  const paid = Number(props.bill.paidAmount || 0)
+  
+  if (paid === 0) return 'BELUM DIBAYAR'
+  if (paid >= total) return 'LUNAS'
+  return 'DIBAYAR SEBAGIAN'
+})
+
+const billStatusColor = computed(() => {
+  if (props.bill.isPaid) return 'success'
+  const paid = Number(props.bill.paidAmount || 0)
+  if (paid > 0) return 'warning'
+  return 'error'
+})
+
+const remainingAmount = computed(() => {
+  return Number(props.bill.totalAmount) - Number(props.bill.paidAmount || 0)
+})
 
 const kwhUsage = computed(() => {
   return (props.bill.meterEnd || 0) - (props.bill.meterStart || 0);
@@ -61,19 +83,42 @@ const periodFormatted = computed(() => {
           <!-- Status + kWh -->
           <div class="flex items-center gap-2 mt-2 flex-wrap">
             <UBadge 
-              :color="bill.isPaid ? 'success' : 'warning'" 
+              :color="billStatusColor" 
               variant="subtle" 
               size="xs"
             >
-              {{ bill.isPaid ? 'LUNAS' : 'BELUM LUNAS' }}
+              {{ billStatus }}
             </UBadge>
             <span class="text-xs text-gray-400">{{ kwhUsage }} kWh</span>
           </div>
           
           <!-- Amount (below) -->
           <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-            <div class="text-2xl font-bold text-primary-600 dark:text-primary-400">
-              {{ formatCurrency(bill.totalAmount) }}
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs text-gray-500 mb-1">Total Tagihan</div>
+                <div class="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                  {{ formatCurrency(bill.totalAmount) }}
+                </div>
+                <div v-if="bill.paidAmount && Number(bill.paidAmount) > 0" class="mt-1 space-y-0.5">
+                  <div class="text-xs text-green-600 dark:text-green-400">
+                    Terbayar: {{ formatCurrency(bill.paidAmount) }}
+                  </div>
+                  <div v-if="!bill.isPaid" class="text-xs text-red-600 dark:text-red-400 font-medium">
+                    Sisa: {{ formatCurrency(remainingAmount) }}
+                  </div>
+                </div>
+              </div>
+              <UButton
+                v-if="!bill.isPaid && bill.paidAmount && Number(bill.paidAmount) > 0"
+                icon="i-heroicons-banknotes"
+                size="xs"
+                color="primary"
+                variant="soft"
+                @click.stop="emit('viewPayments', bill.id)"
+              >
+                Riwayat
+              </UButton>
             </div>
           </div>
         </div>
@@ -143,10 +188,10 @@ const periodFormatted = computed(() => {
           size="sm" 
           color="primary" 
           variant="soft"
-          icon="i-heroicons-credit-card"
-          @click.stop="emit('payOnline', bill.id)"
+          icon="i-heroicons-banknotes"
+          @click.stop="emit('recordPayment', bill.id)"
         >
-          Bayar Online
+          Catat Pembayaran
         </UButton>
         <UButton 
           v-if="!bill.isPaid"

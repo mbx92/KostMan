@@ -28,6 +28,17 @@ const { generateRentReceipt, generateUtilityReceipt, generateCombinedReceipt } =
 // Confirm Dialog
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog> | null>(null);
 
+// Payment Modal State
+const paymentModalOpen = ref(false);
+const paymentBillId = ref<string | null>(null);
+const paymentBillType = ref<'rent' | 'utility'>('rent');
+const paymentBillData = ref<RentBill | UtilityBill | null>(null);
+
+// Payment History State
+const paymentHistoryOpen = ref(false);
+const paymentHistoryBillId = ref<string | null>(null);
+const paymentHistoryBillType = ref<'rent' | 'utility'>('rent');
+
 // Fetch data on mount
 const dueSoonReminders = ref<any[]>([]);
 const dueSoonLoading = ref(false);
@@ -169,6 +180,41 @@ const totalUnpaidUtility = computed(() =>
 const totalUnpaid = computed(
   () => totalUnpaidRent.value + totalUnpaidUtility.value
 );
+
+// Client-side filtering for mobile view
+const mobileFilteredRentBills = computed(() => {
+  if (!rentFilter.value) return filteredRentBills.value;
+  const search = rentFilter.value.toLowerCase();
+  return filteredRentBills.value.filter(bill => {
+    const roomName = bill.room?.name?.toLowerCase() || '';
+    const tenantName = bill.tenant?.name?.toLowerCase() || bill.room?.tenantName?.toLowerCase() || '';
+    const propertyName = bill.property?.name?.toLowerCase() || '';
+    return roomName.includes(search) || tenantName.includes(search) || propertyName.includes(search);
+  });
+});
+
+const mobileFilteredUtilityBills = computed(() => {
+  if (!utilityFilter.value) return filteredUtilityBills.value;
+  const search = utilityFilter.value.toLowerCase();
+  return filteredUtilityBills.value.filter(bill => {
+    const roomName = bill.room?.name?.toLowerCase() || '';
+    const tenantName = bill.tenant?.name?.toLowerCase() || bill.room?.tenantName?.toLowerCase() || '';
+    const propertyName = bill.property?.name?.toLowerCase() || '';
+    return roomName.includes(search) || tenantName.includes(search) || propertyName.includes(search);
+  });
+});
+
+const mobileFilteredCombinedBills = computed(() => {
+  if (!summaryFilter.value) return combinedBills.value;
+  const search = summaryFilter.value.toLowerCase();
+  return combinedBills.value.filter(item => {
+    const roomName = item.rent?.room?.name?.toLowerCase() || item.util?.room?.name?.toLowerCase() || '';
+    const tenantName = item.rent?.tenant?.name?.toLowerCase() || item.util?.tenant?.name?.toLowerCase() || 
+                       item.rent?.room?.tenantName?.toLowerCase() || item.util?.room?.tenantName?.toLowerCase() || '';
+    const propertyName = item.rent?.property?.name?.toLowerCase() || item.util?.property?.name?.toLowerCase() || '';
+    return roomName.includes(search) || tenantName.includes(search) || propertyName.includes(search);
+  });
+});
 
 // Mobile Pagination
 const mobileLimits = reactive({
@@ -741,6 +787,46 @@ const markUtilityPaid = async (id: string) => {
   }
 };
 
+// Payment Handlers
+const openPaymentModal = (billId: string, billType: 'rent' | 'utility') => {
+  const bill = billType === 'rent' 
+    ? rentBills.value.find(b => b.id === billId)
+    : utilityBills.value.find(b => b.id === billId);
+  
+  if (!bill) {
+    toast.add({
+      title: "Error",
+      description: "Tagihan tidak ditemukan",
+      color: "error",
+    });
+    return;
+  }
+  
+  paymentBillId.value = billId;
+  paymentBillType.value = billType;
+  paymentBillData.value = bill;
+  paymentModalOpen.value = true;
+};
+
+const openPaymentHistory = (billId: string, billType: 'rent' | 'utility') => {
+  paymentHistoryBillId.value = billId;
+  paymentHistoryBillType.value = billType;
+  paymentHistoryOpen.value = true;
+};
+
+const handlePaymentAdded = async () => {
+  // Refresh bills data
+  await store.fetchRentBills();
+  await store.fetchUtilityBills();
+  paymentModalOpen.value = false;
+  
+  toast.add({
+    title: "Pembayaran Dicatat",
+    description: "Pembayaran berhasil dicatat",
+    color: "success",
+  });
+};
+
 const deleteUtility = async (id: string) => {
   const confirmed = await confirmDialog.value?.confirm({
     title: "Hapus Utility Bill?",
@@ -1254,8 +1340,13 @@ const sendReminder = async (reminder: any) => {
     <UCard v-if="activeTab === 'rent'">
       <!-- Mobile View: Accordion Cards -->
       <div v-if="filteredRentBills.length > 0" class="lg:hidden p-4 space-y-3">
+        <!-- Search Filter Mobile -->
+        <div class="mb-4">
+          <UInput v-model="rentFilter" placeholder="Cari kamar, nama penghuni..." icon="i-heroicons-magnifying-glass" />
+        </div>
+        
         <BillingRentBillCard
-          v-for="bill in filteredRentBills.slice(0, mobileLimits.rent)"
+          v-for="bill in mobileFilteredRentBills.slice(0, mobileLimits.rent)"
           :key="bill.id"
           :bill="bill"
           :format-currency="formatCurrency"
@@ -1264,6 +1355,8 @@ const sendReminder = async (reminder: any) => {
           @pay-online="(id) => payOnline(id, 'rent')"
           @print="printRent"
           @delete="deleteRent"
+          @record-payment="(id) => openPaymentModal(id, 'rent')"
+          @view-payments="(id) => openPaymentHistory(id, 'rent')"
         />
         
         <!-- Loading Skeleton -->
@@ -1282,9 +1375,9 @@ const sendReminder = async (reminder: any) => {
         </div>
         
         <!-- Pagination Buttons -->
-        <div v-if="filteredRentBills.length > 5 && !mobileLoading.rent" class="flex justify-center gap-4 pt-2">
+        <div v-if="mobileFilteredRentBills.length > 5 && !mobileLoading.rent" class="flex justify-center gap-4 pt-2">
           <span 
-            v-if="mobileLimits.rent < filteredRentBills.length"
+            v-if="mobileLimits.rent < mobileFilteredRentBills.length"
             class="text-sm text-primary-600 dark:text-primary-400 font-medium cursor-pointer hover:underline"
             @click="loadMoreMobile('rent')"
           >
@@ -1349,14 +1442,13 @@ const sendReminder = async (reminder: any) => {
           <!-- Actions Cell -->
           <template #actions-cell="{ row }">
             <div class="flex justify-end gap-1">
-              <UTooltip text="Bayar Online" v-if="!row.original.isPaid">
+              <UTooltip text="Catat Pembayaran" v-if="!row.original.isPaid">
                 <UButton
                   size="xs"
                   color="primary"
                   variant="soft"
-                  icon="i-heroicons-credit-card"
-                  :loading="payingBillId === row.original.id"
-                  @click="payOnline(row.original.id, 'rent')"
+                  icon="i-heroicons-banknotes"
+                  @click="openPaymentModal(row.original.id, 'rent')"
                 />
               </UTooltip>
               <UTooltip text="Tandai Lunas" v-if="!row.original.isPaid">
@@ -1414,8 +1506,13 @@ const sendReminder = async (reminder: any) => {
     <UCard v-if="activeTab === 'utility'">
       <!-- Mobile View: Accordion Cards -->
       <div v-if="filteredUtilityBills.length > 0" class="lg:hidden p-4 space-y-3">
+        <!-- Search Filter Mobile -->
+        <div class="mb-4">
+          <UInput v-model="utilityFilter" placeholder="Cari kamar, nama penghuni..." icon="i-heroicons-magnifying-glass" />
+        </div>
+        
         <BillingUtilityBillCard
-          v-for="bill in filteredUtilityBills.slice(0, mobileLimits.utility)"
+          v-for="bill in mobileFilteredUtilityBills.slice(0, mobileLimits.utility)"
           :key="bill.id"
           :bill="bill"
           :format-currency="formatCurrency"
@@ -1423,6 +1520,8 @@ const sendReminder = async (reminder: any) => {
           @pay-online="(id) => payOnline(id, 'utility')"
           @print="printUtility"
           @delete="deleteUtility"
+          @record-payment="(id) => openPaymentModal(id, 'utility')"
+          @view-payments="(id) => openPaymentHistory(id, 'utility')"
         />
         
         <!-- Loading Skeleton -->
@@ -1441,9 +1540,9 @@ const sendReminder = async (reminder: any) => {
         </div>
         
         <!-- Pagination Buttons -->
-        <div v-if="filteredUtilityBills.length > 5 && !mobileLoading.utility" class="flex justify-center gap-4 pt-2">
+        <div v-if="mobileFilteredUtilityBills.length > 5 && !mobileLoading.utility" class="flex justify-center gap-4 pt-2">
           <span 
-            v-if="mobileLimits.utility < filteredUtilityBills.length"
+            v-if="mobileLimits.utility < mobileFilteredUtilityBills.length"
             class="text-sm text-primary-600 dark:text-primary-400 font-medium cursor-pointer hover:underline"
             @click="loadMoreMobile('utility')"
           >
@@ -1506,14 +1605,13 @@ const sendReminder = async (reminder: any) => {
           <!-- Actions Cell -->
           <template #actions-cell="{ row }">
             <div class="flex justify-end gap-1">
-              <UTooltip text="Bayar Online" v-if="!row.original.isPaid">
+              <UTooltip text="Catat Pembayaran" v-if="!row.original.isPaid">
                 <UButton
                   size="xs"
                   color="primary"
                   variant="soft"
-                  icon="i-heroicons-credit-card"
-                  :loading="payingBillId === row.original.id"
-                  @click="payOnline(row.original.id, 'utility')"
+                  icon="i-heroicons-banknotes"
+                  @click="openPaymentModal(row.original.id, 'utility')"
                 />
               </UTooltip>
               <UTooltip text="Tandai Lunas" v-if="!row.original.isPaid">
@@ -1574,8 +1672,13 @@ const sendReminder = async (reminder: any) => {
     <UCard v-if="activeTab === 'summary'">
       <!-- Mobile View: Accordion Cards -->
       <div v-if="combinedBills.length > 0" class="lg:hidden p-4 space-y-3">
+        <!-- Search Filter Mobile -->
+        <div class="mb-4">
+          <UInput v-model="summaryFilter" placeholder="Cari kamar, nama penghuni..." icon="i-heroicons-magnifying-glass" />
+        </div>
+        
         <BillingSummaryCard
-          v-for="item in combinedBills.slice(0, mobileLimits.summary)"
+          v-for="item in mobileFilteredCombinedBills.slice(0, mobileLimits.summary)"
           :key="`${item.roomId}-${item.period}`"
           :item="item"
           :format-currency="formatCurrency"
@@ -1599,9 +1702,9 @@ const sendReminder = async (reminder: any) => {
         </div>
         
         <!-- Pagination Buttons -->
-        <div v-if="combinedBills.length > 5 && !mobileLoading.summary" class="flex justify-center gap-4 pt-2">
+        <div v-if="mobileFilteredCombinedBills.length > 5 && !mobileLoading.summary" class="flex justify-center gap-4 pt-2">
           <span 
-            v-if="mobileLimits.summary < combinedBills.length"
+            v-if="mobileLimits.summary < mobileFilteredCombinedBills.length"
             class="text-sm text-primary-600 dark:text-primary-400 font-medium cursor-pointer hover:underline"
             @click="loadMoreMobile('summary')"
           >
@@ -1715,23 +1818,39 @@ const sendReminder = async (reminder: any) => {
           <!-- Actions Cell -->
           <template #actions-cell="{ row }">
             <div class="flex justify-end gap-1">
+              <UTooltip text="Bayar Sewa" v-if="row.original.rent && !row.original.rent.isPaid">
+                <UButton
+                  size="xs"
+                  color="primary"
+                  variant="soft"
+                  icon="i-heroicons-banknotes"
+                  @click="openPaymentModal(row.original.rent.id, 'rent')"
+                />
+              </UTooltip>
+              <UTooltip text="Bayar Utilitas" v-if="row.original.util && !row.original.util.isPaid">
+                <UButton
+                  size="xs"
+                  color="primary"
+                  variant="soft"
+                  icon="i-heroicons-bolt"
+                  @click="openPaymentModal(row.original.util.id, 'utility')"
+                />
+              </UTooltip>
               <UTooltip text="Kirim ke WhatsApp">
                 <UButton
-                  size="sm"
+                  size="xs"
                   class="bg-[#25D366] hover:bg-[#128C7E] text-white"
                   icon="i-simple-icons-whatsapp"
                   @click="sendToWhatsApp(row.original)"
-                >WA</UButton>
-              </UTooltip>
+                /></UTooltip>
               <UTooltip text="Cetak Laporan">
                 <UButton
-                  size="sm"
+                  size="xs"
                   color="primary"
                   variant="soft"
                   icon="i-heroicons-printer"
                   @click="printCombined(row.original)"
-                >Cetak</UButton>
-              </UTooltip>
+                /></UTooltip>
             </div>
           </template>
         </UTable>
@@ -1930,4 +2049,45 @@ const sendReminder = async (reminder: any) => {
 
   <!-- Confirm Dialog -->
   <ConfirmDialog ref="confirmDialog" />
+  
+  <!-- Payment Modal -->
+  <UModal :open="paymentModalOpen" @close="paymentModalOpen = false">
+    <template #content>
+      <PaymentModal
+        v-if="paymentBillData"
+        :bill-id="paymentBillId || ''"
+        :bill-type="paymentBillType"
+        :total-amount="Number(paymentBillData.totalAmount)"
+        :paid-amount="Number(paymentBillData.paidAmount || 0)"
+        :is-paid="paymentBillData.isPaid"
+        @payment-added="handlePaymentAdded"
+        @close="paymentModalOpen = false"
+      />
+    </template>
+  </UModal>
+  
+  <!-- Payment History Modal -->
+  <UModal :open="paymentHistoryOpen" @close="paymentHistoryOpen = false">
+    <template #content>
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Riwayat Pembayaran</h3>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-heroicons-x-mark"
+              @click="paymentHistoryOpen = false"
+            />
+          </div>
+        </template>
+        
+        <PaymentHistory
+          v-if="paymentHistoryOpen && paymentHistoryBillId"
+          :bill-id="paymentHistoryBillId"
+          :bill-type="paymentHistoryBillType"
+        />
+      </UCard>
+    </template>
+  </UModal>
 </template>

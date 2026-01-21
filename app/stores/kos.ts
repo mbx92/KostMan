@@ -421,10 +421,20 @@ export const useKosStore = defineStore('kos', () => {
                 method: 'PUT',
                 body: payload
             })
+            
+            // Update local store
             const index = rooms.value.findIndex(r => r.id === id)
             if (index !== -1) {
-                rooms.value[index] = { ...rooms.value[index], ...updated, price: Number(updated.price) }
+                rooms.value[index] = { ...updated, price: Number(updated.price) }
             }
+            
+            // Re-fetch to get complete data with relations (property, tenant, etc.)
+            // This ensures room.property and other joined data are available
+            const completeRoom = await fetchRoomById(id)
+            if (completeRoom && index !== -1) {
+                rooms.value[index] = completeRoom
+            }
+            
             return updated
         } catch (err: any) {
             roomsError.value = err?.data?.message || err?.message || 'Failed to update room'

@@ -64,15 +64,19 @@ export default defineEventHandler(async (event) => {
     }
 
     // Parse order ID to get bill info
-    // New format: R-{shortId}-{timestamp} or U-{shortId}-{timestamp}
-    // Old format: RENT-{billId}-{timestamp} or UTILITY-{billId}-{timestamp}
+    // Formats: 
+    // - Combined: C-{shortRoomId}-{timestamp}
+    // - Single: R-{shortId}-{timestamp} or U-{shortId}-{timestamp}
+    // - Old: RENT-{billId}-{timestamp} or UTILITY-{billId}-{timestamp}
     const orderParts = orderId.split('-');
     const typePrefix = orderParts[0].toUpperCase();
-    const shortBillId = orderParts[1]; // First 8 chars of UUID
+    const shortId = orderParts[1]; // First 8 chars of UUID
     
     // Determine bill type from prefix
-    let billType: 'rent' | 'utility';
-    if (typePrefix === 'R' || typePrefix === 'RENT') {
+    let billType: 'rent' | 'utility' | 'combined';
+    if (typePrefix === 'C' || typePrefix === 'COMBINED') {
+        billType = 'combined';
+    } else if (typePrefix === 'R' || typePrefix === 'RENT') {
         billType = 'rent';
     } else if (typePrefix === 'U' || typePrefix === 'UTILITY') {
         billType = 'utility';
@@ -81,26 +85,62 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'Invalid order_id format' });
     }
 
-    // Find bill by shortId prefix (using LIKE query)
+    // Find bill(s) by shortId prefix or get from transaction metadata
     let billId: string | null = null;
+    let rentBillId: string | null = null;
+    let utilityBillId: string | null = null;
     
-    if (billType === 'rent') {
+    if (billType === 'combined') {
+        // For combined payments, query Midtrans API to get transaction metadata
+        try {
+            const baseUrl = midtransConfig.isProduction
+                ? 'https://api.midtrans.com/v2'
+                : 'https://api.sandbox.midtrans.com/v2';
+            
+            const authString = Buffer.from(`${serverKey}:`).toString('base64');
+            
+            const transactionDetails = await $fetch<any>(`${baseUrl}/${orderId}/status`, {
+                headers: {
+                    'Authorization': `Basic ${authString}`,
+                },
+            });
+            
+            console.log('[Midtrans Webhook] Transaction details:', JSON.stringify(transactionDetails, null, 2));
+            
+            // Extract bill IDs from metadata
+            if (transactionDetails.metadata) {
+                rentBillId = transactionDetails.metadata.rent_bill_id || null;
+                utilityBillId = transactionDetails.metadata.utility_bill_id || null;
+                
+                console.log(`[Midtrans Webhook] Found combined bills: Rent=${rentBillId}, Utility=${utilityBillId}`);
+            } else {
+                console.error('[Midtrans Webhook] No metadata found in transaction');
+            }
+        } catch (error) {
+            console.error('[Midtrans Webhook] Failed to fetch transaction details:', error);
+        }
+    } else if (billType === 'rent') {
         const bills = await db.select({ id: rentBills.id })
             .from(rentBills)
-            .where(sql`${rentBills.id}::text LIKE ${shortBillId + '%'}`)
+            .where(sql`${rentBills.id}::text LIKE ${shortId + '%'}`)
             .limit(1);
         billId = bills[0]?.id || null;
-    } else {
+    } else if (billType === 'utility') {
         const bills = await db.select({ id: utilityBills.id })
             .from(utilityBills)
-            .where(sql`${utilityBills.id}::text LIKE ${shortBillId + '%'}`)
+            .where(sql`${utilityBills.id}::text LIKE ${shortId + '%'}`)
             .limit(1);
         billId = bills[0]?.id || null;
     }
 
-    if (!billId) {
-        console.error('[Midtrans Webhook] Bill not found for shortId:', shortBillId);
+    if (billType !== 'combined' && !billId) {
+        console.error('[Midtrans Webhook] Bill not found for shortId:', shortId);
         throw createError({ statusCode: 404, statusMessage: 'Bill not found' });
+    }
+    
+    if (billType === 'combined' && !rentBillId && !utilityBillId) {
+        console.error('[Midtrans Webhook] No bills found for combined payment');
+        throw createError({ statusCode: 404, statusMessage: 'Bills not found for combined payment' });
     }
 
     // Check transaction status
@@ -123,13 +163,43 @@ export default defineEventHandler(async (event) => {
     // Update bill status if payment is successful
     if (isPaymentSuccess) {
         try {
-            if (billType === 'rent') {
+            if (billType === 'combined') {
+                // Update both bills if they exist
+                const updatePromises = [];
+                
+                if (rentBillId) {
+                    updatePromises.push(
+                        db.update(rentBills)
+                            .set({
+                                isPaid: true,
+                                paidAt: new Date(),
+                            })
+                            .where(eq(rentBills.id, rentBillId))
+                    );
+                    console.log(`[Midtrans Webhook] Will mark rent bill ${rentBillId} as paid`);
+                }
+                
+                if (utilityBillId) {
+                    updatePromises.push(
+                        db.update(utilityBills)
+                            .set({
+                                isPaid: true,
+                                paidAt: new Date(),
+                            })
+                            .where(eq(utilityBills.id, utilityBillId))
+                    );
+                    console.log(`[Midtrans Webhook] Will mark utility bill ${utilityBillId} as paid`);
+                }
+                
+                await Promise.all(updatePromises);
+                console.log(`[Midtrans Webhook] Combined bills marked as paid`);
+            } else if (billType === 'rent') {
                 await db.update(rentBills)
                     .set({
                         isPaid: true,
                         paidAt: new Date(),
                     })
-                    .where(eq(rentBills.id, billId));
+                    .where(eq(rentBills.id, billId!));
                     
                 console.log(`[Midtrans Webhook] Rent bill ${billId} marked as paid`);
             } else {
@@ -138,7 +208,7 @@ export default defineEventHandler(async (event) => {
                         isPaid: true,
                         paidAt: new Date(),
                     })
-                    .where(eq(utilityBills.id, billId));
+                    .where(eq(utilityBills.id, billId!));
                     
                 console.log(`[Midtrans Webhook] Utility bill ${billId} marked as paid`);
             }

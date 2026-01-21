@@ -184,24 +184,26 @@ const onExpenseSaved = async () => {
 <template>
   <div class="p-6 space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Pengeluaran</h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-1">Pantau dan kelola pengeluaran bisnis Anda</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Pengeluaran</h1>
+        <p class="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-1">Pantau dan kelola pengeluaran bisnis Anda</p>
       </div>
-      <div class="flex gap-3">
+      <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <UButton
           label="Kelola Kategori"
           icon="i-heroicons-tag"
           color="neutral"
           variant="outline"
           to="/expenses/categories"
+          class="w-full sm:w-auto justify-center"
         />
         <UButton
           label="Tambah Pengeluaran"
           icon="i-heroicons-plus"
           color="primary"
           @click="openAddExpense"
+          class="w-full sm:w-auto justify-center"
         />
       </div>
     </div>
@@ -299,8 +301,8 @@ const onExpenseSaved = async () => {
       </div>
     </div>
 
-    <!-- Expenses Table -->
-    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+    <!-- Expenses Table - Desktop -->
+    <div class="hidden md:block bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -386,6 +388,85 @@ const onExpenseSaved = async () => {
             </template>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Expenses Cards - Mobile -->
+    <div class="md:hidden space-y-3">
+      <div v-if="expensesLoading" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center">
+        <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto text-gray-500" />
+      </div>
+      <div v-else-if="filteredExpenses.length === 0" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center text-gray-500">
+        Tidak ada pengeluaran ditemukan
+      </div>
+      <div 
+        v-else 
+        v-for="expense in filteredExpenses" 
+        :key="expense.id"
+        class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4"
+      >
+        <div class="space-y-3">
+          <!-- Header: Category & Date -->
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getCategoryColor(expense.category) }" />
+              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ expense.category }}</span>
+            </div>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(expense.expenseDate) }}</span>
+          </div>
+
+          <!-- Description -->
+          <p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{{ expense.description }}</p>
+
+          <!-- Property & Amount -->
+          <div class="flex items-center justify-between">
+            <div>
+              <span v-if="expense.type === 'global'" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                Global
+              </span>
+              <span v-else class="text-xs text-gray-500 dark:text-gray-400">{{ expense.propertyName || '-' }}</span>
+            </div>
+            <span class="text-base font-semibold text-gray-900 dark:text-white">{{ formatCurrency(expense.amount) }}</span>
+          </div>
+
+          <!-- Status & Actions -->
+          <div class="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+            <span v-if="expense.isPaid" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+              Lunas
+            </span>
+            <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+              Belum Dibayar
+            </span>
+
+            <div class="flex items-center gap-1">
+              <UButton 
+                icon="i-heroicons-pencil" 
+                size="xs"
+                color="neutral" 
+                variant="soft"
+                @click="openEditExpense(expense)"
+                square
+              />
+              <UButton 
+                v-if="!expense.isPaid"
+                icon="i-heroicons-check" 
+                size="xs"
+                color="success" 
+                variant="soft"
+                @click="markAsPaid(expense.id)"
+                square
+              />
+              <UButton 
+                icon="i-heroicons-trash" 
+                size="xs"
+                color="error" 
+                variant="soft"
+                @click="deleteExpense(expense.id)"
+                square
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
