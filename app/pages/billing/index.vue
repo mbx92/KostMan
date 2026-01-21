@@ -768,19 +768,57 @@ const deleteUtility = async (id: string) => {
 
 // Print Actions
 const printRent = (bill: RentBill) => {
-  const room = rooms.value.find((r) => r.id === bill.roomId);
-  const prop = properties.value.find((p) => p.id === room?.propertyId);
-  if (!room || !prop) return;
-  const tenant = tenants.value.find((t) => t.id === room.tenantId) || null;
-  generateRentReceipt(bill, room, prop, tenant);
+  try {
+    const room = rooms.value.find((r) => r.id === bill.roomId);
+    const prop = properties.value.find((p) => p.id === room?.propertyId);
+    
+    if (!room || !prop) {
+      console.error('Print failed: Room or property not found', { billId: bill.id, roomId: bill.roomId });
+      toast.add({
+        title: 'Error',
+        description: 'Data kamar atau properti tidak ditemukan',
+        color: 'error',
+      });
+      return;
+    }
+    
+    const tenant = tenants.value.find((t) => t.id === room.tenantId) || null;
+    generateRentReceipt(bill, room, prop, tenant);
+  } catch (error: any) {
+    console.error('Print rent error:', error);
+    toast.add({
+      title: 'Error',
+      description: error?.message || 'Gagal mencetak tagihan',
+      color: 'error',
+    });
+  }
 };
 
 const printUtility = (bill: UtilityBill) => {
-  const room = rooms.value.find((r) => r.id === bill.roomId);
-  const prop = properties.value.find((p) => p.id === room?.propertyId);
-  if (!room || !prop) return;
-  const tenant = tenants.value.find((t) => t.id === room.tenantId) || null;
-  generateUtilityReceipt(bill, room, prop, tenant);
+  try {
+    const room = rooms.value.find((r) => r.id === bill.roomId);
+    const prop = properties.value.find((p) => p.id === room?.propertyId);
+    
+    if (!room || !prop) {
+      console.error('Print failed: Room or property not found', { billId: bill.id, roomId: bill.roomId });
+      toast.add({
+        title: 'Error',
+        description: 'Data kamar atau properti tidak ditemukan',
+        color: 'error',
+      });
+      return;
+    }
+    
+    const tenant = tenants.value.find((t) => t.id === room.tenantId) || null;
+    generateUtilityReceipt(bill, room, prop, tenant);
+  } catch (error: any) {
+    console.error('Print utility error:', error);
+    toast.add({
+      title: 'Error',
+      description: error?.message || 'Gagal mencetak tagihan',
+      color: 'error',
+    });
+  }
 };
 
 const printCombined = (item: {
@@ -788,17 +826,37 @@ const printCombined = (item: {
   util?: UtilityBill;
   roomId: string;
 }) => {
-  const room = rooms.value.find((r) => r.id === item.roomId);
-  const prop = properties.value.find((p) => p.id === room?.propertyId);
-  if (!room || !prop) return;
-  const tenant = tenants.value.find((t) => t.id === room.tenantId) || null;
-  generateCombinedReceipt(
-    item.rent || null,
-    item.util || null,
-    room,
-    prop,
-    tenant
-  );
+  try {
+    // Use data from bills if available (already joined)
+    const room = item.rent?.room || item.util?.room || rooms.value.find((r) => r.id === item.roomId);
+    const prop = item.rent?.property || item.util?.property || properties.value.find((p) => p.id === room?.propertyId);
+    
+    if (!room || !prop) {
+      console.error('Print failed: Room or property not found', { roomId: item.roomId });
+      toast.add({
+        title: 'Error',
+        description: 'Data kamar atau properti tidak ditemukan',
+        color: 'error',
+      });
+      return;
+    }
+    
+    const tenant = tenants.value.find((t) => t.id === room.tenantId) || null;
+    generateCombinedReceipt(
+      item.rent || null,
+      item.util || null,
+      room,
+      prop,
+      tenant
+    );
+  } catch (error: any) {
+    console.error('Print combined error:', error);
+    toast.add({
+      title: 'Error',
+      description: error?.message || 'Gagal mencetak laporan',
+      color: 'error',
+    });
+  }
 };
 
 // Send to WhatsApp
