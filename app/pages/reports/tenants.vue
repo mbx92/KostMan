@@ -86,6 +86,31 @@ const totalOutstanding = computed(() => {
     return reportData.value?.tenants.reduce((sum, t) => sum + t.paymentHistory.outstandingBalance, 0) || 0
 })
 
+// -- Pagination --
+const page = ref(1)
+const limit = ref(10)
+
+const paginatedTenants = computed(() => {
+  if (!reportData.value?.tenants) return []
+  const start = (page.value - 1) * limit.value
+  const end = start + limit.value
+  return reportData.value.tenants.slice(start, end)
+})
+
+const totalTenants = computed(() => reportData.value?.tenants?.length || 0)
+const totalPages = computed(() => Math.ceil(totalTenants.value / limit.value))
+
+// -- Modal State --
+const isModalOpen = ref(false)
+const selectedTenant = ref<any>(null)
+
+const showTenantDetail = (tenant: any) => {
+  selectedTenant.value = tenant
+  isModalOpen.value = true
+}
+
+
+
 </script>
 
 <template>
@@ -195,11 +220,11 @@ const totalOutstanding = computed(() => {
                         <th class="px-6 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-if="reportData?.tenants.length === 0">
+                <tbody :key="`page-${page}`">
+                    <tr v-if="paginatedTenants.length === 0">
                         <td colspan="7" class="px-6 py-8 text-center text-gray-500">Tidak ada penyewa ditemukan</td>
                     </tr>
-                    <tr v-for="tenant in reportData?.tenants" :key="tenant.id" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr v-for="tenant in paginatedTenants" :key="tenant.id" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3">
                             <div class="font-medium text-gray-900 dark:text-white">{{ tenant.name }}</div>
                             <div class="text-xs text-gray-500">{{ tenant.contact }}</div>
@@ -227,13 +252,153 @@ const totalOutstanding = computed(() => {
                             {{ formatCurrency(tenant.paymentHistory.outstandingBalance) }}
                         </td>
                         <td class="px-6 py-3 text-right">
-                            <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-eye" :to="`/tenants/${tenant.id}`" />
+                            <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-eye" @click="showTenantDetail(tenant)" />
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Menampilkan {{ ((page - 1) * limit) + 1 }} - {{ Math.min(page * limit, totalTenants) }} dari {{ totalTenants }} data
+            </div>
+            <div class="flex gap-1">
+                <button 
+                    v-for="p in totalPages" 
+                    :key="p"
+                    @click="page = p"
+                    :class="[
+                        'px-3 py-1 text-sm rounded',
+                        page === p 
+                            ? 'bg-primary-500 text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ]"
+                >
+                    {{ p }}
+                </button>
+            </div>
+        </div>
     </div>
     
   </div>
+
+  <!-- Tenant Detail Modal - Manual Implementation -->
+  <ClientOnly>
+    <Teleport to="body">
+      <div v-if="isModalOpen" class="fixed inset-0 z-[999] flex items-center justify-center px-4 py-6 sm:px-0">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-gray-900/75 transition-opacity" @click="isModalOpen = false"></div>
+
+        <!-- Modal Panel -->
+        <div class="relative w-full max-w-3xl transform transition-all sm:my-8">
+          <UCard class="shadow-2xl">
+            <template #header>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Detail Penyewa</h3>
+                  <p class="text-sm text-gray-500 mt-1">Informasi lengkap penyewa</p>
+                </div>
+                <UButton color="neutral" variant="ghost" icon="i-heroicons-x-mark" @click="isModalOpen = false" />
+              </div>
+            </template>
+
+            <div v-if="selectedTenant" class="space-y-6 overflow-y-auto max-h-[60vh] sm:max-h-[70vh] px-2">
+              <!-- Basic Info -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Nama Penyewa</label>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white mt-1">{{ selectedTenant.name }}</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Kontak</label>
+                  <p class="text-sm text-gray-900 dark:text-white mt-1">{{ selectedTenant.contact }}</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Properti</label>
+                  <p class="text-sm text-gray-900 dark:text-white mt-1">{{ selectedTenant.propertyName }}</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Kamar</label>
+                  <p class="text-sm text-gray-900 dark:text-white mt-1">{{ selectedTenant.roomName }}</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Status</label>
+                  <div class="mt-1">
+                    <UBadge :color="selectedTenant.status === 'active' ? 'success' : 'neutral'" variant="subtle" size="xs">
+                      {{ selectedTenant.status === 'active' ? 'Aktif' : 'Tidak Aktif' }}
+                    </UBadge>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Tanggal Masuk</label>
+                  <p class="text-sm text-gray-900 dark:text-white mt-1">{{ formatDate(selectedTenant.moveInDate) }}</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Durasi Tinggal</label>
+                  <p class="text-sm text-gray-900 dark:text-white mt-1">{{ selectedTenant.tenancyDuration }} bulan</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-500 uppercase">Sewa Bulanan</label>
+                  <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(selectedTenant.monthlyRent) }}</p>
+                </div>
+              </div>
+
+              <!-- Payment History -->
+              <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Riwayat Pembayaran</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <p class="text-xs text-gray-500">Total Tagihan</p>
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ selectedTenant.paymentHistory.totalBills }}</p>
+                  </div>
+                  <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                    <p class="text-xs text-gray-500">Lunas</p>
+                    <p class="text-lg font-bold text-green-600">{{ selectedTenant.paymentHistory.paidBills }}</p>
+                  </div>
+                  <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                    <p class="text-xs text-gray-500">Belum Lunas</p>
+                    <p class="text-lg font-bold text-red-600">{{ selectedTenant.paymentHistory.unpaidBills }}</p>
+                  </div>
+                  <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                    <p class="text-xs text-gray-500">Total Dibayar</p>
+                    <p class="text-lg font-bold text-blue-600">{{ formatCurrency(selectedTenant.paymentHistory.totalPaid) }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Payment Performance -->
+              <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Performa Pembayaran</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-xs text-gray-500">Pembayaran Tepat Waktu</label>
+                    <p class="text-sm font-semibold text-green-600 mt-1">{{ selectedTenant.paymentHistory.onTimePayments }} kali</p>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">Pembayaran Terlambat</label>
+                    <p class="text-sm font-semibold text-red-600 mt-1">{{ selectedTenant.paymentHistory.latePayments }} kali</p>
+                  </div>
+                  <div class="col-span-1 sm:col-span-2">
+                    <label class="text-xs text-gray-500">Tunggakan</label>
+                    <p class="text-lg font-bold mt-1" :class="selectedTenant.paymentHistory.outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'">
+                      {{ formatCurrency(selectedTenant.paymentHistory.outstandingBalance) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <template #footer>
+              <div class="flex justify-end gap-2">
+                <UButton color="neutral" variant="ghost" @click="isModalOpen = false">Tutup</UButton>
+                <UButton color="primary" :to="`/tenants/${selectedTenant?.id}`">Lihat Detail Lengkap</UButton>
+              </div>
+            </template>
+          </UCard>
+        </div>
+      </div>
+    </Teleport>
+  </ClientOnly>
 </template>

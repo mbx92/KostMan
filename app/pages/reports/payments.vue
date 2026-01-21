@@ -122,6 +122,22 @@ const getPaymentMethodLabel = (value: string) => {
     return found ? found.label : (value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' '))
 }
 
+// -- Pagination --
+const page = ref(1)
+const limit = ref(10)
+
+const paginatedPayments = computed(() => {
+  if (!reportData.value?.payments) return []
+  const start = (page.value - 1) * limit.value
+  const end = start + limit.value
+  return reportData.value.payments.slice(start, end)
+})
+
+const totalPayments = computed(() => reportData.value?.payments?.length || 0)
+const totalPages = computed(() => Math.ceil(totalPayments.value / limit.value))
+
+
+
 </script>
 
 <template>
@@ -281,11 +297,11 @@ const getPaymentMethodLabel = (value: string) => {
                         <th class="px-6 py-3 text-right">Jumlah</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-if="reportData?.payments.length === 0">
+                <tbody :key="`page-${page}`">
+                    <tr v-if="paginatedPayments.length === 0">
                         <td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada pembayaran ditemukan untuk periode ini</td>
                     </tr>
-                    <tr v-for="payment in reportData?.payments" :key="payment.id" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr v-for="payment in paginatedPayments" :key="payment.id" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 whitespace-nowrap text-gray-500">
                             {{ payment.paidDate ? formatDate(payment.paidDate) : '-' }}
                         </td>
@@ -312,6 +328,28 @@ const getPaymentMethodLabel = (value: string) => {
                     </tr>
                 </tbody>
             </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Menampilkan {{ ((page - 1) * limit) + 1 }} - {{ Math.min(page * limit, totalPayments) }} dari {{ totalPayments }} data
+            </div>
+            <div class="flex gap-1">
+                <button 
+                    v-for="p in totalPages" 
+                    :key="p"
+                    @click="page = p"
+                    :class="[
+                        'px-3 py-1 text-sm rounded',
+                        page === p 
+                            ? 'bg-primary-500 text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ]"
+                >
+                    {{ p }}
+                </button>
+            </div>
         </div>
     </div>
 

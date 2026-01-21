@@ -181,7 +181,9 @@ export default defineEventHandler(async (event) => {
             lowestUsageRoom
         },
         byPeriod,
-        byRoom,
+        byRoom: {
+            data: byRoom // Return all rooms for client-side pagination
+        },
         unusualUsage
     };
 });

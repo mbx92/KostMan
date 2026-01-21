@@ -14,13 +14,11 @@ const pool = new pg.Pool({
 const db = drizzle(pool);
 
 async function main() {
-    console.log('Seeding Reports Data...');
+    console.log('Seeding Reports Data with 40+ entries...');
 
     try {
         // --- CLEANUP ---
-        // --- CLEANUP ---
         console.log('Cleaning existing data (preserving users)...');
-        // Delete children first
         console.log('Deleting rentBills...'); await db.delete(rentBills);
         console.log('Deleting utilityBills...'); await db.delete(utilityBills);
 
@@ -65,13 +63,11 @@ async function main() {
             { name: 'Tax', type: 'tax' },
             { name: 'Consumables', type: 'cleaning' }
         ];
-        // Note: 'type' might be restricted by enum or just string. Schema usually has 'category' table with name. 
-        // Let's assume standardized names.
 
         try {
             await db.insert(expenseCategories).values(
                 categoriesData.map(c => ({
-                    userId, // Fix: Schema requires userId
+                    userId,
                     name: c.name,
                     description: `Expenses for ${c.name}`
                 }))
@@ -82,10 +78,12 @@ async function main() {
         }
 
         // --- SEED PROPERTIES ---
-        console.log('Seeding Properties...');
+        console.log('Seeding Properties (4 properties for more data)...');
         const propsData = [
             { name: 'Kost Mawar (Premium)', address: 'Jl. Mawar No. 1' },
-            { name: 'Kost Melati (Budget)', address: 'Jl. Melati No. 5' }
+            { name: 'Kost Melati (Budget)', address: 'Jl. Melati No. 5' },
+            { name: 'Kost Anggrek (Mid-Range)', address: 'Jl. Anggrek No. 10' },
+            { name: 'Kost Dahlia (Luxury)', address: 'Jl. Dahlia No. 15' }
         ];
 
         let propertiesResult: any[] = [];
@@ -105,32 +103,41 @@ async function main() {
 
         const prop1 = propertiesResult[0]; // Mawar
         const prop2 = propertiesResult[1]; // Melati
+        const prop3 = propertiesResult[2]; // Anggrek
+        const prop4 = propertiesResult[3]; // Dahlia
 
-        if (!prop1 || !prop2) {
+        if (!prop1 || !prop2 || !prop3 || !prop4) {
             throw new Error("Failed to seed properties");
         }
 
-        // --- SEED TENANTS ---
-        console.log('Seeding Tenants...');
-        const tenantsData = [
-            { name: 'Budi Santoso', contact: '081234567890', status: 'active' },
-            { name: 'Siti Nurhaliza', contact: '081234567891', status: 'active' },
-            { name: 'Andi Wijaya', contact: '081234567892', status: 'active' },
-            { name: 'Dewi Lestari', contact: '081234567893', status: 'active' },
-            { name: 'Rina Kurnia', contact: '081234567894', status: 'active' },
-            { name: 'Joko Anwar', contact: '081234567895', status: 'inactive' }, // Past tenant
-            { name: 'Maya Putri', contact: '081234567896', status: 'inactive' },
-            { name: 'Eko Prasetyo', contact: '081234567897', status: 'active' }
-        ];
+        // --- SEED TENANTS (50 tenants for more data) ---
+        console.log('Seeding Tenants (50 tenants)...');
+        const tenantsData = [];
+        const firstNames = ['Budi', 'Siti', 'Andi', 'Dewi', 'Rina', 'Joko', 'Maya', 'Eko', 'Putri', 'Agus',
+            'Lina', 'Rudi', 'Sari', 'Doni', 'Fitri', 'Hadi', 'Indah', 'Jaya', 'Kartika', 'Lukman',
+            'Mega', 'Nanda', 'Oki', 'Prita', 'Qori', 'Reza', 'Sinta', 'Tono', 'Umar', 'Vina',
+            'Wati', 'Xena', 'Yudi', 'Zahra', 'Arif', 'Bella', 'Citra', 'Dimas', 'Elsa', 'Fajar',
+            'Gita', 'Hendra', 'Ika', 'Johan', 'Kiki', 'Lani', 'Mira', 'Nina', 'Omar', 'Pandu'];
+        const lastNames = ['Santoso', 'Wijaya', 'Lestari', 'Kurnia', 'Anwar', 'Putri', 'Prasetyo', 'Kusuma',
+            'Hidayat', 'Sari', 'Rahman', 'Susanto', 'Wibowo', 'Setiawan', 'Nugroho'];
 
-        // Schema requires idCardNumber
+        for (let i = 0; i < 50; i++) {
+            const firstName = firstNames[i % firstNames.length];
+            const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+            tenantsData.push({
+                name: `${firstName} ${lastName}`,
+                contact: `08123456${String(7890 + i).padStart(4, '0')}`,
+                status: i < 40 ? 'active' : 'inactive' // 40 active, 10 inactive
+            });
+        }
+
         let tenantsResult: any[] = [];
         try {
             tenantsResult = await db.insert(tenants).values(
                 tenantsData.map((t, idx) => ({
                     name: t.name,
                     contact: t.contact,
-                    idCardNumber: `123456789012345${idx}`, // Unique ID
+                    idCardNumber: `${String(1234567890123450 + idx).slice(0, 16)}`,
                     status: t.status as any
                 }))
             ).returning();
@@ -139,34 +146,77 @@ async function main() {
             throw e;
         }
 
-        // --- SEED ROOMS ---
-        console.log('Seeding Rooms...');
+        // --- SEED ROOMS (50 rooms across 4 properties) ---
+        console.log('Seeding Rooms (50 rooms)...');
         const roomsToInsert = [];
+        const prices = {
+            premium: [2500000, 2600000, 2700000, 2800000, 2900000],
+            budget: [1100000, 1200000, 1300000, 1400000],
+            midRange: [1800000, 1900000, 2000000, 2100000],
+            luxury: [3000000, 3200000, 3500000, 3800000, 4000000]
+        };
 
-        // Prop 1 Rooms (Premium) - 2.5jt
-        // Assign tenants 0, 1, 2, 7 (Active)
-        // Tenant 5, 6 (Inactive) were here
-        // We only link ACTIVE tenants to rooms in 'tenantId' column usually.
+        let roomIndex = 0;
 
-        // Room 101 - Active (Budi)
-        roomsToInsert.push({ propertyId: prop1.id, name: '101', price: '2500000', tenantId: tenantsResult[0]?.id, status: 'occupied' as any, moveInDate: '2025-08-01' });
-        // Room 102 - Active (Siti)
-        roomsToInsert.push({ propertyId: prop1.id, name: '102', price: '2500000', tenantId: tenantsResult[1]?.id, status: 'occupied' as any, moveInDate: '2025-09-01' });
-        // Room 103 - Active (Andi)
-        roomsToInsert.push({ propertyId: prop1.id, name: '103', price: '2600000', tenantId: tenantsResult[2]?.id, status: 'occupied' as any, moveInDate: '2025-10-15' });
-        // Room 104 - Available (Previously Joko)
-        roomsToInsert.push({ propertyId: prop1.id, name: '104', price: '2500000', tenantId: null, status: 'available' as any });
-        // Room 105 - Active (Eko)
-        roomsToInsert.push({ propertyId: prop1.id, name: '105', price: '2800000', tenantId: tenantsResult[7]?.id, status: 'occupied' as any, moveInDate: '2026-01-01' });
+        // Property 1 (Mawar - Premium): 15 rooms
+        for (let i = 1; i <= 15; i++) {
+            const price = prices.premium[i % prices.premium.length];
+            const tenant = roomIndex < 40 ? tenantsResult[roomIndex] : null;
+            roomsToInsert.push({
+                propertyId: prop1.id,
+                name: `${100 + i}`,
+                price: String(price),
+                tenantId: tenant?.id || null,
+                status: tenant ? 'occupied' : 'available' as any,
+                moveInDate: tenant ? '2025-12-01' : null
+            });
+            if (tenant) roomIndex++;
+        }
 
-        // Prop 2 Rooms (Budget) - 1.2jt
-        // Assign tenants 3, 4 (Active)
-        // Room 201 - Active (Dewi)
-        roomsToInsert.push({ propertyId: prop2.id, name: '201', price: '1200000', tenantId: tenantsResult[3]?.id, status: 'occupied' as any, moveInDate: '2025-06-01' });
-        // Room 202 - Active (Rina)
-        roomsToInsert.push({ propertyId: prop2.id, name: '202', price: '1200000', tenantId: tenantsResult[4]?.id, status: 'occupied' as any, moveInDate: '2025-07-01' });
-        // Room 203 - Available
-        roomsToInsert.push({ propertyId: prop2.id, name: '203', price: '1100000', tenantId: null, status: 'available' as any });
+        // Property 2 (Melati - Budget): 12 rooms
+        for (let i = 1; i <= 12; i++) {
+            const price = prices.budget[i % prices.budget.length];
+            const tenant = roomIndex < 40 ? tenantsResult[roomIndex] : null;
+            roomsToInsert.push({
+                propertyId: prop2.id,
+                name: `${200 + i}`,
+                price: String(price),
+                tenantId: tenant?.id || null,
+                status: tenant ? 'occupied' : 'available' as any,
+                moveInDate: tenant ? '2025-12-01' : null
+            });
+            if (tenant) roomIndex++;
+        }
+
+        // Property 3 (Anggrek - Mid-Range): 13 rooms
+        for (let i = 1; i <= 13; i++) {
+            const price = prices.midRange[i % prices.midRange.length];
+            const tenant = roomIndex < 40 ? tenantsResult[roomIndex] : null;
+            roomsToInsert.push({
+                propertyId: prop3.id,
+                name: `${300 + i}`,
+                price: String(price),
+                tenantId: tenant?.id || null,
+                status: tenant ? 'occupied' : 'available' as any,
+                moveInDate: tenant ? '2025-12-01' : null
+            });
+            if (tenant) roomIndex++;
+        }
+
+        // Property 4 (Dahlia - Luxury): 10 rooms
+        for (let i = 1; i <= 10; i++) {
+            const price = prices.luxury[i % prices.luxury.length];
+            const tenant = roomIndex < 40 ? tenantsResult[roomIndex] : null;
+            roomsToInsert.push({
+                propertyId: prop4.id,
+                name: `${400 + i}`,
+                price: String(price),
+                tenantId: tenant?.id || null,
+                status: tenant ? 'occupied' : 'available' as any,
+                moveInDate: tenant ? '2025-12-01' : null
+            });
+            if (tenant) roomIndex++;
+        }
 
         let roomsResult: any[] = [];
         try {
@@ -176,178 +226,162 @@ async function main() {
             throw e;
         }
 
-        // --- SEED BILLS (History) ---
-        console.log('Seeding Bills History (6 Months)...');
+        console.log(`Seeded ${roomsResult.length} rooms with ${roomIndex} occupied rooms`);
+
+        // --- SEED BILLS (Last Month & This Month for trend analysis) ---
+        console.log('Seeding Bills for Last Month and This Month...');
 
         const months = [
-            { period: '2025-08', start: '2025-08-01', end: '2025-08-31' },
-            { period: '2025-09', start: '2025-09-01', end: '2025-09-30' },
-            { period: '2025-10', start: '2025-10-01', end: '2025-10-31' },
-            { period: '2025-11', start: '2025-11-01', end: '2025-11-30' },
-            { period: '2025-12', start: '2025-12-01', end: '2025-12-31' },
-            { period: '2026-01', start: '2026-01-01', end: '2026-01-31' }
+            { period: '2025-12', start: '2025-12-01', end: '2025-12-31' }, // Last month (20 data)
+            { period: '2026-01', start: '2026-01-01', end: '2026-01-31' }  // This month (20 data)
         ];
 
         const rentBillsData: any[] = [];
         const utilityBillsData: any[] = [];
         const paymentMethods = ['cash', 'transfer', 'credit_card', 'e_wallet'];
 
-        // Debug lengths
-        console.log(`Seeded ${tenantsResult.length} tenants and ${roomsResult.length} rooms.`);
+        console.log(`Processing bills for ${roomsResult.length} rooms...`);
 
         for (const month of months) {
-            // For each Active Tenant, check if they were active in this month
-            // Budi (Aug), Siti (Sep), Andi (Oct), Dewi (Jun), Rina (Jul), Eko (Jan 26)
+            // Generate bills for all occupied rooms
+            for (let i = 0; i < roomsResult.length; i++) {
+                const room = roomsResult[i];
 
-            if (roomsResult.length < 8 || tenantsResult.length < 8) {
-                console.error("Not enough rooms/tenants seeded to proceed with bills generation.");
-                break;
-            }
+                // Only generate bills for occupied rooms
+                if (!room.tenantId) continue;
 
-            // Map Active Tenants to their current rooms (simplification: assume they stayed in same room)
-            // Need to match tenant to room from roomsResult
-            const activeMap = [
-                { t: tenantsResult[0], r: roomsResult[0], start: '2025-08-01', end: undefined }, // Budi -> 101
-                { t: tenantsResult[1], r: roomsResult[1], start: '2025-09-01', end: undefined }, // Siti -> 102
-                { t: tenantsResult[2], r: roomsResult[2], start: '2025-10-15', end: undefined }, // Andi -> 103
-                { t: tenantsResult[3], r: roomsResult[5], start: '2025-06-01', end: undefined }, // Dewi -> 201
-                { t: tenantsResult[4], r: roomsResult[6], start: '2025-07-01', end: undefined }, // Rina -> 202
-                { t: tenantsResult[7], r: roomsResult[4], start: '2026-01-01', end: undefined }, // Eko -> 105
-            ];
+                // Generate Rent Bill
+                const isPaid = Math.random() > 0.15; // 85% paid
+                const paidDate = isPaid ? new Date(month.start) : null;
+                if (paidDate) paidDate.setDate(paidDate.getDate() + Math.floor(Math.random() * 10) + 1);
 
-            // Add Inactive tenants history (Joko, Maya)
-            // Joko was in 104 (Aug-Oct), Maya in 203 (Aug-Nov) - Hypothetical
-            const inactiveMap = [
-                { t: tenantsResult[5], r: roomsResult[3], start: '2025-01-01', end: '2025-10-31' }, // Joko
-                { t: tenantsResult[6], r: roomsResult[7], start: '2025-01-01', end: '2025-11-30' }  // Maya
-            ];
+                const paymentMethod = isPaid ? paymentMethods[Math.floor(Math.random() * paymentMethods.length)] : null;
 
-            const allMappings = [...activeMap, ...inactiveMap];
+                rentBillsData.push({
+                    roomId: room.id,
+                    tenantId: room.tenantId,
+                    periodStartDate: month.start,
+                    periodEndDate: month.end,
+                    dueDate: month.start,
+                    period: month.period,
+                    roomPrice: room.price,
+                    totalAmount: room.price,
+                    isPaid: isPaid,
+                    paidAt: isPaid ? paidDate : null,
+                    paymentMethod: paymentMethod as any,
+                    generatedAt: new Date(month.start)
+                });
 
-            for (const map of allMappings) {
-                // Safety check
-                if (!map.t || !map.r) {
-                    console.warn(`Skipping mapping due to missing tenant/room. Tenant: ${map.t?.id}, Room: ${map.r?.id}`);
-                    continue;
-                }
-                const mapStart = new Date(map.start);
-                const mapEnd = map.end ? new Date(map.end) : new Date('2099-12-31');
-                const monthEnd = new Date(month.end);
+                // Generate Utility Bill with varying usage
+                const baseUsage = 50 + Math.floor(Math.random() * 150); // 50-200 kWh
+                // Add trend: this month usage slightly higher than last month
+                const trendFactor = month.period === '2026-01' ? 1.1 : 1.0;
+                const usage = Math.floor(baseUsage * trendFactor);
 
-                // If tenancy covers this month
-                if (mapStart <= monthEnd && mapEnd >= new Date(month.start)) {
-                    // Generate Rent Bill
-                    const isPaid = Math.random() > 0.1; // 90% paid
-                    const paidDate = isPaid ? new Date(month.start) : null;
-                    if (paidDate) paidDate.setDate(paidDate.getDate() + 5); // Paid 1-5 days after
+                const meterStart = 1000 + (i * 200) + (month.period === '2026-01' ? baseUsage : 0);
+                const meterEnd = meterStart + usage;
+                const costPerKwh = 1500;
+                const usageCost = usage * costPerKwh;
+                const totalUtil = usageCost + 15000 + 20000;
 
-                    const paymentMethod = isPaid ? paymentMethods[Math.floor(Math.random() * paymentMethods.length)] : null; // Should be null if not paid? Schema allows null.
+                const genDate = new Date(month.end);
+                const isUtilPaid = Math.random() > 0.15;
+                const utilPaidDate = isUtilPaid ? new Date(month.end) : null;
+                if (utilPaidDate) utilPaidDate.setDate(utilPaidDate.getDate() + Math.floor(Math.random() * 5) + 1);
 
-                    rentBillsData.push({
-                        roomId: map.r.id,
-                        tenantId: map.t.id,
-                        periodStartDate: month.start,
-                        periodEndDate: month.end,
-                        dueDate: month.start, // Due on 1st
-                        period: month.period,
-                        roomPrice: map.r.price,
-                        totalAmount: map.r.price,
-                        isPaid: isPaid,
-                        paidAt: isPaid ? paidDate : null, // Pass Date object
-                        paymentMethod: paymentMethod as any, // Schema change added this
-                        generatedAt: new Date(month.start) // Pass Date object
-                    });
-
-                    // Generate Utility Bill (Random usage)
-                    const meterStart = Math.floor(Math.random() * 1000);
-                    const usage = 50 + Math.floor(Math.random() * 150); // 50-200 kWh
-                    const meterEnd = meterStart + usage;
-                    const costPerKwh = 1500;
-                    const usageCost = usage * costPerKwh;
-                    const totalUtil = usageCost + 15000 + 20000; // + Water 15k, Trash 20k
-
-                    // Create Date for 'generatedAt' usually end of month
-                    const genDate = new Date(month.end);
-                    const isUtilPaid = Math.random() > 0.1;
-                    const utilPaidDate = isUtilPaid ? new Date(month.end) : null;
-                    if (utilPaidDate) utilPaidDate.setDate(utilPaidDate.getDate() + 2);
-
-                    utilityBillsData.push({
-                        roomId: map.r.id,
-                        tenantId: map.t.id,
-                        period: month.period,
-                        meterStart: meterStart,
-                        meterEnd: meterEnd,
-                        costPerKwh: String(costPerKwh),
-                        usageCost: String(usageCost),
-                        waterFee: '15000',
-                        trashFee: '20000',
-                        totalAmount: String(totalUtil),
-                        isPaid: isUtilPaid,
-                        paidAt: isUtilPaid ? utilPaidDate : null, // Pass Date object
-                        paymentMethod: isUtilPaid ? paymentMethods[Math.floor(Math.random() * paymentMethods.length)] : null,
-                        generatedAt: genDate // Pass Date object
-                    });
-                }
+                utilityBillsData.push({
+                    roomId: room.id,
+                    tenantId: room.tenantId,
+                    period: month.period,
+                    meterStart: meterStart,
+                    meterEnd: meterEnd,
+                    costPerKwh: String(costPerKwh),
+                    usageCost: String(usageCost),
+                    waterFee: '15000',
+                    trashFee: '20000',
+                    totalAmount: String(totalUtil),
+                    isPaid: isUtilPaid,
+                    paidAt: isUtilPaid ? utilPaidDate : null,
+                    paymentMethod: isUtilPaid ? paymentMethods[Math.floor(Math.random() * paymentMethods.length)] : null,
+                    generatedAt: genDate
+                });
             }
         }
 
         console.log(`Prepared ${rentBillsData.length} rent bills and ${utilityBillsData.length} utility bills.`);
 
-        // Batch insert bills 
+        // Insert bills
         try {
             if (rentBillsData.length) {
-                console.log('Sample rent bill:', JSON.stringify(rentBillsData[0]));
+                console.log('Inserting rent bills...');
                 await db.insert(rentBills).values(rentBillsData);
             }
         } catch (e) {
             console.error('Error inserting rent bills:' + JSON.stringify(e));
-            // console.log('Sample data:', JSON.stringify(rentBillsData[0])); // Optional debug
             throw e;
         }
 
         try {
-            if (utilityBillsData.length) await db.insert(utilityBills).values(utilityBillsData);
+            if (utilityBillsData.length) {
+                console.log('Inserting utility bills...');
+                await db.insert(utilityBills).values(utilityBillsData);
+            }
         } catch (e) {
             console.error('Error inserting utility bills:' + JSON.stringify(e));
             throw e;
         }
 
-        // --- SEED EXPENSES ---
-        console.log('Seeding Expenses...');
+        // --- SEED EXPENSES (20 per month = 40 total) ---
+        console.log('Seeding Expenses (40+ entries)...');
         const expensesData: any[] = [];
 
         for (const month of months) {
-            // 3-5 expenses per month per property
-            const props = [prop1, prop2];
+            const props = [prop1, prop2, prop3, prop4];
+
+            // Generate 5 expenses per property per month = 20 expenses per month
             for (const prop of props) {
-                const count = 3 + Math.floor(Math.random() * 3);
-                for (let i = 0; i < count; i++) {
+                for (let i = 0; i < 5; i++) {
                     const cat = categoriesData[Math.floor(Math.random() * categoriesData.length)];
-                    const amount = 50000 + Math.floor(Math.random() * 1000000); // 50k - 1jt
+                    const baseAmount = 100000 + Math.floor(Math.random() * 900000);
+                    // Add trend: this month expenses slightly higher
+                    const trendFactor = month.period === '2026-01' ? 1.15 : 1.0;
+                    const amount = Math.floor(baseAmount * trendFactor);
+
                     const expDate = new Date(month.start);
                     expDate.setDate(Math.floor(Math.random() * 28) + 1);
 
                     expensesData.push({
                         propertyId: prop.id,
                         userId: userId,
-                        // Fix: expense schema uses 'category' (string) not 'categoryId'
                         category: cat.name,
-                        description: `${cat.name} Expense - ${month.period}`,
+                        description: `${cat.name} - ${prop.name.split(' ')[1]} - ${month.period}`,
                         amount: String(amount),
-                        expenseDate: expDate.toISOString().split('T')[0], // YYYY-MM-DD
-                        paidDate: expDate.toISOString().split('T')[0], // Cash basis
+                        expenseDate: expDate.toISOString().split('T')[0],
+                        paidDate: expDate.toISOString().split('T')[0],
                         isPaid: true,
-                        paymentMethod: 'cash',
+                        paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)] as any,
                         type: 'property'
                     });
                 }
             }
         }
 
-        if (expensesData.length) await db.insert(expenses).values(expensesData);
+        if (expensesData.length) {
+            console.log(`Inserting ${expensesData.length} expenses...`);
+            await db.insert(expenses).values(expensesData);
+        }
 
-        console.log('Seeding Complete! 🚀');
+        console.log('\n=== SEEDING SUMMARY ===');
+        console.log(`✓ Properties: ${propertiesResult.length}`);
+        console.log(`✓ Tenants: ${tenantsResult.length} (${tenantsData.filter(t => t.status === 'active').length} active)`);
+        console.log(`✓ Rooms: ${roomsResult.length} (${roomIndex} occupied)`);
+        console.log(`✓ Rent Bills: ${rentBillsData.length} (across 2 months)`);
+        console.log(`✓ Utility Bills: ${utilityBillsData.length} (across 2 months)`);
+        console.log(`✓ Expenses: ${expensesData.length} (across 2 months)`);
+        console.log('\nData Distribution:');
+        console.log(`  - December 2025: ~${Math.floor(rentBillsData.length / 2)} rent bills, ~${Math.floor(utilityBillsData.length / 2)} utility bills, ${expensesData.length / 2} expenses`);
+        console.log(`  - January 2026: ~${Math.floor(rentBillsData.length / 2)} rent bills, ~${Math.floor(utilityBillsData.length / 2)} utility bills, ${expensesData.length / 2} expenses`);
+        console.log('\nSeeding Complete! 🚀\n');
 
     } catch (error) {
         console.error('Error seeding database:', error);

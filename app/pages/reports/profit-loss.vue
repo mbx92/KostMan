@@ -245,7 +245,7 @@ const maxVal = computed(() => {
         <div class="lg:col-span-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
              <h3 class="font-semibold text-gray-900 dark:text-white mb-6">Tren Keuangan</h3>
              <div class="h-64 flex items-end justify-between gap-4 overflow-x-auto pb-4">
-                 <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[50px] flex-1">
+                 <div v-for="item in reportData?.byPeriod" :key="item.period" class="h-full flex flex-col items-center gap-2 group min-w-[50px] flex-1">
                      
                      <div class="w-full h-full relative flex items-end justify-center gap-1">
                          <!-- Revenue Bar -->

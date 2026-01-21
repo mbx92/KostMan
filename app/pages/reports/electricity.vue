@@ -28,6 +28,10 @@ const startDate = ref(formatDateToString(getStartOfMonth(now)))
 const endDate = ref(formatDateToString(getEndOfMonth(now)))
 const selectedPropertyId = ref('all')
 
+// Pagination state
+const page = ref(1)
+const limit = ref(10)
+
 // -- Fetch Properties --
 const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
@@ -52,16 +56,24 @@ interface ElectricityReportData {
     totalCost: number
     roomsReported: number
   }>
-  byRoom: Array<{
-    roomId: string
-    roomName: string
-    propertyName: string
-    totalUsage: number
-    totalCost: number
-    averageUsage: number
-    trend: 'increasing' | 'decreasing' | 'stable'
-    readings: any[]
-  }>
+  byRoom: {
+    data: Array<{
+      roomId: string
+      roomName: string
+      propertyName: string
+      totalUsage: number
+      totalCost: number
+      averageUsage: number
+      trend: 'increasing' | 'decreasing' | 'stable'
+      readings: any[]
+    }>
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }
   unusualUsage: Array<{
     roomId: string
     roomName: string
@@ -72,13 +84,51 @@ interface ElectricityReportData {
   }>
 }
 
-// -- Fetch Report --
-const { data: reportData, pending } = await useFetch<ElectricityReportData>('/api/reports/electricity', {
-  query: computed(() => ({
-    startDate: startDate.value,
-    endDate: endDate.value,
-    propertyId: selectedPropertyId.value === 'all' ? undefined : selectedPropertyId.value
-  }))
+// -- State for report data --
+const reportData = ref<ElectricityReportData | null>(null)
+const pending = ref(false)
+
+// -- Fetch Report Function --
+const fetchReport = async () => {
+  pending.value = true
+  try {
+    const data = await $fetch<ElectricityReportData>('/api/reports/electricity', {
+      query: {
+        startDate: startDate.value,
+        endDate: endDate.value,
+        propertyId: selectedPropertyId.value === 'all' ? undefined : selectedPropertyId.value
+        // No page/limit - fetch all data
+      }
+    })
+    reportData.value = data
+  } catch (error) {
+    console.error('Error fetching report:', error)
+  } finally {
+    pending.value = false
+  }
+}
+
+// Client-side pagination computed
+const paginatedRooms = computed(() => {
+  if (!reportData.value?.byRoom.data) return []
+  const start = (page.value - 1) * limit.value
+  const end = start + limit.value
+  return reportData.value.byRoom.data.slice(start, end)
+})
+
+const totalRooms = computed(() => reportData.value?.byRoom.data.length || 0)
+const totalPages = computed(() => Math.ceil(totalRooms.value / limit.value))
+
+// Setup watches and initial fetch on client-side after mount
+onMounted(() => {
+  // Initial fetch
+  fetchReport()
+  
+  // Watch for filter changes
+  watch([startDate, endDate, selectedPropertyId], () => {
+    page.value = 1 // Reset to page 1 when filters change
+    fetchReport()
+  })
 })
 
 // -- Helpers --
@@ -203,7 +253,7 @@ const translateTrend = (trend: string): string => {
     <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
          <h3 class="font-semibold text-gray-900 dark:text-white mb-6">Tren Penggunaan (kWh)</h3>
          <div class="h-64 flex items-end justify-between gap-2 overflow-x-auto pb-2">
-             <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[40px] flex-1">
+             <div v-for="item in reportData?.byPeriod" :key="item.period" class="h-full flex flex-col items-center gap-2 group min-w-[40px] flex-1">
                  <div class="w-full bg-yellow-100 dark:bg-yellow-900/30 rounded-t-lg relative flex items-end justify-center group-hover:bg-yellow-200 transition-colors" 
                       :style="{ height: item.totalUsage > 0 ? `${Math.max(10, (item.totalUsage / (maxUsage || 1)) * 100)}%` : '8px' }">
                      <div class="opacity-0 group-hover:opacity-100 absolute -top-12 bg-black text-white text-xs p-1.5 rounded pointer-events-none whitespace-nowrap z-10">
@@ -235,11 +285,11 @@ const translateTrend = (trend: string): string => {
                         <th class="px-6 py-3 text-right">Total Biaya</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-if="reportData?.byRoom.length === 0">
+                <tbody :key="`page-${page}`">
+                    <tr v-if="!paginatedRooms.length">
                         <td colspan="6" class="px-6 py-8 text-center text-gray-500">Tidak ada data ditemukan</td>
                     </tr>
-                    <tr v-for="room in reportData?.byRoom" :key="room.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr v-for="room in paginatedRooms" :key="room.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 font-medium text-gray-900 dark:text-white">{{ room.roomName }}</td>
                         <td class="px-6 py-3 text-gray-500">{{ room.propertyName }}</td>
                          <td class="px-6 py-3 text-right font-medium">{{ formatNumber(room.totalUsage) }} kWh</td>
@@ -255,6 +305,28 @@ const translateTrend = (trend: string): string => {
                     </tr>
                 </tbody>
             </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Menampilkan {{ ((page - 1) * limit) + 1 }} - {{ Math.min(page * limit, totalRooms) }} dari {{ totalRooms }} data
+            </div>
+            <div class="flex gap-1">
+                <button 
+                    v-for="p in totalPages" 
+                    :key="p"
+                    @click="page = p"
+                    :class="[
+                        'px-3 py-1 text-sm rounded',
+                        page === p 
+                            ? 'bg-primary-500 text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ]"
+                >
+                    {{ p }}
+                </button>
+            </div>
         </div>
     </div>
     

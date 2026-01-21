@@ -35,6 +35,10 @@ const endDate = ref(formatDateToString(getEndOfMonth(now)))
 const selectedPropertyId = ref('all')
 const groupBy = ref('month')
 
+// Pagination state
+const page = ref(1)
+const limit = ref(10)
+
 // -- Options --
 const groupByOptions = [
     { label: 'Bulanan', value: 'month' },
@@ -75,23 +79,82 @@ interface IncomeReportData {
     occupancyRate: number
     averageRentPerRoom: number
   }>
-  topPerformingRooms: Array<{
-    roomId: string
-    roomName: string
-    propertyName: string
-    totalPaid: number
-    paymentsCount: number
-  }>
+  topPerformingRooms: {
+    data: Array<{
+      roomId: string
+      roomName: string
+      propertyName: string
+      totalPaid: number
+      paymentsCount: number
+    }>
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }
 }
 
-// -- Fetch Report --
-const { data: reportData, pending } = await useFetch<IncomeReportData>('/api/reports/income', {
-  query: computed(() => ({
-    startDate: startDate.value,
-    endDate: endDate.value,
-    propertyId: selectedPropertyId.value === 'all' ? undefined : selectedPropertyId.value,
-    groupBy: groupBy.value
-  }))
+// -- State for report data --
+const reportData = ref<IncomeReportData | null>(null)
+const pending = ref(false)
+
+// -- Fetch Report Function --
+const fetchReport = async () => {
+  pending.value = true
+  try {
+    const data = await $fetch<IncomeReportData>('/api/reports/income', {
+      query: {
+        startDate: startDate.value,
+        endDate: endDate.value,
+        propertyId: selectedPropertyId.value === 'all' ? undefined : selectedPropertyId.value,
+        groupBy: groupBy.value
+        // No page/limit - fetch all data
+      }
+    })
+    reportData.value = data
+    console.log('Report data fetched:', {
+      totalRooms: data.topPerformingRooms?.data?.length,
+      firstRoom: data.topPerformingRooms?.data?.[0]
+    })
+  } catch (error) {
+    console.error('Error fetching report:', error)
+  } finally {
+    pending.value = false
+  }
+}
+
+// Client-side pagination computed
+const paginatedRooms = computed(() => {
+  if (!reportData.value?.topPerformingRooms?.data) {
+    console.log('No data available for pagination')
+    return []
+  }
+  const start = (page.value - 1) * limit.value
+  const end = start + limit.value
+  const rooms = reportData.value.topPerformingRooms.data.slice(start, end)
+  console.log(`Pagination: page ${page.value}, showing ${start}-${end}, total: ${reportData.value.topPerformingRooms.data.length}`)
+  return rooms
+})
+
+const totalRooms = computed(() => {
+  const total = reportData.value?.topPerformingRooms?.data?.length || 0
+  console.log('Total rooms:', total)
+  return total
+})
+const totalPages = computed(() => Math.ceil(totalRooms.value / limit.value))
+
+// Setup watches and initial fetch on client-side after mount
+onMounted(() => {
+  // Initial fetch
+  fetchReport()
+  
+  // Watch for filter changes
+  watch([startDate, endDate, selectedPropertyId, groupBy], () => {
+    page.value = 1 // Reset to page 1 when filters change
+    fetchReport()
+  })
 })
 
 // -- Actions --
@@ -99,6 +162,7 @@ const applyPreset = (range: { getValue: () => Date[] }) => {
     const [start, end] = range.getValue()
     startDate.value = formatDateToString(start)
     endDate.value = formatDateToString(end)
+    // page will be reset by the filter watch above
 }
 
 const isPresetSelected = (range: { getValue: () => Date[] }) => {
@@ -249,7 +313,7 @@ const maxIncome = computed(() => {
              
              <!-- Simple CSS Chart -->
              <div class="h-64 flex items-end justify-between gap-2 overflow-x-auto pb-2">
-                 <div v-for="item in reportData?.byPeriod" :key="item.period" class="flex flex-col items-center gap-2 group min-w-[40px] flex-1">
+                 <div v-for="item in reportData?.byPeriod" :key="item.period" class="h-full flex flex-col items-center gap-2 group min-w-[40px] flex-1">
                      
                      <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-t-lg relative flex items-end justify-center overflow-hidden" 
                           :style="{ height: item.total > 0 ? `${Math.max(10, (item.total / (maxIncome || 1)) * 100)}%` : '8px' }">
@@ -320,11 +384,11 @@ const maxIncome = computed(() => {
                         <th class="px-6 py-3 text-right">Total Pendapatan</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-if="reportData?.topPerformingRooms.length === 0">
+                <tbody :key="`page-${page}`">
+                    <tr v-if="!paginatedRooms.length">
                         <td colspan="4" class="px-6 py-8 text-center text-gray-500">Tidak ada data ditemukan</td>
                     </tr>
-                    <tr v-for="room in reportData?.topPerformingRooms" :key="room.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr v-for="room in paginatedRooms" :key="room.roomId" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 font-medium text-gray-900 dark:text-white">
                             {{ room.roomName }}
                         </td>
@@ -340,6 +404,28 @@ const maxIncome = computed(() => {
                     </tr>
                 </tbody>
             </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Menampilkan {{ ((page - 1) * limit) + 1 }} - {{ Math.min(page * limit, totalRooms) }} dari {{ totalRooms }} data
+            </div>
+            <div class="flex gap-1">
+                <button 
+                    v-for="p in totalPages" 
+                    :key="p"
+                    @click="page = p"
+                    :class="[
+                        'px-3 py-1 text-sm rounded',
+                        page === p 
+                            ? 'bg-primary-500 text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ]"
+                >
+                    {{ p }}
+                </button>
+            </div>
         </div>
     </div>
 

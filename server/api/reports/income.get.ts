@@ -174,7 +174,7 @@ export default defineEventHandler(async (event) => {
 
     currentData.total.forEach(processRoom);
 
-    const topPerformingRooms = Array.from(roomMap.entries())
+    const allRooms = Array.from(roomMap.entries())
         .map(([id, stats]) => ({
             roomId: id,
             roomName: stats.name,
@@ -182,9 +182,9 @@ export default defineEventHandler(async (event) => {
             totalPaid: stats.total,
             paymentsCount: stats.count
         }))
-        .sort((a, b) => b.totalPaid - a.totalPaid)
-        .slice(0, 5); // Top 5
+        .sort((a, b) => b.totalPaid - a.totalPaid);
 
+    // Return all rooms (no pagination on server)
     return {
         summary: {
             totalIncome,
@@ -196,6 +196,8 @@ export default defineEventHandler(async (event) => {
         },
         byPeriod,
         byProperty,
-        topPerformingRooms
+        topPerformingRooms: {
+            data: allRooms // Return all rooms for client-side pagination
+        }
     };
 });

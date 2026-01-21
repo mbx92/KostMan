@@ -11,6 +11,13 @@ const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart
 const selectedMonth = ref(currentMonth)
 const selectedPropertyId = ref('all')
 
+const selectedMonthDate = computed({
+  get: () => selectedMonth.value ? `${selectedMonth.value}-01` : '',
+  set: (val) => {
+    if (val) selectedMonth.value = val.slice(0, 7)
+  }
+})
+
 // -- Fetch Properties for filter --
 const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
@@ -112,6 +119,21 @@ watch([selectedMonth, selectedPropertyId], () => {
     // refresh() is handled automatically by reactive query params in useFetch
 })
 
+// -- Pagination for Unpaid Bills --
+const page = ref(1)
+const limit = ref(10)
+
+const paginatedUnpaidBills = computed(() => {
+  if (!reportData.value?.unpaidBills) return []
+  const start = (page.value - 1) * limit.value
+  const end = start + limit.value
+  return reportData.value.unpaidBills.slice(start, end)
+})
+
+const totalUnpaidBills = computed(() => reportData.value?.unpaidBills?.length || 0)
+const totalPages = computed(() => Math.ceil(totalUnpaidBills.value / limit.value))
+
+
 </script>
 
 <template>
@@ -125,9 +147,9 @@ watch([selectedMonth, selectedPropertyId], () => {
       
       <!-- Filters -->
       <div class="flex flex-col sm:flex-row gap-3">
-        <UInput 
-            type="month" 
-            v-model="selectedMonth" 
+        <DatePicker 
+            v-model="selectedMonthDate" 
+            granularity="month"
             class="min-w-[200px]"
         />
         <USelect 
@@ -297,11 +319,11 @@ watch([selectedMonth, selectedPropertyId], () => {
                          <th class="px-6 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-if="unpaidBills.length === 0">
+                <tbody :key="`page-${page}`">
+                    <tr v-if="paginatedUnpaidBills.length === 0">
                         <td colspan="6" class="px-6 py-8 text-center text-gray-500">Tidak ada tagihan belum lunas untuk periode ini</td>
                     </tr>
-                    <tr v-for="(bill, index) in unpaidBills" :key="index" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr v-for="(bill, index) in paginatedUnpaidBills" :key="index" class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td class="px-6 py-3 font-medium">{{ bill.roomName }}</td>
                         <td class="px-6 py-3 text-gray-500">{{ bill.dueDate ? formatDate(bill.dueDate) : '-' }}</td>
                         <td class="px-6 py-3 text-right">{{ formatCurrency(bill.rentAmount) }}</td>
@@ -313,6 +335,28 @@ watch([selectedMonth, selectedPropertyId], () => {
                     </tr>
                 </tbody>
              </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Menampilkan {{ ((page - 1) * limit) + 1 }} - {{ Math.min(page * limit, totalUnpaidBills) }} dari {{ totalUnpaidBills }} data
+            </div>
+            <div class="flex gap-1">
+                <button 
+                    v-for="p in totalPages" 
+                    :key="p"
+                    @click="page = p"
+                    :class="[
+                        'px-3 py-1 text-sm rounded',
+                        page === p 
+                            ? 'bg-primary-500 text-white' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ]"
+                >
+                    {{ p }}
+                </button>
+            </div>
         </div>
     </div>
 
