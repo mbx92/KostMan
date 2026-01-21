@@ -4,11 +4,13 @@ After=network.target postgresql.service
 Wants=postgresql.service
 # PostgreSQL is on the same server (10.100.10.5)
 # Ensure PostgreSQL starts before this service
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 [Service]
 Type=simple
-User=mbx
-Group=mbx
+User=root
+Group=root
 WorkingDirectory=/home/mbx/projects/kosMan
 
 # Load environment variables from .env file
@@ -21,6 +23,7 @@ Environment=NUXT_PORT=3004
 Environment=HOST=0.0.0.0
 Environment=PORT=3004
 Environment=DATABASE_URL=postgresql://mbx:nopassword123!@10.100.10.5:5432/kostMan_dev
+Environment=PATH=/root/.nvm/versions/node/v22.19.0/bin:/usr/local/bin:/usr/bin:/bin
 
 # Execute the application
 ExecStart=/root/.nvm/versions/node/v22.19.0/bin/node .output/server/index.mjs
@@ -28,8 +31,6 @@ ExecStart=/root/.nvm/versions/node/v22.19.0/bin/node .output/server/index.mjs
 # Restart configuration
 Restart=always
 RestartSec=10
-StartLimitIntervalSec=60
-StartLimitBurst=3
 
 # Logging
 StandardOutput=journal

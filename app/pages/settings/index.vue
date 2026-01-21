@@ -19,6 +19,7 @@ const state = reactive({
 
 // --- WhatsApp Template State ---
 const whatsappTemplates = ref<any[]>([])
+const importingTemplates = ref(false)
 const templateFormOpen = ref(false)
 const editingTemplate = ref<any>(null)
 const templateForm = reactive({
@@ -285,6 +286,29 @@ function insertVariable(variable: string) {
   templateForm.message += variable
 }
 
+async function importTemplates() {
+  importingTemplates.value = true
+  try {
+    const result = await $fetch('/api/whatsapp-templates/seed', {
+      method: 'POST'
+    })
+    toast.add({
+      title: 'Berhasil',
+      description: result.message || 'Template berhasil diimport',
+      color: 'success',
+    })
+    await loadWhatsAppTemplates()
+  } catch (error: any) {
+    toast.add({
+      title: 'Gagal',
+      description: error?.data?.message || 'Gagal mengimport template',
+      color: 'error',
+    })
+  } finally {
+    importingTemplates.value = false
+  }
+}
+
 onMounted(async () => {
   await Promise.all([
     store.fetchSettings(),
@@ -459,18 +483,39 @@ onMounted(async () => {
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Template WhatsApp</h2>
           <p class="text-sm text-gray-500">Kelola template pesan untuk reminder pembayaran via WhatsApp.</p>
         </div>
-        <UButton icon="i-heroicons-plus" color="primary" @click="openTemplateForm()">
-          Buat Template
-        </UButton>
+        <div class="flex gap-2">
+          <UButton 
+            icon="i-heroicons-arrow-down-tray" 
+            color="gray" 
+            variant="soft"
+            :loading="importingTemplates"
+            @click="importTemplates"
+          >
+            Import Template
+          </UButton>
+          <UButton icon="i-heroicons-plus" color="primary" @click="openTemplateForm()">
+            Buat Template
+          </UButton>
+        </div>
       </div>
 
       <UCard v-if="whatsappTemplates.length === 0">
         <div class="text-center py-8">
           <UIcon name="i-heroicons-chat-bubble-left-right" class="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p class="text-gray-500 dark:text-gray-400 mb-4">Belum ada template WhatsApp</p>
-          <UButton icon="i-heroicons-plus" @click="openTemplateForm()">
-            Buat Template Pertama
-          </UButton>
+          <div class="flex gap-2 justify-center">
+            <UButton 
+              icon="i-heroicons-arrow-down-tray" 
+              variant="soft"
+              :loading="importingTemplates"
+              @click="importTemplates"
+            >
+              Import Template Default
+            </UButton>
+            <UButton icon="i-heroicons-plus" @click="openTemplateForm()">
+              Buat Template Pertama
+            </UButton>
+          </div>
         </div>
       </UCard>
 

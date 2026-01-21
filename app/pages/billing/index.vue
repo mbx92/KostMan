@@ -230,6 +230,11 @@ const rentColumns: TableColumn<RentBill>[] = [
     header: 'Kamar',
   },
   {
+    accessorFn: (row) => row.tenant?.name || row.room?.tenantName || '',
+    id: 'tenant',
+    header: 'Penghuni',
+  },
+  {
     accessorKey: 'totalAmount',
     header: 'Total',
     meta: { class: { th: 'text-right', td: 'text-right' } },
@@ -261,6 +266,11 @@ const utilityColumns: TableColumn<UtilityBill>[] = [
     accessorFn: (row) => row.room?.name || 'Unknown',
     id: 'room',
     header: 'Kamar',
+  },
+  {
+    accessorFn: (row) => row.tenant?.name || row.room?.tenantName || '',
+    id: 'tenant',
+    header: 'Penghuni',
   },
   {
     accessorFn: (row) => (row.meterEnd || 0) - (row.meterStart || 0),
@@ -301,6 +311,11 @@ const summaryColumns: TableColumn<CombinedBillItem>[] = [
     accessorFn: (row) => row.rent?.room?.name || row.util?.room?.name || 'Unknown',
     id: 'room',
     header: 'Kamar',
+  },
+  {
+    accessorFn: (row) => row.rent?.tenant?.name || row.util?.tenant?.name || row.rent?.room?.tenantName || row.util?.room?.tenantName || '',
+    id: 'tenant',
+    header: 'Penghuni',
   },
   {
     accessorFn: (row) => row.rent?.totalAmount || 0,
@@ -414,12 +429,22 @@ const genRoomOptions = computed(() => {
     ? rooms.value.filter((r) => r.propertyId === genPropertyId.value)
     : rooms.value;
   return baseRooms
-    .filter((r) => r.status === 'occupied') // Only show occupied rooms
     .map((r) => {
       const tenant = tenants.value.find((t) => t.id === r.tenantId);
       const tenantName = tenant?.name || r.tenantName || '';
+      
+      // Show room name with tenant info if available, otherwise just room name
+      let label = r.name;
+      if (tenantName) {
+        label = `${r.name} - ${tenantName}`;
+      } else if (r.status === 'available') {
+        label = `${r.name} (Kosong)`;
+      } else if (r.status === 'maintenance') {
+        label = `${r.name} (Maintenance)`;
+      }
+      
       return { 
-        label: tenantName ? `${r.name} - ${tenantName}` : r.name, 
+        label,
         value: r.id 
       };
     });
@@ -489,6 +514,18 @@ watch([genRoomId, genRoom], () => {
   }
 });
 
+// Refresh data when generate modal is opened
+watch(isGenerating, async (newVal) => {
+  if (newVal) {
+    // Refresh rooms, properties, and tenants when modal opens
+    await Promise.all([
+      store.fetchRooms(),
+      store.fetchProperties(),
+      store.fetchTenants(),
+    ]);
+  }
+});
+
 // Check if selected date range conflicts with existing bills
 const dateRangeConflict = computed(() => {
   if (!genPeriodStartDate.value || !genPeriodEndDate.value || !genRoomId.value) return null;
@@ -511,6 +548,16 @@ const dateRangeConflict = computed(() => {
 
 const generateRentBill = async () => {
   if (!genRoomId.value || !genRoom.value) return;
+  
+  // Validate that room has a tenant
+  if (!genRoom.value.tenantId) {
+    toast.add({
+      title: "Error",
+      description: "Kamar ini belum memiliki penghuni. Silakan assign penghuni terlebih dahulu di halaman Kamar.",
+      color: "error",
+    });
+    return;
+  }
   
   // Check for date range conflicts
   if (dateRangeConflict.value) {
@@ -764,11 +811,16 @@ const sendToWhatsApp = async (item: {
   roomId: string;
   period: string;
 }) => {
-  const room = rooms.value.find((r) => r.id === item.roomId);
-  const prop = properties.value.find((p) => p.id === room?.propertyId);
-  const tenant = tenants.value.find((t) => t.id === room?.tenantId);
+  // Get room and property from bill data (already joined from API)
+  const room = item.rent?.room || item.util?.room;
+  const prop = item.rent?.property || item.util?.property;
+  
+  // Fallback: search in local arrays if not in bill data
+  const roomFallback = room || rooms.value.find((r) => r.id === item.roomId);
+  const propFallback = prop || properties.value.find((p) => p.id === roomFallback?.propertyId);
+  const tenant = tenants.value.find((t) => t.id === roomFallback?.tenantId);
 
-  if (!room || !prop) {
+  if (!roomFallback || !propFallback) {
     toast.add({
       title: "Error",
       description: "Data kamar tidak ditemukan",
@@ -822,10 +874,10 @@ const sendToWhatsApp = async (item: {
 
   const billingData = {
     tenantName: tenant.name,
-    propertyName: prop.name,
-    roomName: room.name,
+    propertyName: propFallback.name,
+    roomName: roomFallback.name,
     period: item.period,
-    occupantCount: room.occupantCount || 1,
+    occupantCount: roomFallback.occupantCount || 1,
     
     // Rent details
     rentAmount: totalRent,
@@ -1194,7 +1246,7 @@ const sendReminder = async (reminder: any) => {
       <div v-if="filteredRentBills.length > 0" class="hidden lg:block">
         <!-- Search Filter -->
         <div class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
-          <UInput v-model="rentFilter" class="max-w-sm" placeholder="Cari tagihan..." icon="i-heroicons-magnifying-glass" />
+          <UInput v-model="rentFilter" class="max-w-sm" placeholder="Cari kamar, nama penghuni..." icon="i-heroicons-magnifying-glass" />
         </div>
         
         <UTable
@@ -1353,7 +1405,7 @@ const sendReminder = async (reminder: any) => {
       <div v-if="filteredUtilityBills.length > 0" class="hidden lg:block">
         <!-- Search Filter -->
         <div class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
-          <UInput v-model="utilityFilter" class="max-w-sm" placeholder="Cari tagihan..." icon="i-heroicons-magnifying-glass" />
+          <UInput v-model="utilityFilter" class="max-w-sm" placeholder="Cari kamar, nama penghuni..." icon="i-heroicons-magnifying-glass" />
         </div>
         
         <UTable
@@ -1511,7 +1563,7 @@ const sendReminder = async (reminder: any) => {
       <div v-if="combinedBills.length > 0" class="hidden lg:block">
         <!-- Search Filter -->
         <div class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
-          <UInput v-model="summaryFilter" class="max-w-sm" placeholder="Cari..." icon="i-heroicons-magnifying-glass" />
+          <UInput v-model="summaryFilter" class="max-w-sm" placeholder="Cari kamar, nama penghuni..." icon="i-heroicons-magnifying-glass" />
         </div>
         
         <UTable
@@ -1687,7 +1739,9 @@ const sendReminder = async (reminder: any) => {
               :disabled="genRoomOptions.length === 0"
             />
             <p v-if="genRoomOptions.length === 0" class="text-xs text-amber-600 mt-1">
-              {{ genPropertyId ? 'Tidak ada kamar terisi di properti ini' : 'Pilih properti terlebih dahulu' }}
+              {{ genPropertyId 
+                ? 'Tidak ada kamar di properti ini' 
+                : 'Pilih properti terlebih dahulu' }}
             </p>
           </UFormField>
 
