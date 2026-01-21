@@ -26,12 +26,12 @@ const state = reactive({
 const statusOptions = computed(() => {
   // If room is currently occupied, don't allow changing status in modal
   if (props.room?.status === 'occupied') {
-    return [{ label: 'Occupied', value: 'occupied' }]
+    return [{ label: 'Terisi', value: 'occupied' }]
   }
   // For new rooms or non-occupied rooms, only allow available/maintenance
   return [
-    { label: 'Available', value: 'available' },
-    { label: 'Maintenance', value: 'maintenance' }
+    { label: 'Tersedia', value: 'available' },
+    { label: 'Perbaikan', value: 'maintenance' }
   ]
 })
 
@@ -39,8 +39,8 @@ const statusOptions = computed(() => {
 const isOccupied = computed(() => props.room?.status === 'occupied')
 
 const schema = z.object({
-  name: z.string().min(1, 'Room name is required'),
-  price: z.number().min(0, 'Price must be positive'),
+  name: z.string().min(1, 'Nama kamar wajib diisi'),
+  price: z.number().min(0, 'Harga harus positif'),
   status: z.enum(['available', 'occupied', 'maintenance']),
 })
 
@@ -84,16 +84,16 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     if (props.room) {
       await store.updateRoom(props.room.id, payload)
       toast.add({
-        title: 'Room Updated',
-        description: 'Room has been updated successfully.',
+        title: 'Kamar Diperbarui',
+        description: 'Kamar berhasil diperbarui.',
         color: 'success',
       })
     } else {
       payload.status = data.status
       await store.addRoom(payload)
       toast.add({
-        title: 'Room Created',
-        description: 'New room has been added successfully.',
+        title: 'Kamar Dibuat',
+        description: 'Kamar baru berhasil ditambahkan.',
         color: 'success',
       })
     }
@@ -103,7 +103,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
   } catch (err: any) {
     toast.add({
       title: 'Error',
-      description: err?.data?.message || err?.message || 'Failed to save room',
+      description: err?.data?.message || err?.message || 'Gagal menyimpan kamar',
       color: 'error',
     })
   } finally {
@@ -113,7 +113,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" :title="room ? 'Edit Room' : 'Add New Room'">
+  <UModal v-model:open="isOpen" :title="room ? 'Edit Kamar' : 'Tambah Kamar Baru'">
     <template #default />
     
     <template #content>
@@ -123,22 +123,22 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           <div class="flex items-center gap-2 text-blue-700 dark:text-blue-300">
             <UIcon name="i-heroicons-user-circle" class="w-5 h-5" />
             <span class="text-sm font-medium">
-              Room occupied by <strong>{{ room.tenantName || 'Unknown tenant' }}</strong>
+              Kamar ditempati oleh <strong>{{ room.tenantName || 'Penghuni tidak diketahui' }}</strong>
             </span>
           </div>
           <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-            To change tenant or make room available, use the "Manage" page.
+            Untuk mengganti penghuni atau mengosongkan kamar, gunakan halaman "Kelola".
           </p>
         </div>
 
         <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
           <div class="space-y-1">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Room Name/Number</label>
-            <UInput v-model="state.name" placeholder="e.g. 101" autofocus class="w-full" />
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama/Nomor Kamar</label>
+            <UInput v-model="state.name" placeholder="cth. 101" autofocus class="w-full" />
           </div>
 
           <div class="space-y-1">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Room Price (Monthly)</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Harga Kamar (Bulanan)</label>
             <div class="relative">
                 <span class="absolute left-3 top-2 text-gray-500 text-sm">Rp</span>
                 <UInput v-model="state.price" type="number" placeholder="0" class="pl-8 w-full" />
@@ -156,13 +156,13 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
               :disabled="isOccupied"
             />
             <p v-if="isOccupied" class="text-xs text-gray-500 mt-1">
-              Status cannot be changed while room is occupied.
+              Status tidak dapat diubah saat kamar terisi.
             </p>
           </div>
 
           <div class="flex justify-end gap-3 mt-6">
-            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
-            <UButton type="submit" label="Save Room" color="primary" :loading="isSaving" />
+            <UButton label="Batal" color="neutral" variant="ghost" :disabled="isSaving" @click="isOpen = false" />
+            <UButton type="submit" label="Simpan Kamar" color="primary" :loading="isSaving" />
           </div>
         </UForm>
       </div>

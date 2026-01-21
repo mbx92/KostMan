@@ -1,88 +1,9 @@
 {
-  "id": "575f7a89-33d0-4b96-925c-ec607d1fb08d",
+  "id": "8c5981c5-e64e-4804-893a-12f7aa6cfe7a",
   "prevId": "abebdf67-b1fc-4155-8fe0-c2ba66d674fb",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.backups": {
-      "name": "backups",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "filename": {
-          "name": "filename",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "backup_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'manual'"
-        },
-        "storage_path": {
-          "name": "storage_path",
-          "type": "varchar(512)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "duration": {
-          "name": "duration",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "backups_created_by_users_id_fk": {
-          "name": "backups_created_by_users_id_fk",
-          "tableFrom": "backups",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.expense_categories": {
       "name": "expense_categories",
       "schema": "",
@@ -1433,14 +1354,6 @@
     }
   },
   "enums": {
-    "public.backup_type": {
-      "name": "backup_type",
-      "schema": "public",
-      "values": [
-        "manual",
-        "scheduled"
-      ]
-    },
     "public.expense_category": {
       "name": "expense_category",
       "schema": "public",

@@ -31,7 +31,7 @@ const propertyName = computed(() =>
 );
 
 const tenantName = computed(() => 
-  props.item.rent?.tenant?.name || props.item.util?.tenant?.name || 'No Tenant'
+  props.item.rent?.tenant?.name || props.item.util?.tenant?.name || 'Belum Ada Penghuni'
 );
 
 const rentAmount = computed(() => Number(props.item.rent?.totalAmount || 0));
@@ -42,14 +42,14 @@ const status = computed(() => {
   const rentPaid = props.item.rent?.isPaid !== false;
   const utilPaid = props.item.util?.isPaid !== false;
   
-  if (rentPaid && utilPaid) return 'PAID';
-  if (props.item.rent?.isPaid || props.item.util?.isPaid) return 'PARTIAL';
-  return 'UNPAID';
+  if (rentPaid && utilPaid) return 'LUNAS';
+  if (props.item.rent?.isPaid || props.item.util?.isPaid) return 'SEBAGIAN';
+  return 'BELUM LUNAS';
 });
 
 const statusColor = computed(() => {
-  if (status.value === 'PAID') return 'success';
-  if (status.value === 'PARTIAL') return 'warning';
+  if (status.value === 'LUNAS') return 'success';
+  if (status.value === 'SEBAGIAN') return 'warning';
   return 'error';
 });
 
@@ -162,7 +162,7 @@ const periodFormatted = computed(() => {
           icon="i-heroicons-printer"
           @click.stop="emit('print', item)"
         >
-          Print
+          Cetak
         </UButton>
       </div>
     </div>

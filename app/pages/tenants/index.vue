@@ -101,11 +101,11 @@ const confirmResetPin = async () => {
       <div>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
            <UIcon name="i-heroicons-user-group" class="w-8 h-8 text-primary-500" />
-           Tenants
+           Penghuni
         </h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-1">Manage your tenants directory.</p>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Kelola direktori penghuni Anda.</p>
       </div>
-      <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Add Tenant</UButton>
+      <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Tambah Penghuni</UButton>
     </div>
 
     <!-- Loading State -->
@@ -150,13 +150,13 @@ const confirmResetPin = async () => {
                 <UIcon name="i-heroicons-identification" class="w-4 h-4" />
                 <span class="font-mono text-xs">{{ tenant.idCardNumber }}</span>
             </div>
-             <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="getAssignedRoom(tenant.id)">
+            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="getAssignedRoom(tenant.id)">
                 <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                <span class="text-primary-600 dark:text-primary-400 font-medium">Room {{ getAssignedRoom(tenant.id)?.name }}</span>
+                <span class="text-primary-600 dark:text-primary-400 font-medium">Kamar {{ getAssignedRoom(tenant.id)?.name }}</span>
             </div>
             <div class="flex items-center gap-2 text-gray-400 italic" v-else>
                 <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                <span>No room assigned</span>
+                <span>Belum ada kamar</span>
             </div>
         </div>
       </UCard>
@@ -165,9 +165,9 @@ const confirmResetPin = async () => {
     <!-- Empty State -->
     <div v-else class="text-center py-20 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
         <UIcon name="i-heroicons-users" class="w-16 h-16 text-gray-400 mb-4" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">No tenants yet</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">Start by adding your first tenant.</p>
-        <UButton icon="i-heroicons-plus" @click="openAddModal">Add Tenant</UButton>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Belum ada penghuni</h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-6">Mulai dengan menambah penghuni pertama Anda.</p>
+        <UButton icon="i-heroicons-plus" @click="openAddModal">Tambah Penghuni</UButton>
     </div>
 
     <!-- Modal -->

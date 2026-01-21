@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     // 1. Get Room ID
     const id = getRouterParam(event, 'id');
     if (!id) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing ID' });
+        throw createError({ statusCode: 400, statusMessage: 'ID tidak ditemukan' });
     }
 
     // 2. Role Check
@@ -36,14 +36,14 @@ export default defineEventHandler(async (event) => {
         .limit(1);
 
     if (currentRoomResult.length === 0) {
-        throw createError({ statusCode: 404, statusMessage: 'Room not found' });
+        throw createError({ statusCode: 404, statusMessage: 'Kamar tidak ditemukan' });
     }
 
     const { property, room } = currentRoomResult[0];
 
     if (user.role !== Role.ADMIN) {
         if (property.userId !== user.id) {
-            throw createError({ statusCode: 403, statusMessage: 'Forbidden' });
+            throw createError({ statusCode: 403, statusMessage: 'Akses ditolak' });
         }
     }
 
@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
         ).limit(1);
 
         if (existing.length > 0) {
-            throw createError({ statusCode: 409, statusMessage: 'Room name already exists in this property' });
+            throw createError({ statusCode: 409, statusMessage: 'Nama kamar sudah ada di properti ini' });
         }
     }
 
@@ -75,10 +75,10 @@ export default defineEventHandler(async (event) => {
     const effectiveMoveInDate = input.moveInDate ?? room.moveInDate;
     const effectiveTenantId = input.tenantId ?? room.tenantId;
     const effectivePrice = input.price ?? Number(room.price);
-    
+
     // Only auto-generate if moveInDate is being newly set (wasn't set before)
     const isNewMoveIn = input.moveInDate && !room.moveInDate && effectiveTenantId;
-    
+
     if (isNewMoveIn && updatedRoom[0]) {
         try {
             // Check if a rent bill already exists for this room starting from moveInDate
@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
                 .from(rentBills)
                 .where(eq(rentBills.roomId, id))
                 .limit(1);
-            
+
             if (existingBills.length === 0) {
                 // No existing bills, create first one
                 const moveInDateStr = input.moveInDate!;
@@ -94,16 +94,16 @@ export default defineEventHandler(async (event) => {
                 const endDate = new Date(startDate);
                 endDate.setMonth(endDate.getMonth() + 1);
                 endDate.setDate(endDate.getDate() - 1);
-                
+
                 const periodStartDate = moveInDateStr;
                 const periodEndDate = endDate.toISOString().slice(0, 10);
                 const dueDate = periodEndDate;
                 const billingCycleDay = startDate.getDate();
                 const period = moveInDateStr.slice(0, 7);
-                
+
                 const roomPrice = Number(effectivePrice);
                 const totalAmount = roomPrice;
-                
+
                 await db.insert(rentBills).values({
                     roomId: id,
                     tenantId: effectiveTenantId,
@@ -118,7 +118,7 @@ export default defineEventHandler(async (event) => {
                     isPaid: false,
                     generatedAt: new Date(),
                 });
-                
+
                 console.log(`[Auto-Bill] Created first rent bill for room ${updatedRoom[0].name} (${periodStartDate} - ${periodEndDate})`);
             }
         } catch (error) {

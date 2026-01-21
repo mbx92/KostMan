@@ -30,11 +30,11 @@ export default defineEventHandler(async (event) => {
         const property = await db.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
 
         if (property.length === 0) {
-            throw createError({ statusCode: 404, statusMessage: 'Property not found' });
+            throw createError({ statusCode: 404, statusMessage: 'Properti tidak ditemukan' });
         }
 
         if (property[0].userId !== user.id) {
-            throw createError({ statusCode: 403, statusMessage: 'Forbidden: You do not own this property' });
+            throw createError({ statusCode: 403, statusMessage: 'Akses ditolak: Anda tidak memiliki properti ini' });
         }
     }
 
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     ).limit(1);
 
     if (existing.length > 0) {
-        throw createError({ statusCode: 409, statusMessage: 'Room name already exists in this property' });
+        throw createError({ statusCode: 409, statusMessage: 'Nama kamar sudah ada di properti ini' });
     }
 
     // 5. Insert
@@ -68,21 +68,21 @@ export default defineEventHandler(async (event) => {
             const endDate = new Date(startDate);
             endDate.setMonth(endDate.getMonth() + 1);
             endDate.setDate(endDate.getDate() - 1);
-            
+
             const periodStartDate = moveInDate;
             const periodEndDate = endDate.toISOString().slice(0, 10);
             const dueDate = periodEndDate;
-            
+
             // Extract billing cycle day from moveInDate
             const billingCycleDay = startDate.getDate();
-            
+
             // Generate legacy period (YYYY-MM) for backward compatibility
             const period = moveInDate.slice(0, 7);
-            
+
             // Calculate total amount
             const roomPrice = Number(input.price);
             const totalAmount = roomPrice; // First month, no proration for now
-            
+
             // Insert first rent bill
             await db.insert(rentBills).values({
                 roomId: newRoom[0].id,
@@ -98,7 +98,7 @@ export default defineEventHandler(async (event) => {
                 isPaid: false,
                 generatedAt: new Date(),
             });
-            
+
             console.log(`[Auto-Bill] Created first rent bill for room ${newRoom[0].name} (${periodStartDate} - ${periodEndDate})`);
         } catch (error) {
             console.error('[Auto-Bill] Failed to create first rent bill:', error);
