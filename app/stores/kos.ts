@@ -113,6 +113,12 @@ export interface Tenant {
     idCardNumber: string
     status: 'active' | 'inactive'
     roomId?: string | null
+    assignedRoom?: {
+        id: string
+        name: string
+        propertyId: string
+        propertyName: string | null
+    } | null
     createdAt?: string
     updatedAt?: string
 }
@@ -128,7 +134,7 @@ export const useKosStore = defineStore('kos', () => {
     const rooms = ref<Room[]>([])
     const roomsLoading = ref(false)
     const roomsError = ref<string | null>(null)
-    const roomsMeta = ref<{ page: number; pageSize: number; total: number; totalPages: number } | null>(null)
+    const roomsMeta = ref<{ page: number; pageSize: number; total: number; totalPages: number }>({ page: 1, pageSize: 20, total: 0, totalPages: 0 })
 
     // Rent Bills - now fetched from API
     const rentBills = ref<RentBill[]>([])
@@ -149,6 +155,7 @@ export const useKosStore = defineStore('kos', () => {
     const tenants = ref<Tenant[]>([])
     const tenantsLoading = ref(false)
     const tenantsError = ref<string | null>(null)
+    const tenantsMeta = ref<{ page: number; pageSize: number; total: number; totalPages: number }>({ page: 1, pageSize: 20, total: 0, totalPages: 0 })
 
     // Global Settings - now fetched from API
     const settings = ref<GlobalSettings>({
@@ -631,13 +638,19 @@ export const useKosStore = defineStore('kos', () => {
 
 
     // Tenants - API Integration
-    async function fetchTenants(status?: 'active' | 'inactive') {
+    async function fetchTenants(params?: { status?: 'active' | 'inactive'; search?: string; page?: number; pageSize?: number }) {
         tenantsLoading.value = true
         tenantsError.value = null
         try {
-            const query = status ? `?status=${status}` : ''
-            const data = await $fetch<Tenant[]>(`/api/tenants${query}`)
-            tenants.value = data
+            const query = new URLSearchParams()
+            if (params?.status) query.append('status', params.status)
+            if (params?.search) query.append('search', params.search)
+            if (params?.page) query.append('page', params.page.toString())
+            if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+            const response = await $fetch<{ data: Tenant[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/api/tenants?${query.toString()}`)
+            tenants.value = response.data
+            tenantsMeta.value = response.meta
         } catch (err: any) {
             tenantsError.value = err?.data?.message || err?.message || 'Failed to fetch tenants'
             console.error('fetchTenants error:', err)
@@ -852,6 +865,9 @@ export const useKosStore = defineStore('kos', () => {
             new Date(b.period).getTime() - new Date(a.period).getTime()
         )
     )
+    const getTenantsByStatus = computed(() => (status?: 'active' | 'inactive') =>
+        status ? tenants.value.filter(t => t.status === status) : tenants.value
+    )
 
 
     async function fetchReminders() {
@@ -892,6 +908,7 @@ export const useKosStore = defineStore('kos', () => {
         tenants,
         tenantsLoading,
         tenantsError,
+        tenantsMeta,
         settings,
         settingsLoading,
         settingsError,
@@ -942,7 +959,8 @@ export const useKosStore = defineStore('kos', () => {
         getRoomsByPropertyId,
         getRentBillsByRoomId,
         getUtilityBillsByRoomId,
-        getMeterReadingsByRoomId
+        getMeterReadingsByRoomId,
+        getTenantsByStatus
     }
 
 }, {

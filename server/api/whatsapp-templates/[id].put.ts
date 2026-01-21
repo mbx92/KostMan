@@ -7,6 +7,7 @@ import { eq, and } from 'drizzle-orm'
 const templateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   message: z.string().min(1).optional(),
+  templateType: z.enum(['billing', 'reminder_overdue', 'reminder_due_soon', 'general']).optional(),
   isDefault: z.boolean().optional(),
 })
 

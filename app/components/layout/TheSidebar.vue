@@ -114,8 +114,55 @@ const defaultNavigation: NavItem[] = [
   }
 ]
 
+// Staff-only navigation
+const staffNavigation: NavItem[] = [
+  {
+    label: 'Dashboard',
+    icon: 'i-heroicons-home',
+    to: '/'
+  },
+  {
+    label: 'Kelola Properti',
+    icon: 'i-heroicons-building-office-2',
+    children: [
+      {
+        label: 'Catat Meter',
+        icon: 'i-heroicons-bolt',
+        to: '/meter-readings'
+      }
+    ]
+  }
+]
+
 // Navigation items from app config with fallback
-const navigation = computed(() => appConfig.navigation?.sidebar || defaultNavigation)
+// Filter based on user role
+const navigation = computed(() => {
+  const userRole = currentUser.value?.role
+  
+  // Staff: Limited navigation
+  if (userRole === 'staff') {
+    return staffNavigation
+  }
+  
+  // Admin/Owner: Full navigation with Catat Meter added
+  const baseNav = appConfig.navigation?.sidebar || defaultNavigation
+  return baseNav.map((item: NavItem) => {
+    if (item.label === 'Kelola Properti' && item.children) {
+      return {
+        ...item,
+        children: [
+          ...item.children,
+          {
+            label: 'Catat Meter',
+            icon: 'i-heroicons-bolt',
+            to: '/meter-readings'
+          }
+        ]
+      }
+    }
+    return item
+  })
+})
 
 // Track expanded items
 const expandedItems = ref<Set<string>>(new Set())

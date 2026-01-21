@@ -21,6 +21,95 @@ const currentUser = computed(() => authData.value?.user)
 // Search
 const searchOpen = ref(false)
 const searchQuery = ref('')
+const isSearching = ref(false)
+const searchResults = ref<{
+  tenants: any[]
+  rooms: any[]
+  properties: any[]
+}>({ tenants: [], rooms: [], properties: [] })
+
+// All menu items for filtering
+const allMenuItems = [
+  { label: 'Dashboard', icon: 'i-heroicons-home', to: '/' },
+  { label: 'Properti', icon: 'i-heroicons-building-office-2', to: '/properties' },
+  { label: 'Kamar', icon: 'i-heroicons-building-office', to: '/rooms' },
+  { label: 'Penghuni', icon: 'i-heroicons-users', to: '/tenants' },
+  { label: 'Tagihan', icon: 'i-heroicons-document-text', to: '/billing' },
+  { label: 'Catat Meter', icon: 'i-heroicons-bolt', to: '/meter-readings' },
+  { label: 'Pengingat', icon: 'i-heroicons-bell', to: '/reminders' },
+  { label: 'Laporan Listrik', icon: 'i-heroicons-chart-bar', to: '/reports/electricity' },
+  { label: 'Laporan Penghuni', icon: 'i-heroicons-user-group', to: '/reports/tenants' },
+  { label: 'Laporan Pembayaran', icon: 'i-heroicons-banknotes', to: '/reports/payments' },
+  { label: 'Laporan Pendapatan', icon: 'i-heroicons-currency-dollar', to: '/reports/income' },
+  { label: 'Laporan Kas', icon: 'i-heroicons-calculator', to: '/reports/cash' },
+  { label: 'Pengaturan', icon: 'i-heroicons-cog-6-tooth', to: '/settings' }
+]
+
+// Filtered menus based on search query
+const filteredMenus = computed(() => {
+  if (!searchQuery.value.trim()) return allMenuItems.slice(0, 6) // Show first 6 if no query
+  const q = searchQuery.value.toLowerCase()
+  return allMenuItems.filter(m => m.label.toLowerCase().includes(q))
+})
+
+// Debounced search function
+let searchTimeout: NodeJS.Timeout | null = null
+const debouncedSearch = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  
+  if (!searchQuery.value.trim() || searchQuery.value.length < 2) {
+    searchResults.value = { tenants: [], rooms: [], properties: [] }
+    return
+  }
+  
+  searchTimeout = setTimeout(async () => {
+    isSearching.value = true
+    try {
+      const results = await $fetch('/api/search', {
+        query: { q: searchQuery.value }
+      })
+      searchResults.value = results as any
+    } catch (e) {
+      console.error('Search error:', e)
+    } finally {
+      isSearching.value = false
+    }
+  }, 300)
+}
+
+// Watch search query
+watch(searchQuery, debouncedSearch)
+
+// Reset search when modal closes
+watch(searchOpen, (open) => {
+  if (!open) {
+    searchQuery.value = ''
+    searchResults.value = { tenants: [], rooms: [], properties: [] }
+  }
+})
+
+// Navigate to result
+const goToResult = (type: string, id: string) => {
+  searchOpen.value = false
+  switch (type) {
+    case 'tenant':
+      router.push(`/tenants/${id}`)
+      break
+    case 'room':
+      router.push(`/rooms/${id}`)
+      break
+    case 'property':
+      router.push(`/properties/${id}`)
+      break
+  }
+}
+
+// Check if has any search results
+const hasResults = computed(() => {
+  return searchResults.value.tenants.length > 0 || 
+         searchResults.value.rooms.length > 0 || 
+         searchResults.value.properties.length > 0
+})
 
 // Bill Reminders
 import { useKosStore } from '~/stores/kos';
@@ -150,7 +239,7 @@ onMounted(() => {
         class="hidden sm:flex"
         @click="searchOpen = true"
       >
-        <span class="hidden lg:inline text-sm text-gray-500">Search...</span>
+        <span class="hidden lg:inline text-sm text-gray-500">Cari...</span>
         <UKbd class="hidden lg:inline ml-2">⌘K</UKbd>
       </UButton>
 
@@ -298,36 +387,117 @@ onMounted(() => {
     </div>
 
     <!-- Search Modal -->
-    <UModal v-model:open="searchOpen">
+    <UModal v-model:open="searchOpen" :title="'Pencarian'" :description="'Cari menu, penghuni, kamar, atau properti'">
       <template #content>
-        <div class="p-4">
+        <div class="p-4 max-h-[70vh] overflow-y-auto">
           <UInput
             v-model="searchQuery"
             icon="i-heroicons-magnifying-glass"
-            placeholder="Search components, pages..."
+            placeholder="Cari menu, penghuni, kamar..."
             size="lg"
+            class="w-full"
             autofocus
           />
           
-          <div class="mt-4">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick Links</p>
+          <!-- Loading State -->
+          <div v-if="isSearching" class="mt-4 flex items-center justify-center py-4">
+            <UIcon name="i-heroicons-arrow-path" class="w-5 h-5 animate-spin text-gray-400" />
+            <span class="ml-2 text-sm text-gray-500">Mencari...</span>
+          </div>
+          
+          <!-- Search Results from Database -->
+          <div v-else-if="hasResults" class="mt-4 space-y-4">
+            <!-- Tenants Results -->
+            <div v-if="searchResults.tenants.length > 0">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase font-medium">Penghuni</p>
+              <div class="space-y-1">
+                <button
+                  v-for="tenant in searchResults.tenants"
+                  :key="tenant.id"
+                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                  @click="goToResult('tenant', tenant.id)"
+                >
+                  <UIcon name="i-heroicons-user" class="w-4 h-4 text-blue-500" />
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ tenant.name }}</div>
+                    <div class="text-xs text-gray-500 truncate">{{ tenant.roomName }} • {{ tenant.propertyName }}</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Rooms Results -->
+            <div v-if="searchResults.rooms.length > 0">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase font-medium">Kamar</p>
+              <div class="space-y-1">
+                <button
+                  v-for="room in searchResults.rooms"
+                  :key="room.id"
+                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                  @click="goToResult('room', room.id)"
+                >
+                  <UIcon name="i-heroicons-building-office" class="w-4 h-4 text-green-500" />
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ room.name }}</div>
+                    <div class="text-xs text-gray-500 truncate">
+                      {{ room.propertyName }}
+                      <span v-if="room.tenantName"> • {{ room.tenantName }}</span>
+                    </div>
+                  </div>
+                  <UBadge 
+                    :color="room.status === 'occupied' ? 'success' : room.status === 'available' ? 'info' : 'warning'"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    {{ room.status === 'occupied' ? 'Terisi' : room.status === 'available' ? 'Tersedia' : 'Maintenance' }}
+                  </UBadge>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Properties Results -->
+            <div v-if="searchResults.properties.length > 0">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase font-medium">Properti</p>
+              <div class="space-y-1">
+                <button
+                  v-for="property in searchResults.properties"
+                  :key="property.id"
+                  class="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                  @click="goToResult('property', property.id)"
+                >
+                  <UIcon name="i-heroicons-building-office-2" class="w-4 h-4 text-purple-500" />
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ property.name }}</div>
+                    <div class="text-xs text-gray-500 truncate">{{ property.address }}</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Filtered Menu Links -->
+          <div v-if="filteredMenus.length > 0 && !isSearching" class="mt-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase font-medium">
+              {{ searchQuery.trim() ? 'Menu' : 'Akses Cepat' }}
+            </p>
             <div class="space-y-1">
               <NuxtLink
-                v-for="link in [
-                  { label: 'Button', to: '/components/elements/button' },
-                  { label: 'Input', to: '/components/forms/input' },
-                  { label: 'Table', to: '/components/data/table' },
-                  { label: 'Modal', to: '/components/overlays/modal' }
-                ]"
+                v-for="link in filteredMenus"
                 :key="link.to"
                 :to="link.to"
                 class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 @click="searchOpen = false"
               >
-                <UIcon name="i-heroicons-cube" class="w-4 h-4 text-gray-400" />
+                <UIcon :name="link.icon" class="w-4 h-4 text-gray-400" />
                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ link.label }}</span>
               </NuxtLink>
             </div>
+          </div>
+          
+          <!-- No Results -->
+          <div v-if="searchQuery.trim().length >= 2 && !isSearching && !hasResults && filteredMenus.length === 0" class="mt-4 py-8 text-center">
+            <UIcon name="i-heroicons-magnifying-glass" class="w-8 h-8 text-gray-300 mx-auto mb-2" />
+            <p class="text-sm text-gray-500">Tidak ada hasil untuk "{{ searchQuery }}"</p>
           </div>
         </div>
       </template>

@@ -1,0 +1,2 @@
+CREATE TYPE "public"."template_type" AS ENUM('billing', 'reminder_overdue', 'reminder_due_soon', 'general');--> statement-breakpoint
+ALTER TABLE "whatsapp_templates" ADD COLUMN "template_type" "template_type" DEFAULT 'general';

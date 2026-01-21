@@ -5,8 +5,10 @@
   "version": "1.0.0",
   "description": "Premium Nuxt UI Starter Kit with comprehensive component documentation",
   "scripts": {
+    "clean": "rimraf .nuxt .output",
     "build": "nuxt build",
     "dev": "nuxt dev --host 0.0.0.0",
+    "dev:clean": "npm run clean && nuxt dev --host 0.0.0.0",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -22,7 +24,11 @@
     "test:bill-quick": "tsx scripts/quick-bill-test.ts",
     "test:bill-manual": "tsx scripts/test-billing-manual.ts",
     "test:bill-cli": "tsx scripts/billing-cli.ts",
-    "db:seed-notif": "tsx server/database/seed-notif.ts"
+    "db:seed-notif": "tsx server/database/seed-notif.ts",
+    "db:seed-wa-templates": "tsx server/database/seed-wa-templates.ts",
+    "db:clear": "tsx scripts/clear-database.ts",
+    "db:seed-full": "tsx scripts/seed-full.ts",
+    "db:reset": "npm run db:clear && npm run db:seed-full"
   },
   "dependencies": {
     "@internationalized/date": "^3.10.1",
@@ -57,6 +63,7 @@
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
     "happy-dom": "^20.3.0",
+    "rimraf": "^6.1.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

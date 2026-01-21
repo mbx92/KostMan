@@ -307,6 +307,9 @@ export const systemSettings = pgTable("system_settings", {
     .$onUpdate(() => new Date()),
 });
 
+// Template Type Enum for WhatsApp messages
+export const templateTypeEnum = pgEnum("template_type", ["billing", "reminder_overdue", "reminder_due_soon", "general"]);
+
 // WhatsApp Templates - Message templates for billing reminders
 export const whatsappTemplates = pgTable("whatsapp_templates", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -315,6 +318,7 @@ export const whatsappTemplates = pgTable("whatsapp_templates", {
     .notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   message: text("message").notNull(),
+  templateType: templateTypeEnum("template_type").default("general"),
   isDefault: boolean("is_default").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

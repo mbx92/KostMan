@@ -5,7 +5,7 @@ import { meterReadingSchema } from '../../validations/meter-reading';
 import { eq, and } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
-    const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
+    const user = requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
     const body = await readBody(event);
     const validatedData = meterReadingSchema.parse(body);

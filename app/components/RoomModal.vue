@@ -12,11 +12,13 @@ const props = defineProps<{
 const emit = defineEmits(['update:modelValue', 'saved'])
 
 const store = useKosStore()
+const { properties } = storeToRefs(store)
 const toast = useToast()
 
 const isSaving = ref(false)
 
 const state = reactive({
+  propertyId: '',
   name: '',
   price: 0,
   status: 'available' as 'available' | 'occupied' | 'maintenance',
@@ -38,7 +40,13 @@ const statusOptions = computed(() => {
 // Check if room is currently occupied
 const isOccupied = computed(() => props.room?.status === 'occupied')
 
+// Property options
+const propertyOptions = computed(() => 
+  properties.value.map(p => ({ label: p.name, value: p.id }))
+)
+
 const schema = z.object({
+  propertyId: z.string().min(1, 'Properti wajib dipilih'),
   name: z.string().min(1, 'Nama kamar wajib diisi'),
   price: z.number().min(0, 'Harga harus positif'),
   status: z.enum(['available', 'occupied', 'maintenance']),
@@ -48,10 +56,12 @@ type Schema = z.output<typeof schema>
 
 watch(() => props.room, (newVal) => {
   if (newVal) {
+    state.propertyId = newVal.propertyId || props.propertyId
     state.name = newVal.name || ''
     state.price = Number(newVal.price)
     state.status = newVal.status
   } else {
+    state.propertyId = props.propertyId
     state.name = ''
     state.price = 1000000
     state.status = 'available'
@@ -73,7 +83,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     const payload: any = {
       name: data.name,
       price: Number(data.price),
-      propertyId: props.propertyId,
+      propertyId: data.propertyId,
     }
     
     // Only update status if room is not occupied
@@ -114,7 +124,11 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 
 <template>
   <UModal v-model:open="isOpen" :title="room ? 'Edit Kamar' : 'Tambah Kamar Baru'">
-    <template #default />
+    <template #description>
+      <span class="text-sm text-gray-500">
+        {{ room ? 'Perbarui informasi kamar' : 'Isi form untuk menambahkan kamar baru' }}
+      </span>
+    </template>
     
     <template #content>
       <div class="p-6">
@@ -132,6 +146,20 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         </div>
 
         <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Properti</label>
+            <USelect 
+              v-model="state.propertyId" 
+              :items="propertyOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Pilih properti"
+              :disabled="!!room"
+              class="w-full"
+            />
+            <p v-if="room" class="text-xs text-gray-500">Properti tidak dapat diubah setelah kamar dibuat</p>
+          </div>
+
           <div class="space-y-1">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama/Nomor Kamar</label>
             <UInput v-model="state.name" placeholder="cth. 101" autofocus class="w-full" />

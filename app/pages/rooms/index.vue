@@ -3,7 +3,7 @@ import { useKosStore, type Room } from '~/stores/kos'
 import ConfirmDialog from "~/components/ConfirmDialog.vue";
 
 const store = useKosStore()
-const { rooms, properties, tenants, roomsLoading, roomsError } = storeToRefs(store)
+const { rooms, properties, roomsLoading, roomsError, roomsMeta, propertiesLoading } = storeToRefs(store)
 const toast = useToast()
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
@@ -11,6 +11,8 @@ const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 const route = useRoute()
 const selectedPropertyId = ref<string>((route.query.propertyId as string) || '__all__')
 const searchQuery = ref('')
+const currentPage = ref(1)
+const pageSize = 20
 
 // Room Modal State
 const isRoomModalOpen = ref(false)
@@ -20,26 +22,42 @@ const modalPropertyId = ref<string>('')
 // Fetch data on mount
 onMounted(async () => {
   await store.fetchProperties()
-  await store.fetchTenants()
   await loadRooms()
 })
 
 // Load rooms with current filter
 async function loadRooms() {
-  const params: { propertyId?: string; search?: string; pageSize?: number } = { pageSize: 100 }
+  const params: { propertyId?: string; search?: string; page?: number; pageSize?: number } = { 
+    page: currentPage.value,
+    pageSize: pageSize 
+  }
   if (selectedPropertyId.value !== '__all__') {
     params.propertyId = selectedPropertyId.value
   }
-  if (searchQuery.value) {
-    params.search = searchQuery.value
+  if (searchQuery.value.trim()) {
+    params.search = searchQuery.value.trim()
   }
   await store.fetchRooms(params)
 }
 
-// Watch filter changes
-watch([selectedPropertyId, searchQuery], () => {
+// Watch filter changes with debounce for search
+let searchTimeout: NodeJS.Timeout
+watch(searchQuery, () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    loadRooms()
+  }, 300)
+})
+
+watch(selectedPropertyId, () => {
+  currentPage.value = 1
   loadRooms()
-}, { debounce: 300 } as any)
+})
+
+watch(currentPage, () => {
+  loadRooms()
+})
 
 // Property options for filter
 const propertyOptions = computed(() => [
@@ -47,21 +65,18 @@ const propertyOptions = computed(() => [
   ...properties.value.map(p => ({ label: p.name, value: p.id }))
 ])
 
-// Computed to enrich room data with property name and tenant name
+// Check if initial loading (both properties and rooms)
+const isInitialLoading = computed(() => propertiesLoading.value || (roomsLoading.value && enrichedRooms.value.length === 0))
+
+// Computed to enrich room data with property name
 const enrichedRooms = computed(() => {
     return rooms.value.map(room => {
         const property = room.property || properties.value.find(p => p.id === room.propertyId)
-        // Look up tenant name from tenants list if not in room data
-        let tenantName = room.tenantName
-        if (!tenantName && room.tenantId) {
-            const tenant = tenants.value.find(t => t.id === room.tenantId)
-            tenantName = tenant?.name || ''
-        }
         return {
             ...room,
             price: Number(room.price),
             propertyName: property ? property.name : 'Unknown Property',
-            tenantName
+            tenantName: room.tenantName || ''
         }
     })
 })
@@ -85,7 +100,7 @@ const openAddRoomModal = () => {
     // Use currently filtered property or first property
     modalPropertyId.value = selectedPropertyId.value !== '__all__' 
         ? selectedPropertyId.value 
-        : properties.value[0]?.id || ''
+        : (properties.value[0]?.id || '')
     isRoomModalOpen.value = true
 }
 
@@ -141,17 +156,35 @@ const onModalClose = () => {
 
     <!-- Filters -->
     <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-        <div class="flex items-center gap-2">
-            <UIcon name="i-heroicons-funnel" class="text-gray-400" />
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Filter Properti:</span>
-            <USelect 
-                v-model="selectedPropertyId" 
-                :items="propertyOptions" 
-                value-key="value" 
-                label-key="label"
-                class="min-w-[200px]"
-            />
-        </div>
+      <div class="flex flex-wrap gap-4 items-center">
+      <!-- Search -->
+      <UInput 
+        v-model="searchQuery" 
+        placeholder="Cari nama kamar..." 
+        icon="i-heroicons-magnifying-glass"
+        class="w-full md:w-64"
+        :loading="roomsLoading"
+      />
+      <!-- Property Filter -->
+      <USelect 
+        v-model="selectedPropertyId" 
+        :items="propertyOptions" 
+        value-key="value" 
+        label-key="label"
+        class="w-full md:w-48"
+        :disabled="roomsLoading"
+      />
+      <span v-if="roomsMeta.total > 0" class="text-sm text-gray-500 ml-auto flex items-center gap-2">
+        <UIcon v-if="roomsLoading" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+        {{ roomsMeta.total }} kamar
+      </span>
+      </div>
+    </div>
+
+    <!-- Results Info -->
+    <div v-if="roomsMeta.total > 0 && roomsMeta.totalPages > 1" class="flex items-center justify-between text-sm text-gray-500">
+      <span>Halaman {{ roomsMeta.page }} dari {{ roomsMeta.totalPages }}</span>
+      <span>Menampilkan {{ enrichedRooms.length }} data</span>
     </div>
 
     <!-- Error State -->
@@ -169,7 +202,7 @@ const onModalClose = () => {
     </div>
 
     <!-- Loading Skeleton -->
-    <div v-else-if="roomsLoading && enrichedRooms.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div v-if="isInitialLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       <div 
         v-for="i in 4" 
         :key="i"
@@ -193,7 +226,7 @@ const onModalClose = () => {
     </div>
 
     <!-- No Properties Warning -->
-    <div v-else-if="properties.length === 0 && !roomsLoading" class="text-center py-12 bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800">
+    <div v-else-if="!propertiesLoading && properties.length === 0" class="text-center py-12 bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800">
       <UIcon name="i-heroicons-exclamation-triangle" class="w-12 h-12 text-orange-500 mb-3" />
       <h3 class="text-lg font-medium text-gray-900 dark:text-white">Properti Tidak Ditemukan</h3>
       <p class="text-gray-500 mt-1 mb-4">Anda perlu membuat properti terlebih dahulu sebelum menambah kamar.</p>
@@ -201,7 +234,16 @@ const onModalClose = () => {
     </div>
 
     <!-- Room Grid -->
-    <div v-else-if="enrichedRooms.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div v-else-if="enrichedRooms.length > 0" class="relative">
+        <!-- Loading Overlay for pagination -->
+        <div v-if="roomsLoading" class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-10 rounded-xl flex items-center justify-center">
+          <div class="flex flex-col items-center gap-2">
+            <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-primary-500" />
+            <span class="text-sm text-gray-600 dark:text-gray-400">Memuat data...</span>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200" :class="{ 'opacity-50': roomsLoading }">
         <div 
             v-for="room in enrichedRooms" 
             :key="room.id" 
@@ -271,6 +313,7 @@ const onModalClose = () => {
                 <UButton icon="i-heroicons-trash" color="error" variant="ghost" @click.stop="deleteRoom(room)" />
             </div>
         </div>
+        </div>
     </div>
 
     <!-- Empty State -->
@@ -287,6 +330,16 @@ const onModalClose = () => {
     <RoomModal v-model="isRoomModalOpen" :property-id="modalPropertyId" :room="selectedRoom" @update:modelValue="onModalClose" />
     
     <ConfirmDialog ref="confirmDialog" />
+
+    <!-- Pagination -->
+    <div v-if="roomsMeta.totalPages > 1" class="flex justify-center pt-4">
+      <UPagination 
+        :page="currentPage" 
+        :total="roomsMeta.total" 
+        :items-per-page="pageSize"
+        @update:page="(p) => currentPage = p"
+      />
+    </div>
   </div>
 </template>
 

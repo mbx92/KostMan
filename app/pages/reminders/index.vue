@@ -140,20 +140,13 @@ const formatDate = (dateString: string) => {
 }
 
 const sendingWa = ref<string | null>(null);
+const { buildMessage, getDefaultTemplate, openWhatsApp } = useWhatsAppTemplate();
 
 const sendWhatsApp = async (group: any) => {
     const phone = group.tenantContact;
     if (!phone) {
          toast.add({ title: 'Error', description: 'Nomor kontak tidak tersedia', color: 'error' });
          return;
-    }
-    
-    // Normalize phone (08 -> 628)
-    let formattedPhone = phone.replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) {
-        formattedPhone = '62' + formattedPhone.slice(1);
-    } else if (!formattedPhone.startsWith('62')) {
-        formattedPhone = '62' + formattedPhone;
     }
 
     sendingWa.value = group.id;
@@ -181,61 +174,66 @@ const sendWhatsApp = async (group: any) => {
         });
     }
 
-    // Construct Message
-    const occupants = group.occupantCount || 1;
+    // Calculate totals for template
+    let rentTotal = 0;
+    let utilityTotal = 0;
+    let rentBill: any = null;
+    let utilBill: any = null;
     
-    let message = `*TAGIHAN KOST*\n`;
-    message += `${group.propertyName}\n`;
-    message += `================================\n\n`;
-    message += `Kamar: *${group.roomName}*\n`;
-    message += `Penghuni: ${group.tenantName}\n`;
-    if (occupants > 1) {
-        message += `Jumlah Penghuni: ${occupants} orang\n`;
-    }
-    message += `\n================================\n`;
-    
-    // Iterate bills
     for (const bill of group.bills) {
-        message += `Periode: *${bill.period}*\n`;
-        
         if (bill.type === 'rent') {
-            message += `*SEWA KAMAR*\n`;
-            message += `${bill.monthsCovered || 1} bulan x ${formatCurrency(bill.roomPrice)}\n`;
-            message += `Total: ${formatCurrency(bill.amount)}\n`;
+            rentTotal += Number(bill.amount);
+            rentBill = bill;
         } else if (bill.type === 'utility') {
-             message += `*UTILITAS*\n`;
-            // Listrik
-            const kwhUsage = Number(bill.meterEnd) - Number(bill.meterStart);
-            message += `Listrik: ${bill.meterStart} -> ${bill.meterEnd} = ${kwhUsage} kWh\n`;
-            message += `Cost: ${formatCurrency(bill.usageCost)}\n`;
-            
-            // Air & Sampah simplified
-            message += `Air: ${formatCurrency(bill.waterFee)}\n`;
-            if (Number(bill.trashFee) > 0) message += `Sampah: ${formatCurrency(bill.trashFee)}\n`;
-            
-            message += `Total Utils: ${formatCurrency(bill.amount)}\n`;
+            utilityTotal += Number(bill.amount);
+            utilBill = bill;
         }
-        message += `--------------------------------\n`;
     }
 
+    // Determine template type based on reminder urgency
+    const templateType = group.daysUntilDue < 0 ? 'reminder_overdue' : 'reminder_due_soon';
+    
+    // Get template from database
+    const template = await getDefaultTemplate(templateType);
+    
+    // Build billing data for template
+    const billingData = {
+        tenantName: group.tenantName,
+        propertyName: group.propertyName,
+        roomName: group.roomName,
+        period: group.bills[0]?.period || 'N/A',
+        occupantCount: group.occupantCount || 1,
+        daysUntilDue: group.daysUntilDue,
+        
+        // Rent details
+        rentAmount: rentTotal,
+        monthsCovered: rentBill?.monthsCovered || 1,
+        roomPrice: rentBill?.roomPrice || 0,
+        isRentPaid: false,
+        
+        // Utility details
+        meterStart: utilBill?.meterStart,
+        meterEnd: utilBill?.meterEnd,
+        usageCost: utilBill?.usageCost || 0,
+        waterFee: utilBill?.waterFee || 0,
+        trashFee: utilBill?.trashFee || 0,
+        utilityTotal: utilityTotal,
+        isUtilityPaid: false,
+        
+        // Grand total
+        grandTotal: group.totalAmount,
+        
+        // Invoice link
+        invoiceUrl: invoiceLinks.length > 0 
+            ? invoiceLinks.map((link, i) => `Tagihan ${i+1}: ${link}`).join('\n')
+            : undefined
+    };
 
-    message += `\n================================\n`;
-    message += `*TOTAL TAGIHAN: ${formatCurrency(group.totalAmount)}*\n`;
-    message += `Status: *BELUM LUNAS*\n`;
-    message += `================================\n`;
-
-    if (invoiceLinks.length > 0) {
-        message += `\nLihat & Bayar Invoice:\n`;
-        invoiceLinks.forEach((link, idx) => {
-            message += `Tagihan ${idx+1}: ${link}\n`;
-        })
-        message += `\n(Klik link di atas untuk melakukan pembayaran online)\n`;
-    }
-
-    message += `\nMohon segera melakukan pembayaran.\nTerima kasih.`;
+    // Build message using template
+    const message = buildMessage(template.message, billingData);
 
     sendingWa.value = null;
-    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
+    openWhatsApp(phone, message);
 }
 
 // Details Modal
@@ -408,7 +406,15 @@ const openDetails = (group: any) => {
                             <p class="text-sm text-gray-500 truncate">{{ group.roomName }} • {{ group.propertyName }}</p>
                             <div class="mt-1 flex items-center gap-2 flex-wrap">
                                  <UBadge color="orange" variant="subtle" size="xs">
-                                    Jatuh tempo dalam {{ group.daysUntilDue }} hari
+                                    <template v-if="group.daysUntilDue < 0">
+                                        Lewat {{ Math.abs(group.daysUntilDue) }} hari
+                                    </template>
+                                    <template v-else-if="group.daysUntilDue === 0">
+                                        Jatuh tempo hari ini
+                                    </template>
+                                    <template v-else>
+                                        Jatuh tempo dalam {{ group.daysUntilDue }} hari
+                                    </template>
                                  </UBadge>
                                  <span class="text-xs text-gray-400 hidden sm:inline">Jatuh tempo: {{ formatDate(group.dueDate) }}</span>
                             </div>

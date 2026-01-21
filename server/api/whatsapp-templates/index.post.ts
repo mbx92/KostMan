@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm'
 const templateSchema = z.object({
   name: z.string().min(1).max(100),
   message: z.string().min(1),
+  templateType: z.enum(['billing', 'reminder_overdue', 'reminder_due_soon', 'general']).optional(),
   isDefault: z.boolean().optional(),
 })
 
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const data = templateSchema.parse(body)
 
-  // If setting as default, unset other defaults first
+  // If setting as default, unset other defaults for the same template type
   if (data.isDefault) {
     await db.update(whatsappTemplates)
       .set({ isDefault: false })
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
     userId: user.id,
     name: data.name,
     message: data.message,
+    templateType: data.templateType || 'general',
     isDefault: data.isDefault || false,
   }).returning()
 

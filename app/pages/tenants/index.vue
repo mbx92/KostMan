@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { useKosStore, type Tenant, type Room } from '~/stores/kos'
+import { useKosStore, type Tenant } from '~/stores/kos'
 
 const store = useKosStore()
-const { tenants, rooms, tenantsLoading } = storeToRefs(store)
+const { tenants, tenantsLoading, tenantsMeta, properties } = storeToRefs(store)
 const toast = useToast()
 
 const isModalOpen = ref(false)
 const selectedTenant = ref(undefined)
+
+// Pagination and Filter state
+const currentPage = ref(1)
+const pageSize = ref(20)
+const searchQuery = ref('')
+const statusFilter = ref<string>('__all__')
 
 // Reset PIN Modal
 const isResetPinModalOpen = ref(false)
@@ -18,16 +24,70 @@ const isDeleteModalOpen = ref(false)
 const deleteTenant = ref<Tenant | null>(null)
 const deleteLoading = ref(false)
 
+// Load tenants with current filters
+async function loadTenants() {
+  const params: { status?: 'active' | 'inactive'; search?: string; page?: number; pageSize?: number } = {
+    page: currentPage.value,
+    pageSize: pageSize.value
+  }
+  if (statusFilter.value !== '__all__') {
+    params.status = statusFilter.value as 'active' | 'inactive'
+  }
+  if (searchQuery.value.trim()) {
+    params.search = searchQuery.value.trim()
+  }
+  await store.fetchTenants(params)
+}
+
 // Fetch data on mount
 onMounted(async () => {
-  await store.fetchTenants()
-  await store.fetchRooms()
+  await loadTenants()
+  await store.fetchProperties()
 })
 
-// Find room for a tenant - rooms store tenantId, so we look up room by tenantId
-const getAssignedRoom = (tenantId: string): Room | null => {
-  return rooms.value.find(r => r.tenantId === tenantId && r.status === 'occupied') || null
+// Watch filter changes with debounce
+let searchTimeout: NodeJS.Timeout
+watch(searchQuery, () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    loadTenants()
+  }, 300)
+})
+
+watch(statusFilter, () => {
+  currentPage.value = 1
+  loadTenants()
+})
+
+watch(currentPage, () => {
+  loadTenants()
+})
+
+watch(pageSize, () => {
+  currentPage.value = 1
+  loadTenants()
+})
+
+// Get assigned room from tenant data (already included in API response)
+const getAssignedRoom = (tenant: any) => {
+  return tenant.assignedRoom || null
 }
+
+// Status filter options
+const statusOptions = [
+  { label: 'Semua Status', value: '__all__' },
+  { label: 'Aktif', value: 'active' },
+  { label: 'Tidak Aktif', value: 'inactive' }
+]
+
+// Page size options
+const pageSizeOptions = [
+  { label: '10 per halaman', value: 10 },
+  { label: '20 per halaman', value: 20 },
+  { label: '50 per halaman', value: 50 },
+  { label: '100 per halaman', value: 100 }
+]
 
 const openAddModal = () => {
   selectedTenant.value = undefined
@@ -52,6 +112,7 @@ const confirmDelete = async () => {
     await store.deleteTenant(deleteTenant.value.id)
     toast.add({ title: 'Penghuni Dihapus', color: 'success' })
     isDeleteModalOpen.value = false
+    loadTenants()
   } catch (err: any) {
     toast.add({ 
       title: 'Error', 
@@ -92,6 +153,11 @@ const confirmResetPin = async () => {
     resetPinLoading.value = false
   }
 }
+
+// Handle modal close
+const onModalClose = () => {
+  loadTenants()
+}
 </script>
 
 <template>
@@ -108,8 +174,46 @@ const confirmResetPin = async () => {
       <UButton icon="i-heroicons-plus" size="lg" @click="openAddModal">Tambah Penghuni</UButton>
     </div>
 
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div class="flex flex-wrap gap-4 items-center">
+      <!-- Search -->
+      <UInput 
+        v-model="searchQuery" 
+        placeholder="Cari nama, kontak, atau No. KTP..." 
+        icon="i-heroicons-magnifying-glass"
+        class="w-full md:w-64"
+      />
+      <!-- Status Filter -->
+      <USelect 
+        v-model="statusFilter" 
+        :items="statusOptions" 
+        value-key="value" 
+        label-key="label"
+        class="w-full md:w-40"
+      />
+      <!-- Page Size -->
+      <USelect 
+        v-model="pageSize" 
+        :items="pageSizeOptions" 
+        value-key="value" 
+        label-key="label"
+        class="w-full md:w-36"
+      />
+      <span v-if="tenantsMeta.total > 0" class="text-sm text-gray-500 ml-auto">
+        {{ tenantsMeta.total }} penghuni
+      </span>
+      </div>
+    </div>
+
+    <!-- Results Info -->
+    <div v-if="tenantsMeta.total > 0 && tenantsMeta.totalPages > 1" class="flex items-center justify-between text-sm text-gray-500">
+      <span>Halaman {{ tenantsMeta.page }} dari {{ tenantsMeta.totalPages }}</span>
+      <span>Menampilkan {{ tenants.length }} data</span>
+    </div>
+
     <!-- Loading State -->
-    <div v-if="tenantsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div v-if="tenantsLoading && tenants.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       <UCard v-for="i in 4" :key="i">
         <div class="space-y-3">
           <USkeleton class="h-10 w-10 rounded-full" />
@@ -120,7 +224,16 @@ const confirmResetPin = async () => {
     </div>
 
     <!-- Tenants Grid -->
-    <div v-else-if="tenants.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div v-else-if="tenants.length > 0" class="relative">
+      <!-- Loading Overlay for pagination -->
+      <div v-if="tenantsLoading" class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-10 rounded-xl flex items-center justify-center">
+        <div class="flex flex-col items-center gap-2">
+          <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-primary-500" />
+          <span class="text-sm text-gray-600 dark:text-gray-400">Memuat data...</span>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200" :class="{ 'opacity-50': tenantsLoading }">
       <UCard 
         v-for="tenant in tenants" 
         :key="tenant.id"
@@ -131,7 +244,9 @@ const confirmResetPin = async () => {
                  <UAvatar :alt="tenant.name" size="md" />
                  <div>
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white leading-tight">{{ tenant.name }}</h3>
-                    <p class="text-xs text-gray-500">{{ tenant.status }}</p>
+                    <UBadge :color="tenant.status === 'active' ? 'success' : 'neutral'" variant="subtle" size="xs">
+                      {{ tenant.status === 'active' ? 'Aktif' : 'Tidak Aktif' }}
+                    </UBadge>
                  </div>
             </div>
             <div class="flex gap-1">
@@ -150,9 +265,11 @@ const confirmResetPin = async () => {
                 <UIcon name="i-heroicons-identification" class="w-4 h-4" />
                 <span class="font-mono text-xs">{{ tenant.idCardNumber }}</span>
             </div>
-            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="getAssignedRoom(tenant.id)">
+            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="getAssignedRoom(tenant)">
                 <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                <span class="text-primary-600 dark:text-primary-400 font-medium">Kamar {{ getAssignedRoom(tenant.id)?.name }}</span>
+                <span class="text-primary-600 dark:text-primary-400 font-medium">
+                  {{ getAssignedRoom(tenant).propertyName }} - {{ getAssignedRoom(tenant).name }}
+                </span>
             </div>
             <div class="flex items-center gap-2 text-gray-400 italic" v-else>
                 <UIcon name="i-heroicons-home" class="w-4 h-4" />
@@ -160,18 +277,33 @@ const confirmResetPin = async () => {
             </div>
         </div>
       </UCard>
+      </div>
     </div>
     
     <!-- Empty State -->
     <div v-else class="text-center py-20 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
         <UIcon name="i-heroicons-users" class="w-16 h-16 text-gray-400 mb-4" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Belum ada penghuni</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">Mulai dengan menambah penghuni pertama Anda.</p>
-        <UButton icon="i-heroicons-plus" @click="openAddModal">Tambah Penghuni</UButton>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+          {{ searchQuery || statusFilter !== '__all__' ? 'Tidak ada hasil' : 'Belum ada penghuni' }}
+        </h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-6">
+          {{ searchQuery || statusFilter !== '__all__' ? 'Coba ubah filter atau kata kunci pencarian.' : 'Mulai dengan menambah penghuni pertama Anda.' }}
+        </p>
+        <UButton v-if="!searchQuery && statusFilter === '__all__'" icon="i-heroicons-plus" @click="openAddModal">Tambah Penghuni</UButton>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="tenantsMeta.totalPages > 1" class="flex justify-center pt-4">
+      <UPagination 
+        :page="currentPage" 
+        :total="tenantsMeta.total" 
+        :items-per-page="pageSize"
+        @update:page="(p) => currentPage = p"
+      />
     </div>
 
     <!-- Modal -->
-    <TenantModal v-model="isModalOpen" :tenant="selectedTenant" />
+    <TenantModal v-model="isModalOpen" :tenant="selectedTenant" @update:modelValue="onModalClose" />
 
     <!-- Reset PIN Confirmation Modal -->
     <UModal v-model:open="isResetPinModalOpen">
@@ -260,4 +392,3 @@ const confirmResetPin = async () => {
     </UModal>
   </div>
 </template>
-

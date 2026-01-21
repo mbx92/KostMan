@@ -756,6 +756,8 @@ const printCombined = (item: {
 
 // Send to WhatsApp
 const sendingWa = ref(false)
+const { buildMessage, getDefaultTemplate, openWhatsApp } = useWhatsAppTemplate();
+
 const sendToWhatsApp = async (item: {
   rent?: RentBill;
   util?: UtilityBill;
@@ -784,20 +786,11 @@ const sendToWhatsApp = async (item: {
     return;
   }
 
-  // Format phone number for wa.me (remove leading 0, add 62)
-  let phoneNumber = tenant.contact.replace(/\D/g, ""); // Remove non-digits
-  if (phoneNumber.startsWith("0")) {
-    phoneNumber = "62" + phoneNumber.slice(1);
-  } else if (!phoneNumber.startsWith("62")) {
-    phoneNumber = "62" + phoneNumber;
-  }
-
-  // Generate PDF and get URL + Generate public invoice link
+  // Generate public invoice link
   sendingWa.value = true;
   let invoiceUrl = "";
   
   try {
-    // Generate public link for combined view (using roomId + period)
     const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
       `/api/bills/public-link/combined`,
       {
@@ -819,79 +812,50 @@ const sendToWhatsApp = async (item: {
     return;
   }
 
-  // Build message
+  // Get template from database
+  const template = await getDefaultTemplate('billing');
+
+  // Build billing data for template
   const totalRent = item.rent ? Number(item.rent.totalAmount) : 0;
   const totalUtil = item.util ? Number(item.util.totalAmount) : 0;
   const grandTotal = totalRent + totalUtil;
-  const occupants = room.occupantCount || 1;
 
-  let message = `*TAGIHAN KOST*\n`;
-  message += `${prop.name}\n`;
-  message += `================================\n\n`;
-  message += `Periode: *${item.period}*\n`;
-  message += `Kamar: *${room.name}*\n`;
-  message += `Penghuni: ${tenant.name}\n`;
-  if (occupants > 1) {
-    message += `Jumlah Penghuni: ${occupants} orang\n`;
-  }
-  message += `\n================================\n`;
+  const billingData = {
+    tenantName: tenant.name,
+    propertyName: prop.name,
+    roomName: room.name,
+    period: item.period,
+    occupantCount: room.occupantCount || 1,
+    
+    // Rent details
+    rentAmount: totalRent,
+    monthsCovered: item.rent?.monthsCovered || 1,
+    roomPrice: item.rent?.roomPrice || 0,
+    isRentPaid: item.rent?.isPaid || false,
+    
+    // Utility details
+    meterStart: item.util?.meterStart,
+    meterEnd: item.util?.meterEnd,
+    usageCost: item.util?.usageCost || 0,
+    waterFee: item.util?.waterFee || 0,
+    trashFee: item.util?.trashFee || 0,
+    utilityTotal: totalUtil,
+    isUtilityPaid: item.util?.isPaid || false,
+    
+    // Grand total
+    grandTotal: grandTotal,
+    
+    // Invoice link
+    invoiceUrl: invoiceUrl
+  };
 
-  if (item.rent) {
-    message += `\n*SEWA KAMAR*\n`;
-    message += `${item.rent.monthsCovered || 1} bulan x ${formatCurrency(item.rent.roomPrice)}\n`;
-    message += `Total: ${formatCurrency(item.rent.totalAmount)}`;
-    message += item.rent.isPaid ? " [LUNAS]\n" : "\n";
-  }
-
-  if (item.util) {
-    message += `\n*UTILITAS*\n\n`;
-    
-    // Listrik
-    const kwhUsage = item.util.meterEnd - item.util.meterStart;
-    message += `Listrik:\n`;
-    message += `  ${item.util.meterStart} -> ${item.util.meterEnd} = ${kwhUsage} kWh\n`;
-    message += `  ${formatCurrency(item.util.usageCost)}\n\n`;
-    
-    // Air
-    const waterPerPerson = Number(item.util.waterFee) / occupants;
-    message += `Air:\n`;
-    if (occupants > 1) {
-      message += `  ${formatCurrency(waterPerPerson)} x ${occupants} orang\n`;
-    }
-    message += `  ${formatCurrency(item.util.waterFee)}\n`;
-    
-    // Sampah
-    if (Number(item.util.trashFee) > 0) {
-      message += `\nSampah:\n`;
-      message += `  ${formatCurrency(item.util.trashFee)}\n`;
-    }
-    
-    message += `\nTotal Utilitas: ${formatCurrency(item.util.totalAmount)}`;
-    message += item.util.isPaid ? " [LUNAS]\n" : "\n";
-  }
-
-  message += `\n================================\n`;
-  message += `*TOTAL TAGIHAN: ${formatCurrency(grandTotal)}*\n`;
-  
-  if (!item.rent?.isPaid || !item.util?.isPaid) {
-    message += `Status: *BELUM LUNAS*\n`;
-  }
-  
-  message += `================================\n`;
-  
-  // Add invoice link
-  if (invoiceUrl) {
-    message += `\nLihat & Bayar Invoice:\n${invoiceUrl}\n`;
-    message += `\n(Klik link di atas untuk melihat detail tagihan dan melakukan pembayaran online)\n`;
-  }
-  
-  message += `\nMohon segera melakukan pembayaran.\nTerima kasih.`;
+  // Build message using template
+  const message = buildMessage(template.message, billingData);
 
   sendingWa.value = false;
 
   // Open WhatsApp
-  const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-  window.open(waUrl, "_blank");
+  openWhatsApp(tenant.contact, message);
 };
 
 // Helpers

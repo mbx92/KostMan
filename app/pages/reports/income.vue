@@ -411,21 +411,12 @@ const maxIncome = computed(() => {
             <div class="text-sm text-gray-500">
                 Menampilkan {{ ((page - 1) * limit) + 1 }} - {{ Math.min(page * limit, totalRooms) }} dari {{ totalRooms }} data
             </div>
-            <div class="flex gap-1">
-                <button 
-                    v-for="p in totalPages" 
-                    :key="p"
-                    @click="page = p"
-                    :class="[
-                        'px-3 py-1 text-sm rounded',
-                        page === p 
-                            ? 'bg-primary-500 text-white' 
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    ]"
-                >
-                    {{ p }}
-                </button>
-            </div>
+            <UPagination 
+                :page="page" 
+                :total="totalRooms" 
+                :items-per-page="limit"
+                @update:page="(p) => page = p"
+            />
         </div>
     </div>
 

@@ -24,9 +24,17 @@ const editingTemplate = ref<any>(null)
 const templateForm = reactive({
   name: '',
   message: '',
+  templateType: 'general' as 'billing' | 'reminder_overdue' | 'reminder_due_soon' | 'general',
   isDefault: false
 })
 const templateLoading = ref(false)
+
+const templateTypeOptions = [
+  { label: 'Umum', value: 'general' },
+  { label: 'Tagihan Bulanan', value: 'billing' },
+  { label: 'Reminder Overdue', value: 'reminder_overdue' },
+  { label: 'Reminder Jatuh Tempo', value: 'reminder_due_soon' }
+]
 
 const schema = z.object({
   appName: z.string().min(1, 'App Name is required'),
@@ -45,30 +53,7 @@ const midtransState = reactive({
   isProduction: false
 })
 
-// Initialize data
-onMounted(async () => {
-  await Promise.all([
-    store.fetchSettings(),
-    store.fetchIntegrations()
-  ])
-  
-  // Sync state with store
-  if (settings.value) {
-    state.appName = settings.value.appName
-    state.costPerKwh = Number(settings.value.costPerKwh)
-    state.waterFee = Number(settings.value.waterFee)
-    state.trashFee = Number(settings.value.trashFee)
-  }
-
-  // Sync integration state
-  if (integrations.value?.midtrans) {
-    const m = integrations.value.midtrans
-    midtransState.isEnabled = m.isEnabled
-    midtransState.serverKey = m.serverKey || '' // Will be masked if saved
-    midtransState.clientKey = m.clientKey || ''
-    midtransState.isProduction = m.isProduction
-  }
-})
+// Initialize data - consolidated in single onMounted below
 
 const onSubmitGlobal = async (event: FormSubmitEvent<Schema>) => {
   try {
@@ -185,11 +170,13 @@ function openTemplateForm(template?: any) {
     editingTemplate.value = template
     templateForm.name = template.name
     templateForm.message = template.message
+    templateForm.templateType = template.templateType || 'general'
     templateForm.isDefault = template.isDefault
   } else {
     editingTemplate.value = null
     templateForm.name = ''
     templateForm.message = getDefaultTemplate()
+    templateForm.templateType = 'general'
     templateForm.isDefault = false
   }
   templateFormOpen.value = true
@@ -198,26 +185,12 @@ function openTemplateForm(template?: any) {
 function getDefaultTemplate() {
   return `Halo {nama_penyewa},
 
-Ini adalah pengingat untuk pembayaran kost Anda:
+{detail_tagihan}
 
-🏠 Properti: {nama_properti}
-🚪 Kamar: {nama_kamar}
-💰 Jumlah: Rp {jumlah_tagihan}
-📅 Jatuh Tempo: {tanggal_jatuh_tempo}
+{link_pembayaran}
 
-Status: {status_tagihan}
-
-Silakan lakukan pembayaran sebelum tanggal jatuh tempo. Terima kasih!
-
----
-Variabel yang tersedia:
-{nama_penyewa} - Nama penghuni
-{nama_properti} - Nama properti
-{nama_kamar} - Nama kamar
-{jumlah_tagihan} - Total tagihan
-{tanggal_jatuh_tempo} - Tanggal jatuh tempo
-{status_tagihan} - Status tagihan
-{periode} - Periode tagihan`
+Mohon segera melakukan pembayaran.
+Terima kasih.`
 }
 
 async function saveTemplate() {
@@ -239,6 +212,7 @@ async function saveTemplate() {
         body: {
           name: templateForm.name,
           message: templateForm.message,
+          templateType: templateForm.templateType,
           isDefault: templateForm.isDefault,
         }
       })
@@ -254,6 +228,7 @@ async function saveTemplate() {
         body: {
           name: templateForm.name,
           message: templateForm.message,
+          templateType: templateForm.templateType,
           isDefault: templateForm.isDefault,
         }
       })
@@ -314,7 +289,8 @@ onMounted(async () => {
   await Promise.all([
     store.fetchSettings(),
     store.fetchIntegrations(),
-    loadBackupHistory()
+    loadBackupHistory(),
+    loadWhatsAppTemplates()
   ])
   
   // Sync state with store
@@ -689,36 +665,35 @@ onMounted(async () => {
     <ConfirmDialog ref="confirmDialog" />
     
     <!-- WhatsApp Template Modal -->
-    <UModal v-model="templateFormOpen" :ui="{ width: 'max-w-3xl' }">
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">
-              {{ editingTemplate ? 'Edit Template' : 'Buat Template Baru' }}
-            </h3>
-            <UButton 
-              color="neutral" 
-              variant="ghost" 
-              icon="i-heroicons-x-mark" 
-              @click="templateFormOpen = false"
+    <UModal v-model:open="templateFormOpen" :title="editingTemplate ? 'Edit Template' : 'Buat Template Baru'">
+      <template #default />
+      
+      <template #content>
+        <div class="p-6 space-y-4 max-w-3xl">
+          <UFormField label="Jenis Template">
+            <USelect 
+              v-model="templateForm.templateType" 
+              :items="templateTypeOptions"
+              value-key="value"
+              label-key="label"
+              class="w-full"
             />
-          </div>
-        </template>
+          </UFormField>
 
-        <div class="space-y-4">
           <UFormField label="Nama Template" required>
             <UInput 
               v-model="templateForm.name" 
               placeholder="Contoh: Reminder Pembayaran Bulanan"
+              class="w-full"
             />
           </UFormField>
 
           <UFormField label="Pesan Template" required>
             <UTextarea 
               v-model="templateForm.message" 
-              :rows="12"
+              :rows="10"
               placeholder="Tulis template pesan di sini..."
-              class="font-mono text-sm"
+              class="w-full font-mono text-sm"
             />
           </UFormField>
 
@@ -731,16 +706,12 @@ onMounted(async () => {
               <UButton 
                 v-for="variable in [
                   '{nama_penyewa}',
-                  '{nama_properti}',
-                  '{nama_kamar}',
-                  '{jumlah_tagihan}',
-                  '{tanggal_jatuh_tempo}',
-                  '{status_tagihan}',
-                  '{periode}'
+                  '{detail_tagihan}',
+                  '{link_pembayaran}'
                 ]"
                 :key="variable"
                 size="xs"
-                color="neutral"
+                color="primary"
                 variant="soft"
                 @click="insertVariable(variable)"
               >
@@ -756,10 +727,8 @@ onMounted(async () => {
             </div>
             <USwitch v-model="templateForm.isDefault" />
           </div>
-        </div>
 
-        <template #footer>
-          <div class="flex justify-end gap-3">
+          <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
             <UButton 
               color="neutral" 
               variant="soft" 
@@ -775,8 +744,8 @@ onMounted(async () => {
               {{ editingTemplate ? 'Perbarui' : 'Simpan' }} Template
             </UButton>
           </div>
-        </template>
-      </UCard>
+        </div>
+      </template>
     </UModal>
   </div>
 </template>

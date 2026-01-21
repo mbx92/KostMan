@@ -4,7 +4,7 @@ import { meterReadings } from '../../database/schema';
 import { eq, and } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
-    requireRole(event, [Role.ADMIN, Role.OWNER]);
+    requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
     const query = getQuery(event);
     const roomId = query.roomId as string | undefined;
