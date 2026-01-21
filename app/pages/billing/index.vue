@@ -65,7 +65,7 @@ const selectedRoomId = ref("all");
 const selectedStatus = ref<"all" | "paid" | "unpaid">("all");
 
 const propertyOptions = computed(() => [
-  { label: "All Properties", value: "all" },
+  { label: "Semua Properti", value: "all" },
   ...properties.value.map((p) => ({ label: p.name, value: p.id })),
 ]);
 
@@ -75,7 +75,7 @@ const roomOptions = computed(() => {
       ? rooms.value.filter((r) => r.propertyId === selectedPropertyId.value)
       : rooms.value;
   return [
-    { label: "All Rooms", value: "all" },
+    { label: "Semua Kamar", value: "all" },
     ...baseRooms.map((r) => ({ label: r.name, value: r.id })),
   ];
 });
@@ -217,17 +217,17 @@ const rentColumns: TableColumn<RentBill>[] = [
   },
   {
     accessorKey: 'dueDate',
-    header: 'Due Date',
+    header: 'Jatuh Tempo',
   },
   {
     accessorFn: (row) => row.property?.name || 'Unknown',
     id: 'property',
-    header: 'Property',
+    header: 'Properti',
   },
   {
     accessorFn: (row) => row.room?.name || 'Unknown',
     id: 'room',
-    header: 'Room',
+    header: 'Kamar',
   },
   {
     accessorKey: 'totalAmount',
@@ -241,7 +241,7 @@ const rentColumns: TableColumn<RentBill>[] = [
   },
   {
     id: 'actions',
-    header: 'Actions',
+    header: 'Aksi',
     meta: { class: { th: 'text-right', td: 'text-right' } },
   }
 ];
@@ -255,17 +255,17 @@ const utilityColumns: TableColumn<UtilityBill>[] = [
   {
     accessorFn: (row) => row.property?.name || 'Unknown',
     id: 'property',
-    header: 'Property',
+    header: 'Properti',
   },
   {
     accessorFn: (row) => row.room?.name || 'Unknown',
     id: 'room',
-    header: 'Room',
+    header: 'Kamar',
   },
   {
     accessorFn: (row) => (row.meterEnd || 0) - (row.meterStart || 0),
     id: 'usage',
-    header: 'Usage',
+    header: 'Pemakaian',
   },
   {
     accessorKey: 'totalAmount',
@@ -279,7 +279,7 @@ const utilityColumns: TableColumn<UtilityBill>[] = [
   },
   {
     id: 'actions',
-    header: 'Actions',
+    header: 'Aksi',
     meta: { class: { th: 'text-right', td: 'text-right' } },
   }
 ];
@@ -300,18 +300,18 @@ const summaryColumns: TableColumn<CombinedBillItem>[] = [
   {
     accessorFn: (row) => row.rent?.room?.name || row.util?.room?.name || 'Unknown',
     id: 'room',
-    header: 'Room',
+    header: 'Kamar',
   },
   {
     accessorFn: (row) => row.rent?.totalAmount || 0,
     id: 'rent',
-    header: 'Rent',
+    header: 'Sewa',
     meta: { class: { th: 'text-right', td: 'text-right' } },
   },
   {
     accessorFn: (row) => row.util?.totalAmount || 0,
     id: 'utility',
-    header: 'Utility',
+    header: 'Utilitas',
     meta: { class: { th: 'text-right', td: 'text-right' } },
   },
   {
@@ -333,7 +333,7 @@ const summaryColumns: TableColumn<CombinedBillItem>[] = [
   },
   {
     id: 'actions',
-    header: 'Actions',
+    header: 'Aksi',
     meta: { class: { th: 'text-right', td: 'text-right' } },
   }
 ];
@@ -531,8 +531,8 @@ const generateRentBill = async () => {
     });
     await store.fetchRentBills(); // Refresh list to get enriched data
     toast.add({
-      title: "Success",
-      description: "Rent bill generated.",
+      title: "Berhasil",
+      description: "Rent bill berhasil dibuat.",
       color: "success",
     });
     isGenerating.value = false;
@@ -551,8 +551,8 @@ const markRentPaid = async (id: string) => {
   try {
     await store.markRentBillAsPaid(id);
     toast.add({
-      title: "Paid",
-      description: "Rent bill marked as paid.",
+      title: "Lunas",
+      description: "Rent bill ditandai lunas.",
       color: "success",
     });
   } catch (e: any) {
@@ -663,8 +663,8 @@ const deleteRent = async (id: string) => {
     try {
       await store.deleteRentBill(id);
       toast.add({
-        title: "Deleted",
-        description: "Rent bill deleted.",
+        title: "Dihapus",
+        description: "Rent bill telah dihapus.",
         color: "success",
       });
     } catch (e: any) {
@@ -681,8 +681,8 @@ const markUtilityPaid = async (id: string) => {
   try {
     await store.markUtilityBillAsPaid(id);
     toast.add({
-      title: "Paid",
-      description: "Utility bill marked as paid.",
+      title: "Lunas",
+      description: "Utility bill ditandai lunas.",
       color: "success",
     });
   } catch (e: any) {
@@ -705,8 +705,8 @@ const deleteUtility = async (id: string) => {
     try {
       await store.deleteUtilityBill(id);
       toast.add({
-        title: "Deleted",
-        description: "Utility bill deleted.",
+        title: "Dihapus",
+        description: "Utility bill telah dihapus.",
         color: "success",
       });
     } catch (e: any) {
@@ -1030,10 +1030,10 @@ const sendReminder = async (reminder: any) => {
             name="i-heroicons-banknotes"
             class="w-8 h-8 text-primary-500"
           />
-          Billing
+          Tagihan
         </h1>
         <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
-          Manage rent and utility bills.
+          Kelola tagihan sewa dan utilitas.
         </p>
       </div>
       <UButton
@@ -1041,7 +1041,7 @@ const sendReminder = async (reminder: any) => {
         color="primary"
         icon="i-heroicons-plus"
       >
-        Generate Rent Bill
+        Buat Tagihan Sewa
       </UButton>
     </div>
 
@@ -1051,7 +1051,7 @@ const sendReminder = async (reminder: any) => {
         class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
       >
         <div class="text-sm text-gray-500 uppercase tracking-wide font-medium">
-          Total Unpaid
+          Total Belum Lunas
         </div>
         <div class="text-3xl font-bold text-red-500 mt-1">
           {{ formatCurrency(totalUnpaid) }}
@@ -1061,7 +1061,7 @@ const sendReminder = async (reminder: any) => {
         class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
       >
         <div class="text-sm text-gray-500 uppercase tracking-wide font-medium">
-          Unpaid Rent
+          Sewa Belum Lunas
         </div>
         <div class="text-2xl font-bold text-orange-500 mt-1">
           {{ formatCurrency(totalUnpaidRent) }}
@@ -1071,7 +1071,7 @@ const sendReminder = async (reminder: any) => {
         class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
       >
         <div class="text-sm text-gray-500 uppercase tracking-wide font-medium">
-          Unpaid Utility
+          Utilitas Belum Lunas
         </div>
         <div class="text-2xl font-bold text-yellow-500 mt-1">
           {{ formatCurrency(totalUnpaidUtility) }}
@@ -1134,19 +1134,19 @@ const sendReminder = async (reminder: any) => {
           :color="selectedStatus === 'all' ? 'primary' : 'neutral'"
           variant="soft"
           @click="selectedStatus = 'all'"
-          >All</UButton
+          >Semua</UButton
         >
         <UButton
           :color="selectedStatus === 'unpaid' ? 'primary' : 'neutral'"
           variant="soft"
           @click="selectedStatus = 'unpaid'"
-          >Unpaid</UButton
+          >Belum Lunas</UButton
         >
         <UButton
           :color="selectedStatus === 'paid' ? 'primary' : 'neutral'"
           variant="soft"
           @click="selectedStatus = 'paid'"
-          >Paid</UButton
+          >Lunas</UButton
         >
       </div>
     </div>
@@ -1158,21 +1158,21 @@ const sendReminder = async (reminder: any) => {
         variant="soft"
         @click="activeTab = 'rent'"
       >
-        Rent Bills ({{ filteredRentBills.length }})
+        Tagihan Sewa ({{ filteredRentBills.length }})
       </UButton>
       <UButton
         :color="activeTab === 'utility' ? 'primary' : 'neutral'"
         variant="soft"
         @click="activeTab = 'utility'"
       >
-        Utility Bills ({{ filteredUtilityBills.length }})
+        Tagihan Utilitas ({{ filteredUtilityBills.length }})
       </UButton>
       <UButton
         :color="activeTab === 'summary' ? 'primary' : 'neutral'"
         variant="soft"
         @click="activeTab = 'summary'"
       >
-        Monthly Summary
+        Ringkasan Bulanan
       </UButton>
     </div>
 
@@ -1285,7 +1285,7 @@ const sendReminder = async (reminder: any) => {
                   @click="payOnline(row.original.id, 'rent')"
                 />
               </UTooltip>
-              <UTooltip text="Mark as Paid" v-if="!row.original.isPaid">
+              <UTooltip text="Tandai Lunas" v-if="!row.original.isPaid">
                 <UButton
                   size="xs"
                   color="success"
@@ -1294,7 +1294,7 @@ const sendReminder = async (reminder: any) => {
                   @click="markRentPaid(row.original.id)"
                 />
               </UTooltip>
-              <UTooltip text="Print">
+              <UTooltip text="Cetak">
                 <UButton
                   size="xs"
                   color="neutral"
@@ -1303,7 +1303,7 @@ const sendReminder = async (reminder: any) => {
                   @click="printRent(row.original)"
                 />
               </UTooltip>
-              <UTooltip text="Delete">
+              <UTooltip text="Hapus">
                 <UButton
                   size="xs"
                   color="error"
@@ -1319,9 +1319,9 @@ const sendReminder = async (reminder: any) => {
         <!-- Pagination -->
         <div class="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4 px-4 pb-4">
           <span class="text-sm text-gray-500">
-            Showing {{ (rentPagination.pageIndex * rentPagination.pageSize) + 1 }} - 
+            Menampilkan {{ (rentPagination.pageIndex * rentPagination.pageSize) + 1 }} - 
             {{ Math.min((rentPagination.pageIndex + 1) * rentPagination.pageSize, rentTable?.tableApi?.getFilteredRowModel().rows.length || 0) }} 
-            of {{ rentTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
+            dari {{ rentTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
           </span>
           <UPagination
             :page="(rentTable?.tableApi?.getState().pagination.pageIndex || 0) + 1"
@@ -1332,7 +1332,7 @@ const sendReminder = async (reminder: any) => {
         </div>
       </div>
       <div v-if="filteredRentBills.length === 0" class="text-center py-16">
-        <p class="text-gray-500">No rent bills found.</p>
+        <p class="text-gray-500">Tidak ada tagihan sewa ditemukan.</p>
       </div>
     </UCard>
 
@@ -1442,7 +1442,7 @@ const sendReminder = async (reminder: any) => {
                   @click="payOnline(row.original.id, 'utility')"
                 />
               </UTooltip>
-              <UTooltip text="Mark as Paid" v-if="!row.original.isPaid">
+              <UTooltip text="Tandai Lunas" v-if="!row.original.isPaid">
                 <UButton
                   size="xs"
                   color="success"
@@ -1451,7 +1451,7 @@ const sendReminder = async (reminder: any) => {
                   @click="markUtilityPaid(row.original.id)"
                 />
               </UTooltip>
-              <UTooltip text="Print">
+              <UTooltip text="Cetak">
                 <UButton
                   size="xs"
                   color="neutral"
@@ -1460,7 +1460,7 @@ const sendReminder = async (reminder: any) => {
                   @click="printUtility(row.original)"
                 />
               </UTooltip>
-              <UTooltip text="Delete">
+              <UTooltip text="Hapus">
                 <UButton
                   size="xs"
                   color="error"
@@ -1476,9 +1476,9 @@ const sendReminder = async (reminder: any) => {
         <!-- Pagination -->
         <div class="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4 px-4 pb-4">
           <span class="text-sm text-gray-500">
-            Showing {{ (utilityPagination.pageIndex * utilityPagination.pageSize) + 1 }} - 
+            Menampilkan {{ (utilityPagination.pageIndex * utilityPagination.pageSize) + 1 }} - 
             {{ Math.min((utilityPagination.pageIndex + 1) * utilityPagination.pageSize, utilityTable?.tableApi?.getFilteredRowModel().rows.length || 0) }} 
-            of {{ utilityTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
+            dari {{ utilityTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
           </span>
           <UPagination
             :page="(utilityTable?.tableApi?.getState().pagination.pageIndex || 0) + 1"
@@ -1489,9 +1489,9 @@ const sendReminder = async (reminder: any) => {
         </div>
       </div>
       <div v-if="filteredUtilityBills.length === 0" class="text-center py-16">
-        <p class="text-gray-500">No utility bills found.</p>
+        <p class="text-gray-500">Tidak ada tagihan utilitas ditemukan.</p>
         <p class="text-gray-400 text-sm mt-1">
-          Utility bills are auto-generated when you add meter readings.
+          Tagihan utilitas otomatis dibuat saat Anda menambah pembacaan meter.
         </p>
       </div>
     </UCard>
@@ -1649,14 +1649,14 @@ const sendReminder = async (reminder: any) => {
                   @click="sendToWhatsApp(row.original)"
                 >WA</UButton>
               </UTooltip>
-              <UTooltip text="Print Statement">
+              <UTooltip text="Cetak Laporan">
                 <UButton
                   size="sm"
                   color="primary"
                   variant="soft"
                   icon="i-heroicons-printer"
                   @click="printCombined(row.original)"
-                >Print</UButton>
+                >Cetak</UButton>
               </UTooltip>
             </div>
           </template>
@@ -1665,9 +1665,9 @@ const sendReminder = async (reminder: any) => {
         <!-- Pagination -->
         <div class="flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4 px-4 pb-4">
           <span class="text-sm text-gray-500">
-            Showing {{ (summaryPagination.pageIndex * summaryPagination.pageSize) + 1 }} - 
+            Menampilkan {{ (summaryPagination.pageIndex * summaryPagination.pageSize) + 1 }} - 
             {{ Math.min((summaryPagination.pageIndex + 1) * summaryPagination.pageSize, summaryTable?.tableApi?.getFilteredRowModel().rows.length || 0) }} 
-            of {{ summaryTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
+            dari {{ summaryTable?.tableApi?.getFilteredRowModel().rows.length || 0 }}
           </span>
           <UPagination
             :page="(summaryTable?.tableApi?.getState().pagination.pageIndex || 0) + 1"
@@ -1678,7 +1678,7 @@ const sendReminder = async (reminder: any) => {
         </div>
       </div>
       <div v-if="combinedBills.length === 0" class="text-center py-16">
-        <p class="text-gray-500">No data found for summary.</p>
+        <p class="text-gray-500">Tidak ada data untuk ringkasan.</p>
       </div>
     </UCard>
   </div>
@@ -1689,7 +1689,7 @@ const sendReminder = async (reminder: any) => {
       <UCard>
         <template #header>
           <div class="flex items-center justify-between">
-            <h3 class="font-semibold text-lg">Generate Rent Bill</h3>
+            <h3 class="font-semibold text-lg">Buat Tagihan Sewa</h3>
             <UButton
               variant="ghost"
               color="neutral"

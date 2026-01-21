@@ -57,6 +57,13 @@
       "when": 1768872666824,
       "tag": "0007_rare_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1768954247951,
+      "tag": "0008_overjoyed_pestilence",
+      "breakpoints": true
     }
   ]
 }

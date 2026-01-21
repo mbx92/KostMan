@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
 
     if (!id) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing ID param' });
+        throw createError({ statusCode: 400, statusMessage: 'Parameter ID tidak ditemukan' });
     }
 
     const body = await readBody(event);
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
         .returning();
 
     if (!result.length) {
-        throw createError({ statusCode: 404, statusMessage: 'Tenant not found' });
+        throw createError({ statusCode: 404, statusMessage: 'Penghuni tidak ditemukan' });
     }
 
     return result[0];
