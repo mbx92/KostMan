@@ -11,6 +11,7 @@
     "dev:clean": "npm run clean && nuxt dev --host 0.0.0.0",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "start": "PORT=3004 HOST=0.0.0.0 node .output/server/index.mjs",
     "postinstall": "nuxt prepare",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

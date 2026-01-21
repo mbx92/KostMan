@@ -65,4 +65,14 @@ export default defineNuxtConfig({
     strict: false,
     typeCheck: false,
   },
+
+  // Production server configuration
+  nitro: {
+    preset: 'node-server',
+    // Force port for production
+    devServer: {
+      host: process.env.HOST || '0.0.0.0',
+      port: parseInt(process.env.PORT || '3004'),
+    },
+  },
 })

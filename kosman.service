@@ -12,14 +12,15 @@ Group=mbx
 WorkingDirectory=/home/mbx/projects/kosMan
 
 # Load environment variables from .env file
-EnvironmentFile=/home/mbx/projects/kosMan/.env
+EnvironmentFile=-/home/mbx/projects/kosMan/.env
 
-# Override/add specific values
+# Override/add specific values (including database)
 Environment=NODE_ENV=production
 Environment=NUXT_HOST=0.0.0.0
 Environment=NUXT_PORT=3004
 Environment=HOST=0.0.0.0
 Environment=PORT=3004
+Environment=DATABASE_URL=postgresql://mbx:nopassword123!@10.100.10.5:5432/kostMan_dev
 
 # Execute the application
 ExecStart=/root/.nvm/versions/node/v22.19.0/bin/node .output/server/index.mjs
