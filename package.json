@@ -16,6 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:fix-migration": "tsx scripts/fix-migration.ts",
+    "db:test": "bash scripts/test-db-connection.sh",
     "db:seed": "tsx server/database/seed.ts",
     "db:seed-bills": "tsx server/database/seed-bills.ts",
     "test": "vitest",

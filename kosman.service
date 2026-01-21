@@ -2,6 +2,8 @@
 Description=KosMan Nuxt Application
 After=network.target postgresql.service
 Wants=postgresql.service
+# PostgreSQL is on the same server (10.100.10.5)
+# Ensure PostgreSQL starts before this service
 
 [Service]
 Type=simple
