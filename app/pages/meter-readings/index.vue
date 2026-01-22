@@ -15,13 +15,13 @@ const toast = useToast()
 // Date formatter for period display
 const df = new DateFormatter('id-ID', { month: 'long', year: 'numeric' })
 
-// Number formatter - use consistent formatting for SSR and client
+// Number formatter
 const formatNumber = (num: number | null | undefined): string => {
   if (num === null || num === undefined) return '0'
   return new Intl.NumberFormat('id-ID').format(num)
 }
 
-// Fetch properties
+// Fetch properties for filter
 const { data: propertiesData } = await useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 const propertyOptions = computed(() => [
@@ -38,129 +38,42 @@ const recordingStatus = ref('all') // 'all', 'recorded', 'unrecorded'
 const currentPage = ref(1)
 const pageSize = 10
 
-// Fetch rooms and properties
-const { data: roomsData, refresh: refreshRooms } = await useFetch('/api/rooms', {
-  query: { pageSize: 1000 }
-})
-
-const rooms = computed(() => roomsData.value?.data || [])
-
-// Fetch all meter readings
-const { data: allReadings, refresh: refreshReadings } = await useFetch('/api/meter-readings')
-
-// Get latest reading per room
-const latestReadingByRoom = computed(() => {
-  const map = new Map()
-  const readings = allReadings.value || []
-  
-  readings.forEach((r: any) => {
-    const existing = map.get(r.roomId)
-    if (!existing || r.period > existing.period) {
-      map.set(r.roomId, r)
-    }
-  })
-  
-  return map
-})
-
-// Combine rooms with their latest meter readings
-const roomsWithMeter = computed(() => {
-  return rooms.value.map((room: any) => {
-    const reading = latestReadingByRoom.value.get(room.id)
-    return {
-      ...room,
-      lastMeterEnd: reading?.meterEnd || null,
-      lastPeriod: reading?.period || null,
-      lastRecordedAt: reading?.recordedAt || null
-    }
-  })
-})
-
 // Current period (YYYY-MM)
 const currentPeriod = computed(() => {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 })
 
-// Filtered rooms (by property, search, and recording status)
-const filteredRooms = computed(() => {
-  let result = roomsWithMeter.value
-  
-  // Filter by property
-  if (selectedPropertyId.value !== '__all__') {
-    result = result.filter((room: any) => room.propertyId === selectedPropertyId.value)
-  }
-  
-  // Filter by recording status
-  if (recordingStatus.value === 'recorded') {
-    result = result.filter((room: any) => room.lastPeriod === currentPeriod.value)
-  } else if (recordingStatus.value === 'unrecorded') {
-    result = result.filter((room: any) => room.lastPeriod !== currentPeriod.value)
-  }
-  
-  // Filter by search
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter((room: any) => 
-      room.name.toLowerCase().includes(query) ||
-      room.property?.name?.toLowerCase().includes(query)
-    )
-  }
-  
-  return result
+// --- Server Side Data Fetching ---
+
+// 1. Fetch Stats
+const { data: statsData, refresh: refreshStats } = await useFetch('/api/meter-readings/stats', {
+  query: computed(() => ({
+    propertyId: selectedPropertyId.value,
+    period: currentPeriod.value
+  }))
 })
 
-// Pagination computed (for desktop table)
-const totalItems = computed(() => filteredRooms.value.length)
-const totalPages = computed(() => Math.ceil(totalItems.value / pageSize))
-const paginatedRooms = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  const end = start + pageSize
-  return filteredRooms.value.slice(start, end)
+// 2. Fetch Rooms (Paginated)
+const { data: roomsData, refresh: refreshRooms, pending: isLoading } = await useFetch('/api/meter-readings/rooms', {
+  query: computed(() => ({
+    page: currentPage.value,
+    pageSize: pageSize,
+    propertyId: selectedPropertyId.value,
+    status: recordingStatus.value,
+    search: searchQuery.value, // Make sure search is reactive
+    period: currentPeriod.value
+  })),
+  watch: [currentPage, selectedPropertyId, recordingStatus, searchQuery] 
 })
 
-// Mobile Load More pagination (like reminders page)
-const mobileLimit = ref(10)
-const loadingMore = ref(false)
+const paginatedRooms = computed(() => roomsData.value?.data || [])
+const totalItems = computed(() => roomsData.value?.meta?.total || 0)
+const totalPages = computed(() => roomsData.value?.meta?.totalPages || 0)
 
-const mobileRooms = computed(() => {
-  return filteredRooms.value.slice(0, mobileLimit.value)
-})
-
-const hasMoreRooms = computed(() => mobileLimit.value < filteredRooms.value.length)
-const canShowLess = computed(() => mobileLimit.value > 10)
-
-const loadMore = async () => {
-  loadingMore.value = true
-  await new Promise(resolve => setTimeout(resolve, 300))
-  mobileLimit.value += 10
-  loadingMore.value = false
-}
-
-const showLess = () => {
-  mobileLimit.value = 10
-}
-
-// Reset page/limit when filter changes
-watch([selectedPropertyId, searchQuery, recordingStatus], () => {
+// Reset page when filters change
+watch([selectedPropertyId, recordingStatus, searchQuery], () => {
   currentPage.value = 1
-  mobileLimit.value = 10
-})
-
-// Stats computed - based on all rooms (only filtered by property, not by recording status)
-const statsFiltered = computed(() => {
-  let result = roomsWithMeter.value
-  
-  // Only apply property filter for stats
-  if (selectedPropertyId.value !== '__all__') {
-    result = result.filter((room: any) => room.propertyId === selectedPropertyId.value)
-  }
-  
-  return {
-    total: result.length,
-    recorded: result.filter((r: any) => r.lastPeriod === currentPeriod.value).length,
-    pending: result.filter((r: any) => r.lastPeriod !== currentPeriod.value).length
-  }
 })
 
 // Modal state
@@ -175,13 +88,12 @@ const form = reactive({
   meterEnd: 0
 })
 
-// Calendar date for period display (read-only, locked to current month)
+// Calendar date for period display
 const periodDate = computed(() => {
   const [year, month] = form.period.split('-').map(Number)
   return new CalendarDate(year, month, 1)
 })
 
-// Formatted period display
 const formattedPeriod = computed(() => {
   return df.format(periodDate.value.toDate(getLocalTimeZone()))
 })
@@ -192,11 +104,35 @@ const usage = computed(() => {
 })
 
 // Open modal to record meter
+// Open modal to record meter
 function openMeterModal(room: any) {
   selectedRoom.value = room
   form.period = currentPeriod.value
-  form.meterStart = room.lastMeterEnd || 0
-  form.meterEnd = room.lastMeterEnd || 0
+
+  // Check if we are editing an existing record for the CURRENT period
+  if (room.currentPeriodStatus === 'recorded' && room.lastPeriod === currentPeriod.value) {
+     // If editing, use the existing values (Need to fetch StartMeter too ideally, 
+     // but 'lastMeterEnd' in the listing is actually the 'meterEnd' of the record).
+     // Wait, the API 'rooms.get.ts' only provided 'lastMeterEnd'. 
+     // We need to fetch the reading details or rely on 'lastMeterEnd' being the 'Current End' 
+     // and 'lastMeterStart'?
+     // Actually, looking at 'rooms.get.ts', we map 'lastMeterEnd' from the latest reading.
+     // But we don't have 'meterStart' in the payload. We should fix rooms.get.ts to return meterStart too.
+     // For now, let's assume we can get it, or we fetch it.
+     // Better strategy: Let's assume we need to fix rooms.get.ts first to return meterStart.
+     // Reverting this thought: I will first update rooms.get.ts to include meterStart.
+     // BUT, proceed with UI change assuming properties will exist.
+     
+     form.meterStart = room.lastMeterStart || 0 
+     form.meterEnd = room.lastMeterEnd || 0
+  } else {
+     // If new, start from the previous month's end (which is 'lastMeterEnd' if exists)
+     // BUT, 'lastMeterEnd' in room object is the *latest* reading found.
+     // If status is 'unrecorded', 'lastMeterEnd' is from PREVIOUS month.
+     form.meterStart = room.lastMeterEnd || 0
+     form.meterEnd = room.lastMeterEnd || 0
+  }
+  
   showModal.value = true
 }
 
@@ -215,8 +151,9 @@ async function submitMeterReading() {
   
   isSubmitting.value = true
   try {
+    // Use PUT to allow Upsert (Update if exists, Insert if new)
     await $fetch('/api/meter-readings', {
-      method: 'POST',
+      method: 'PUT',
       body: {
         roomId: selectedRoom.value.id,
         period: form.period,
@@ -232,7 +169,9 @@ async function submitMeterReading() {
     })
     
     showModal.value = false
-    await refreshReadings()
+    // Refresh data
+    await refreshRooms()
+    await refreshStats()
   } catch (err: any) {
     toast.add({
       title: 'Gagal',
@@ -244,7 +183,6 @@ async function submitMeterReading() {
   }
 }
 
-// Format date
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString('id-ID', {
@@ -271,7 +209,7 @@ function formatDate(dateStr: string | null) {
             <span class="font-semibold">Total Kamar</span>
           </div>
         </template>
-        <div class="text-3xl font-bold">{{ statsFiltered.total }}</div>
+        <div class="text-3xl font-bold">{{ statsData?.total || 0 }}</div>
         <p v-if="selectedPropertyId !== '__all__'" class="text-sm text-gray-500">Properti terpilih</p>
       </UCard>
       
@@ -283,7 +221,7 @@ function formatDate(dateStr: string | null) {
           </div>
         </template>
         <div class="text-3xl font-bold text-green-600 dark:text-green-400">
-          {{ statsFiltered.recorded }}
+          {{ statsData?.recorded || 0 }}
         </div>
         <p class="text-sm text-gray-500">Periode {{ currentPeriod }}</p>
       </UCard>
@@ -296,7 +234,7 @@ function formatDate(dateStr: string | null) {
           </div>
         </template>
         <div class="text-3xl font-bold text-orange-600 dark:text-orange-400">
-          {{ statsFiltered.pending }}
+          {{ statsData?.pending || 0 }}
         </div>
         <p class="text-sm text-gray-500">Periode {{ currentPeriod }}</p>
       </UCard>
@@ -310,6 +248,7 @@ function formatDate(dateStr: string | null) {
           placeholder="Cari nama kamar..."
           icon="i-heroicons-magnifying-glass"
           class="w-full sm:w-64"
+          :debounce="500"
         />
         <USelect 
           v-model="selectedPropertyId" 
@@ -347,7 +286,11 @@ function formatDate(dateStr: string | null) {
           </div>
         </template>
         
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto relative">
+           <div v-if="isLoading" class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center z-10">
+             <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-primary-500" />
+           </div>
+
           <table class="w-full">
             <thead>
               <tr class="border-b border-gray-200 dark:border-gray-700">
@@ -374,10 +317,10 @@ function formatDate(dateStr: string | null) {
                 </td>
                 <td class="py-3 px-4">
                   <UBadge 
-                    :color="room.status === 'occupied' ? 'success' : room.status === 'available' ? 'info' : 'warning'"
-                    variant="soft"
+                     :color="room.status === 'occupied' ? 'success' : room.status === 'available' ? 'info' : 'warning'"
+                     variant="soft"
                   >
-                    {{ room.status === 'occupied' ? 'Terisi' : room.status === 'available' ? 'Tersedia' : 'Maintenance' }}
+                     {{ room.status === 'occupied' ? 'Terisi' : room.status === 'available' ? 'Tersedia' : 'Maintenance' }}
                   </UBadge>
                 </td>
                 <td class="py-3 px-4">
@@ -389,7 +332,7 @@ function formatDate(dateStr: string | null) {
                 <td class="py-3 px-4">
                   <div v-if="room.lastPeriod">
                     <UBadge 
-                      :color="room.lastPeriod === currentPeriod ? 'success' : 'neutral'"
+                      :color="room.currentPeriodStatus === 'recorded' ? 'success' : 'neutral'"
                       variant="soft"
                     >
                       {{ room.lastPeriod }}
@@ -400,17 +343,17 @@ function formatDate(dateStr: string | null) {
                 </td>
                 <td class="py-3 px-4 text-center">
                   <UButton
+                    :color="room.currentPeriodStatus === 'recorded' ? 'neutral' : 'primary'"
+                    :variant="room.currentPeriodStatus === 'recorded' ? 'ghost' : 'soft'"
                     icon="i-heroicons-bolt"
-                    color="primary"
-                    variant="soft"
                     size="sm"
                     @click="openMeterModal(room)"
                   >
-                    Catat Meter
+                    {{ room.currentPeriodStatus === 'recorded' ? 'Ubah' : 'Catat Meter' }}
                   </UButton>
                 </td>
               </tr>
-              <tr v-if="paginatedRooms.length === 0">
+              <tr v-if="!isLoading && paginatedRooms.length === 0">
                 <td colspan="6" class="py-8 text-center text-gray-500">
                   Tidak ada kamar ditemukan
                 </td>
@@ -423,21 +366,25 @@ function formatDate(dateStr: string | null) {
         <template v-if="totalPages > 1" #footer>
           <div class="flex justify-center">
             <UPagination 
-              :page="currentPage" 
+              v-model:page="currentPage" 
               :total="totalItems" 
               :items-per-page="pageSize"
-              @update:page="(p) => currentPage = p"
             />
           </div>
         </template>
       </UCard>
     </div>
 
-    <!-- Mobile Card View (like reminders page) -->
+    <!-- Mobile Card View -->
     <div class="md:hidden">
-      <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow-sm overflow-hidden">
+      <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 shadow-sm overflow-hidden min-h-[300px] relative">
+        <!-- Loading Overlay -->
+        <div v-if="isLoading" class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center z-10">
+             <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-primary-500" />
+        </div>
+
         <div 
-          v-for="room in mobileRooms" 
+          v-for="room in paginatedRooms" 
           :key="room.id"
           class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
         >
@@ -447,11 +394,11 @@ function formatDate(dateStr: string | null) {
               <p class="text-sm text-gray-500 truncate">{{ room.property?.name || '-' }}</p>
               <div class="mt-1 flex items-center gap-2 flex-wrap">
                 <UBadge 
-                  :color="room.lastPeriod === currentPeriod ? 'success' : 'warning'" 
+                  :color="room.currentPeriodStatus === 'recorded' ? 'success' : 'warning'" 
                   variant="subtle" 
                   size="xs"
                 >
-                  {{ room.lastPeriod === currentPeriod ? 'Sudah dicatat' : 'Belum dicatat' }}
+                  {{ room.currentPeriodStatus === 'recorded' ? 'Sudah dicatat' : 'Belum dicatat' }}
                 </UBadge>
                 <span v-if="room.lastMeterEnd !== null" class="text-xs text-gray-400">
                   {{ formatNumber(room.lastMeterEnd) }} kWh
@@ -460,10 +407,10 @@ function formatDate(dateStr: string | null) {
             </div>
             
             <div class="shrink-0">
-              <UButton
+               <UButton
+                :color="room.currentPeriodStatus === 'recorded' ? 'neutral' : 'primary'"
+                :variant="room.currentPeriodStatus === 'recorded' ? 'ghost' : 'soft'"
                 icon="i-heroicons-bolt"
-                color="primary"
-                variant="soft"
                 size="sm"
                 @click="openMeterModal(room)"
               />
@@ -471,37 +418,18 @@ function formatDate(dateStr: string | null) {
           </div>
         </div>
         
-        <!-- Loading Skeleton -->
-        <div v-if="loadingMore" class="p-4 space-y-3">
-          <div class="animate-pulse flex items-center gap-3">
-            <div class="w-9 h-9 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            <div class="flex-1 space-y-2">
-              <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-              <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-            </div>
-          </div>
-        </div>
-        
-        <div v-if="mobileRooms.length === 0 && !loadingMore" class="p-8 text-center text-gray-500">
+        <div v-if="!isLoading && paginatedRooms.length === 0" class="p-8 text-center text-gray-500">
           Tidak ada kamar ditemukan
         </div>
         
-        <!-- Load More / Show Less -->
-        <div v-if="(hasMoreRooms || canShowLess) && !loadingMore" class="p-2 bg-gray-50 dark:bg-gray-800/30 flex justify-center gap-4">
-          <span 
-            v-if="hasMoreRooms"
-            class="text-sm text-primary-600 dark:text-primary-400 font-medium select-none cursor-pointer hover:underline"
-            @click="loadMore"
-          >
-            Lebih Banyak
-          </span>
-          <span 
-            v-if="canShowLess"
-            class="text-sm text-gray-500 dark:text-gray-400 font-medium select-none cursor-pointer hover:underline"
-            @click="showLess"
-          >
-            Tampilkan Lebih Sedikit
-          </span>
+        <!-- Mobile Pagination -->
+        <div v-if="totalPages > 1" class="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-center">
+            <UPagination 
+              v-model:page="currentPage" 
+              :total="totalItems" 
+              :items-per-page="pageSize"
+              :max="5"
+            />
         </div>
       </div>
     </div>

@@ -66,7 +66,9 @@ export const properties = pgTable("properties", {
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (table) => ({
+  nameIdx: index("property_name_idx").on(table.name),
+}));
 
 export const propertySettings = pgTable("property_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -113,6 +115,7 @@ export const rooms = pgTable(
   },
   (t) => ({
     unq: unique().on(t.propertyId, t.name),
+    nameIdx: index("room_name_idx").on(t.name),
   }),
 );
 
