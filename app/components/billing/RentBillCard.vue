@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RentBill } from '~/stores/kos';
+import type { RentBill } from "~/stores/kos";
 
 interface Props {
   bill: RentBill;
@@ -21,120 +21,126 @@ const emit = defineEmits<{
 const isExpanded = ref(false);
 
 const billStatus = computed(() => {
-  const total = Number(props.bill.totalAmount)
-  const paid = Number(props.bill.paidAmount || 0)
-  
-  if (paid === 0) return 'BELUM DIBAYAR'
-  if (paid >= total) return 'LUNAS'
-  return 'DIBAYAR SEBAGIAN'
-})
+  const total = Number(props.bill.totalAmount);
+  const paid = Number(props.bill.paidAmount || 0);
+
+  if (paid === 0) return "BELUM DIBAYAR";
+  if (paid >= total) return "LUNAS";
+  return "DIBAYAR SEBAGIAN";
+});
 
 const billStatusColor = computed(() => {
-  if (props.bill.isPaid) return 'success'
-  const paid = Number(props.bill.paidAmount || 0)
-  if (paid > 0) return 'warning'
-  return 'error'
-})
+  if (props.bill.isPaid) return "success";
+  const paid = Number(props.bill.paidAmount || 0);
+  if (paid > 0) return "warning";
+  return "error";
+});
 
 const remainingAmount = computed(() => {
-  return Number(props.bill.totalAmount) - Number(props.bill.paidAmount || 0)
-})
+  return Number(props.bill.totalAmount) - Number(props.bill.paidAmount || 0);
+});
 
 const daysCount = computed(() => {
   if (!props.bill.periodStartDate || !props.bill.periodEndDate) return 0;
-  const [startY, startM, startD] = props.bill.periodStartDate.split('-').map(Number);
-  const [endY, endM, endD] = props.bill.periodEndDate.split('-').map(Number);
+  const [startY, startM, startD] = props.bill.periodStartDate
+    .split("-")
+    .map(Number);
+  const [endY, endM, endD] = props.bill.periodEndDate.split("-").map(Number);
   const start = new Date(startY, startM - 1, startD);
   const end = new Date(endY, endM - 1, endD);
-  return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  return (
+    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  );
 });
 
 const dueDateFormatted = computed(() => {
-  if (!props.bill.dueDate) return '';
-  return new Date(props.bill.dueDate).toLocaleDateString('id-ID', { 
-    day: 'numeric', 
-    month: 'short',
-    year: 'numeric'
+  if (!props.bill.dueDate) return "";
+  return new Date(props.bill.dueDate).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 });
 </script>
 
 <template>
-  <div class="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+  <div
+    class="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+  >
     <!-- Collapsed Header (always visible) -->
-    <div 
-      class="p-4 cursor-pointer"
-      @click="isExpanded = !isExpanded"
-    >
+    <div class="p-4 cursor-pointer" @click="isExpanded = !isExpanded">
       <div class="flex items-start gap-3">
-        <UIcon 
-          :name="isExpanded ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'" 
+        <UIcon
+          :name="
+            isExpanded
+              ? 'i-heroicons-chevron-down'
+              : 'i-heroicons-chevron-right'
+          "
           class="w-5 h-5 text-gray-400 mt-0.5 shrink-0"
         />
         <div class="min-w-0 flex-1">
           <!-- Room + Tenant -->
           <div class="flex items-center gap-2 flex-wrap">
             <span class="font-bold text-gray-900 dark:text-white text-lg">
-              {{ bill.room?.name || 'Unknown' }}
+              {{ bill.room?.name || "Unknown" }}
             </span>
             <span class="text-gray-400">•</span>
             <span class="text-sm text-gray-500">
-              {{ bill.tenant?.name || 'Belum Ada Penghuni' }}
+              {{ bill.tenant?.name || "Belum Ada Penghuni" }}
             </span>
           </div>
-          
+
           <!-- Property -->
           <div class="text-sm text-gray-500 mt-0.5">
-            {{ bill.property?.name || 'Unknown Property' }}
+            {{ bill.property?.name || "Unknown Property" }}
           </div>
-          
+
           <!-- Status + Due Date -->
           <div class="flex items-center gap-2 mt-2 flex-wrap">
-            <UBadge 
-              :color="billStatusColor" 
-              variant="subtle" 
-              size="xs"
-            >
+            <UBadge :color="billStatusColor" variant="subtle" size="xs">
               {{ billStatus }}
             </UBadge>
-            <span class="text-xs text-gray-400">Jatuh Tempo: {{ dueDateFormatted }}</span>
+            <span class="text-xs text-gray-400"
+              >Jatuh Tempo: {{ dueDateFormatted }}</span
+            >
           </div>
-          
+
           <!-- Amount (below) -->
           <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
             <div class="flex items-center justify-between">
               <div>
                 <div class="text-xs text-gray-500 mb-1">Total Tagihan</div>
-                <div class="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                <div
+                  class="text-2xl font-bold text-primary-600 dark:text-primary-400"
+                >
                   {{ formatCurrency(bill.totalAmount) }}
                 </div>
-                <div v-if="bill.paidAmount && Number(bill.paidAmount) > 0" class="mt-1 space-y-0.5">
+                <div
+                  v-if="bill.paidAmount && Number(bill.paidAmount) > 0"
+                  class="mt-1 space-y-0.5"
+                >
                   <div class="text-xs text-green-600 dark:text-green-400">
                     Terbayar: {{ formatCurrency(bill.paidAmount) }}
                   </div>
-                  <div v-if="!bill.isPaid" class="text-xs text-red-600 dark:text-red-400 font-medium">
+                  <div
+                    v-if="!bill.isPaid"
+                    class="text-xs text-red-600 dark:text-red-400 font-medium"
+                  >
                     Sisa: {{ formatCurrency(remainingAmount) }}
                   </div>
                 </div>
               </div>
-              <UButton
-                v-if="!bill.isPaid && bill.paidAmount && Number(bill.paidAmount) > 0"
-                icon="i-heroicons-banknotes"
-                size="xs"
-                color="primary"
-                variant="soft"
-                @click.stop="emit('viewPayments', bill.id)"
-              >
-                Riwayat
-              </UButton>
             </div>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Expanded Content -->
-    <div v-show="isExpanded" class="border-t border-gray-100 dark:border-gray-800">
+    <div
+      v-show="isExpanded"
+      class="border-t border-gray-100 dark:border-gray-800"
+    >
       <!-- Bill Details -->
       <div class="p-4 space-y-3 bg-gray-50 dark:bg-gray-800/30">
         <div class="grid grid-cols-2 gap-3 text-sm">
@@ -151,14 +157,16 @@ const dueDateFormatted = computed(() => {
             </div>
           </div>
         </div>
-        
+
         <div class="h-px bg-gray-200 dark:bg-gray-700"></div>
-        
+
         <!-- Breakdown -->
         <div class="space-y-2 text-sm">
           <div class="flex justify-between">
             <span class="text-gray-500">Sewa Kamar:</span>
-            <span class="font-medium">{{ formatCurrency(bill.roomPrice) }}</span>
+            <span class="font-medium">{{
+              formatCurrency(bill.roomPrice)
+            }}</span>
           </div>
           <div v-if="Number(bill.waterFee) > 0" class="flex justify-between">
             <span class="text-gray-500">Air:</span>
@@ -168,53 +176,62 @@ const dueDateFormatted = computed(() => {
             <span class="text-gray-500">Sampah:</span>
             <span class="font-medium">{{ formatCurrency(bill.trashFee) }}</span>
           </div>
-          <div v-if="Number(bill.additionalCost) > 0" class="flex justify-between">
+          <div
+            v-if="Number(bill.additionalCost) > 0"
+            class="flex justify-between"
+          >
             <span class="text-gray-500">Biaya Tambahan:</span>
-            <span class="font-medium">{{ formatCurrency(bill.additionalCost) }}</span>
+            <span class="font-medium">{{
+              formatCurrency(bill.additionalCost)
+            }}</span>
           </div>
           <div class="h-px bg-gray-200 dark:bg-gray-700"></div>
           <div class="flex justify-between font-bold">
             <span class="text-gray-900 dark:text-white">Total:</span>
-            <span class="text-primary-600 dark:text-primary-400">{{ formatCurrency(bill.totalAmount) }}</span>
+            <span class="text-primary-600 dark:text-primary-400">{{
+              formatCurrency(bill.totalAmount)
+            }}</span>
           </div>
         </div>
       </div>
-      
+
       <!-- Actions -->
-      <div class="p-3 flex flex-wrap gap-2 border-t border-gray-100 dark:border-gray-800">
-        <UButton 
+      <div
+        class="p-3 flex flex-wrap gap-2 border-t border-gray-100 dark:border-gray-800"
+      >
+        <UButton
           v-if="!bill.isPaid"
-          size="sm" 
-          color="primary" 
+          size="sm"
+          color="primary"
           variant="soft"
           icon="i-heroicons-banknotes"
           @click.stop="emit('recordPayment', bill.id)"
         >
           Catat Pembayaran
         </UButton>
-        <UButton 
+        <UButton
           v-if="!bill.isPaid"
-          size="sm" 
-          color="success" 
+          size="sm"
+          color="success"
           variant="soft"
           icon="i-heroicons-check"
           @click.stop="emit('markPaid', bill.id)"
         >
           Tandai Lunas
         </UButton>
-        <UButton 
-          size="sm" 
-          color="neutral" 
+        <UButton
+          size="sm"
+          color="neutral"
           variant="ghost"
           icon="i-heroicons-printer"
           @click.stop="emit('print', bill)"
         >
           Cetak
         </UButton>
-        <UButton 
+        <UButton
           v-if="!bill.isPaid"
-          size="sm" 
-          color="red" 
+          size="sm"
+          color="red"
           variant="ghost"
           icon="i-heroicons-trash"
           @click.stop="emit('delete', bill.id)"
