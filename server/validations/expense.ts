@@ -79,7 +79,7 @@ export const updateExpenseSchema = z.object({
 
 
 export const expenseQuerySchema = z.object({
-    propertyId: z.string().uuid().optional(),
+    propertyId: z.union([z.string().uuid(), z.literal("global")]).optional(),
     type: z.enum(["property", "global"]).optional(),
     category: z.string().optional(),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

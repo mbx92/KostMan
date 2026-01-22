@@ -77,9 +77,14 @@ export default defineEventHandler(async (event) => {
         .limit(limit)
         .offset(offset);
 
-    // Get total count for pagination
-    const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
+    // Get total count and stats for pagination
+    const [{ count, totalAmount, totalPaid, totalUnpaid }] = await db
+        .select({
+            count: sql<number>`count(*)`,
+            totalAmount: sql<number>`COALESCE(SUM(${expenses.amount}), 0)`,
+            totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${expenses.isPaid} THEN ${expenses.amount} ELSE 0 END), 0)`,
+            totalUnpaid: sql<number>`COALESCE(SUM(CASE WHEN NOT ${expenses.isPaid} THEN ${expenses.amount} ELSE 0 END), 0)`
+        })
         .from(expenses)
         .where(and(...conditions));
 
@@ -92,5 +97,10 @@ export default defineEventHandler(async (event) => {
             total: Number(count),
             totalPages: Math.ceil(Number(count) / limit),
         },
+        stats: {
+            totalAmount: Number(totalAmount),
+            totalPaid: Number(totalPaid),
+            totalUnpaid: Number(totalUnpaid)
+        }
     };
 });

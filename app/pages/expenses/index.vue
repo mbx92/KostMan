@@ -8,16 +8,6 @@ const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 const expenseModalOpen = ref(false)
 const selectedExpense = ref<any>(null)
 
-// Fetch expenses
-const { data: expensesData, pending: expensesLoading, refresh: refreshExpenses } = useFetch('/api/expenses', {
-  query: {
-    page: 1,
-    limit: 100
-  }
-})
-
-const expenses = computed(() => expensesData.value?.expenses || [])
-
 // Fetch properties for filter
 const { data: propertiesData } = useFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
@@ -47,51 +37,57 @@ const categoryOptions = computed(() => [
   ...allCategories.value.map((c: any) => ({ label: c.name, value: c.name }))
 ])
 
-// Filtered expenses
-const filteredExpenses = computed(() => {
-  let result = [...expenses.value]
+// Pagination
+const page = ref(1)
+const pageCount = ref(10)
 
-  if (selectedPropertyId.value === 'global') {
-    result = result.filter((e: any) => e.type === 'global')
-  } else if (selectedPropertyId.value !== 'all') {
-    result = result.filter((e: any) => e.propertyId === selectedPropertyId.value)
+// Computed Query Params
+const queryParams = computed(() => {
+  const params: any = {
+    page: page.value,
+    limit: pageCount.value
+  }
+
+  if (selectedPropertyId.value !== 'all') {
+    params.propertyId = selectedPropertyId.value
   }
 
   if (selectedType.value !== 'all') {
-    result = result.filter((e: any) => e.type === selectedType.value)
+    params.type = selectedType.value
   }
 
   if (selectedCategory.value !== 'all') {
-    result = result.filter((e: any) => e.category === selectedCategory.value)
+    params.category = selectedCategory.value
   }
 
-  if (selectedStatus.value === 'paid') {
-    result = result.filter((e: any) => e.isPaid)
-  } else if (selectedStatus.value === 'unpaid') {
-    result = result.filter((e: any) => !e.isPaid)
+  if (selectedStatus.value !== 'all') {
+    params.isPaid = selectedStatus.value === 'paid' ? 'true' : 'false'
   }
 
-  return result.sort((a: any, b: any) => 
-    new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()
-  )
+  return params
 })
 
+// Watch filters to reset page
+watch([selectedPropertyId, selectedType, selectedCategory, selectedStatus], () => {
+  page.value = 1
+})
+
+// Fetch expenses
+const { data: expensesData, pending: expensesLoading, refresh: refreshExpenses } = useFetch('/api/expenses', {
+  query: queryParams,
+  watch: [page, selectedPropertyId, selectedType, selectedCategory, selectedStatus]
+})
+
+const expenses = computed(() => expensesData.value?.expenses || [])
+const totalExpensesCount = computed(() => expensesData.value?.pagination?.total || 0)
+
+// Used for display in table (direct mapping as server now handles filtering/sorting)
+const filteredExpenses = expenses
+
 // Stats
-const totalExpenses = computed(() => 
-  filteredExpenses.value.reduce((sum: number, e: any) => sum + Number(e.amount), 0)
-)
-
-const totalPaid = computed(() =>
-  filteredExpenses.value
-    .filter((e: any) => e.isPaid)
-    .reduce((sum: number, e: any) => sum + Number(e.amount), 0)
-)
-
-const totalUnpaid = computed(() =>
-  filteredExpenses.value
-    .filter((e: any) => !e.isPaid)
-    .reduce((sum: number, e: any) => sum + Number(e.amount), 0)
-)
+const totalExpenses = computed(() => expensesData.value?.stats?.totalAmount || 0)
+const totalPaid = computed(() => expensesData.value?.stats?.totalPaid || 0)
+const totalUnpaid = computed(() => expensesData.value?.stats?.totalUnpaid || 0)
 
 // Actions
 const openAddExpense = () => {
@@ -393,81 +389,34 @@ const onExpenseSaved = async () => {
 
     <!-- Expenses Cards - Mobile -->
     <div class="md:hidden space-y-3">
-      <div v-if="expensesLoading" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center">
+      <div v-if="expensesLoading" class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center">
         <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto text-gray-500" />
       </div>
-      <div v-else-if="filteredExpenses.length === 0" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center text-gray-500">
+      <div v-else-if="filteredExpenses.length === 0" class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500">
         Tidak ada pengeluaran ditemukan
       </div>
-      <div 
+      
+      <ExpensesExpenseCard 
         v-else 
         v-for="expense in filteredExpenses" 
         :key="expense.id"
-        class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4"
-      >
-        <div class="space-y-3">
-          <!-- Header: Category & Date -->
-          <div class="flex items-start justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getCategoryColor(expense.category) }" />
-              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ expense.category }}</span>
-            </div>
-            <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(expense.expenseDate) }}</span>
-          </div>
+        :expense="expense"
+        :format-currency="formatCurrency"
+        :format-date="formatDate"
+        :get-category-color="getCategoryColor"
+        @edit="openEditExpense"
+        @mark-paid="markAsPaid"
+        @delete="deleteExpense"
+      />
+    </div>
 
-          <!-- Description -->
-          <p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{{ expense.description }}</p>
-
-          <!-- Property & Amount -->
-          <div class="flex items-center justify-between">
-            <div>
-              <span v-if="expense.type === 'global'" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
-                Global
-              </span>
-              <span v-else class="text-xs text-gray-500 dark:text-gray-400">{{ expense.propertyName || '-' }}</span>
-            </div>
-            <span class="text-base font-semibold text-gray-900 dark:text-white">{{ formatCurrency(expense.amount) }}</span>
-          </div>
-
-          <!-- Status & Actions -->
-          <div class="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-            <span v-if="expense.isPaid" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
-              Lunas
-            </span>
-            <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-              Belum Dibayar
-            </span>
-
-            <div class="flex items-center gap-1">
-              <UButton 
-                icon="i-heroicons-pencil" 
-                size="xs"
-                color="neutral" 
-                variant="soft"
-                @click="openEditExpense(expense)"
-                square
-              />
-              <UButton 
-                v-if="!expense.isPaid"
-                icon="i-heroicons-check" 
-                size="xs"
-                color="success" 
-                variant="soft"
-                @click="markAsPaid(expense.id)"
-                square
-              />
-              <UButton 
-                icon="i-heroicons-trash" 
-                size="xs"
-                color="error" 
-                variant="soft"
-                @click="deleteExpense(expense.id)"
-                square
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+    <!-- Pagination -->
+    <div class="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-800">
+      <UPagination
+        v-model:page="page"
+        :items-per-page="pageCount"
+        :total="totalExpensesCount"
+      />
     </div>
 
     <!-- Expense Modal -->
