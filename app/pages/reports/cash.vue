@@ -5,18 +5,33 @@ const route = useRoute()
 const router = useRouter()
 
 // -- State --
-// Format: YYYY-MM
 const now = new Date()
-const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+const currentYear = now.getFullYear()
+const currentMonth = String(now.getMonth() + 1).padStart(2, '0')
+
 const selectedMonth = ref(currentMonth)
+const selectedYear = ref(String(currentYear))
 const selectedPropertyId = ref('all')
 
-const selectedMonthDate = computed({
-  get: () => selectedMonth.value ? `${selectedMonth.value}-01` : '',
-  set: (val) => {
-    if (val) selectedMonth.value = val.slice(0, 7)
-  }
-})
+const monthOptions = [
+  { label: 'Januari', value: '01' },
+  { label: 'Februari', value: '02' },
+  { label: 'Maret', value: '03' },
+  { label: 'April', value: '04' },
+  { label: 'Mei', value: '05' },
+  { label: 'Juni', value: '06' },
+  { label: 'Juli', value: '07' },
+  { label: 'Agustus', value: '08' },
+  { label: 'September', value: '09' },
+  { label: 'Oktober', value: '10' },
+  { label: 'November', value: '11' },
+  { label: 'Desember', value: '12' },
+]
+
+
+
+// Computed for API
+const queryMonth = computed(() => `${selectedYear.value}-${selectedMonth.value}`)
 
 // -- Fetch Properties for filter --
 const { data: propertiesData } = await useFetch('/api/properties')
@@ -76,7 +91,7 @@ interface ReportData {
 // -- Fetch Report Data --
 const { data: reportData, pending, refresh } = await useFetch<ReportData>('/api/reports/cash', {
   query: computed(() => ({
-    month: selectedMonth.value,
+    month: queryMonth.value,
     propertyId: selectedPropertyId.value === 'all' ? undefined : selectedPropertyId.value
   }))
 })
@@ -115,7 +130,8 @@ const occupiedRooms = computed(() => reportData.value?.expectedCash.occupiedRoom
 const paidBills = computed(() => reportData.value?.realCash.paidBills || [])
 
 // Watchers to refresh data
-watch([selectedMonth, selectedPropertyId], () => {
+// Watchers to refresh data
+watch([queryMonth, selectedPropertyId], () => {
     // refresh() is handled automatically by reactive query params in useFetch
 })
 
@@ -146,19 +162,40 @@ const totalPages = computed(() => Math.ceil(totalUnpaidBills.value / limit.value
       </div>
       
       <!-- Filters -->
-      <div class="flex flex-col sm:flex-row gap-3">
-        <DatePicker 
-            v-model="selectedMonthDate" 
-            granularity="month"
-            class="min-w-[200px]"
-        />
-        <USelect 
-            v-model="selectedPropertyId" 
-            :items="propertyOptions"
-            value-key="value"
-            label-key="label"
-            class="min-w-[200px]"
-        />
+      <!-- Filters -->
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-auto">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Bulan</label>
+                 <USelect 
+                    v-model="selectedMonth" 
+                    :items="monthOptions"
+                    value-key="value"
+                    label-key="label"
+                    class="w-full"
+                    placeholder="Pilih Bulan"
+                />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Tahun</label>
+                 <UInput 
+                     v-model="selectedYear" 
+                    type="number"
+                    class="w-full"
+                    placeholder="Tahun"
+                />
+            </div>
+            <div>
+                 <label class="block text-xs font-medium text-gray-500 mb-1">Properti</label>
+                 <USelect 
+                    v-model="selectedPropertyId" 
+                    :items="propertyOptions"
+                    value-key="value"
+                    label-key="label"
+                    class="w-full"
+                />
+            </div>
+          </div>
       </div>
     </div>
 

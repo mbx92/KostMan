@@ -55,23 +55,6 @@ export default defineEventHandler(async (event) => {
     const totalExpectedUtilities = 0; // Can be enhanced with property settings later
 
     // 3. Get Real Cash (Paid Bills) for the month
-    // Rent Bills
-    const rentBillArgs = [sql`TO_CHAR(${rentBills.periodStartDate}, 'YYYY-MM') = ${month}`]; // Adjust date matching if needed, simplest is matching period string if exists
-    // The schema has 'period' column varchar(7) for YYYY-MM
-    const rentBillsList = await db.select()
-        .from(rentBills)
-        .where(and(
-            eq(rentBills.period, month),
-            eq(rentBills.isPaid, true),
-            propertyId ? eq(rentBills.roomId, sql`(SELECT id FROM rooms WHERE id = ${rentBills.roomId} AND property_id = ${propertyId})`) : undefined
-        ));
-
-    // For property filtering on bills, we need to join rooms. Drizzle doesn't support subquery in where easily this way without raw sql or strict joins.
-    // Let's create a helper to filter or fetch everything and filter in memory if dataset is small, or do a proper join.
-    // Given the complexity of dynamic joins in this setup, let's fetch bills and filter by propertyId in JS if needed, 
-    // OR ideally do a join. Let's try to do a join for correctness.
-
-    // Actually, let's construct the queries properly.
 
     /* 
        Optimized Query Strategy:
@@ -87,8 +70,6 @@ export default defineEventHandler(async (event) => {
         .from(rentBills)
         .innerJoin(rooms, eq(rentBills.roomId, rooms.id))
         .where(and(
-            // Logic: Period matches month. 
-            // Note: Schema has 'period' column.
             eq(rentBills.period, month),
             propertyId ? eq(rooms.propertyId, propertyId) : undefined
         ));

@@ -136,8 +136,6 @@ const paginatedPayments = computed(() => {
 const totalPayments = computed(() => reportData.value?.payments?.length || 0)
 const totalPages = computed(() => Math.ceil(totalPayments.value / limit.value))
 
-
-
 </script>
 
 <template>
