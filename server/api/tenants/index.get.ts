@@ -1,7 +1,7 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
 import { tenants, rooms, properties } from '../../database/schema';
-import { eq, like, or, sql, and, count } from 'drizzle-orm';
+import { eq, like, ilike, or, sql, and, count } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
     requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
@@ -26,16 +26,16 @@ export default defineEventHandler(async (event) => {
         const searchTerm = `%${search.trim()}%`;
         conditions.push(
             or(
-                like(tenants.name, searchTerm),
-                like(tenants.contact, searchTerm),
-                like(tenants.idCardNumber, searchTerm)
+                ilike(tenants.name, searchTerm),
+                ilike(tenants.contact, searchTerm),
+                ilike(tenants.idCardNumber, searchTerm)
             )
         );
     }
 
     // Combine conditions with AND
-    const whereClause = conditions.length > 0 
-        ? and(...conditions) 
+    const whereClause = conditions.length > 0
+        ? and(...conditions)
         : undefined;
 
     // Get total count

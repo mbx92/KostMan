@@ -10,6 +10,7 @@ import {
   date,
   integer,
   text,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["owner", "admin", "staff"]);
@@ -89,7 +90,11 @@ export const tenants = pgTable("tenants", {
   pin: varchar("pin", { length: 255 }), // Hashed PIN
   isDefaultPin: boolean("is_default_pin").default(true),
   pinChangedAt: timestamp("pin_changed_at"),
-});
+}, (table) => ({
+  nameIdx: index("tenant_name_idx").on(table.name),
+  contactIdx: index("tenant_contact_idx").on(table.contact),
+  nikIdx: index("tenant_nik_idx").on(table.idCardNumber),
+}));
 
 export const rooms = pgTable(
   "rooms",
