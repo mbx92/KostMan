@@ -131,7 +131,7 @@ const handleLogout = async () => {
     await $fetch('/api/auth/logout', { method: 'POST' })
     toast.add({
       title: 'Logged out successfully',
-      color: 'green',
+      color: 'success',
     })
     // Force page reload to clear all state and redirect
     if (process.client) {
@@ -142,7 +142,7 @@ const handleLogout = async () => {
     toast.add({
       title: 'Logout failed',
       description: error.message,
-      color: 'red',
+      color: 'error',
     })
   }
 }
@@ -152,7 +152,7 @@ const handleUserAction = (action: string) => {
   console.log('User action:', action) // Debug log
   switch (action) {
     case 'profile':
-      router.push('/examples/profile')
+      router.push('/account')
       break
     case 'settings':
       router.push('/settings')
@@ -281,7 +281,7 @@ onMounted(() => {
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
               <div class="flex items-center justify-between">
                 <h3 class="font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                <UBadge v-if="reminders.counts.overdue > 0" color="red" variant="subtle">
+                <UBadge v-if="reminders.counts.overdue > 0" color="error" variant="subtle">
                   {{ reminders.counts.overdue }} Overdue
                 </UBadge>
               </div>

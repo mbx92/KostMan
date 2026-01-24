@@ -31,6 +31,13 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    if (user.status === 'suspended') {
+        throw createError({
+            statusCode: 403,
+            statusMessage: 'Account suspended. Please contact administrator.',
+        });
+    }
+
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
         throw createError({

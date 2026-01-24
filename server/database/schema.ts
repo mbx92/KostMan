@@ -14,11 +14,13 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["owner", "admin", "staff"]);
+export const userStatusEnum = pgEnum("user_status", ["active", "suspended"]);
 export const roomStatusEnum = pgEnum("room_status", [
   "available",
   "occupied",
   "maintenance",
 ]);
+
 export const expenseCategoryEnum = pgEnum("expense_category", [
   "maintenance",
   "utilities",
@@ -46,6 +48,7 @@ export const users = pgTable("users", {
   password: varchar("password", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   role: roleEnum("role").default("owner"),
+  status: userStatusEnum("status").default("active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

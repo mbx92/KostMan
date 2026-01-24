@@ -23,7 +23,7 @@ const fillDevCredentials = () => {
   toast.add({
     title: "Dev credentials filled",
     description: "Ready to login with admin account",
-    color: "blue",
+    color: "primary",
   });
 };
 
@@ -37,7 +37,7 @@ const handleLogin = async () => {
   isLoading.value = true;
 
   try {
-    const response = await $fetch("/api/auth/login", {
+    const response = await $fetch<{ token: string, user: any }>("/api/auth/login", {
       method: "POST",
       body: {
         email: form.email,
@@ -49,7 +49,7 @@ const handleLogin = async () => {
     toast.add({
       title: "Login successful",
       description: `Welcome back, ${response.user.name}!`,
-      color: "green",
+      color: "success",
     });
 
     // Redirect to homepage
@@ -62,7 +62,7 @@ const handleLogin = async () => {
     toast.add({
       title: "Login failed",
       description: message,
-      color: "red",
+      color: "error",
     });
   } finally {
     isLoading.value = false;
@@ -117,7 +117,7 @@ const handleLogin = async () => {
           <!-- Error Message -->
           <UAlert
             v-if="errorMessage"
-            color="red"
+            color="error"
             variant="soft"
             :title="errorMessage"
             :close-button="{ icon: 'i-heroicons-x-mark-20-solid', color: 'red', variant: 'link' }"
@@ -177,7 +177,7 @@ const handleLogin = async () => {
             block
             size="lg"
             variant="outline"
-            color="blue"
+            color="primary"
             icon="i-heroicons-code-bracket"
             @click="fillDevCredentials"
           >

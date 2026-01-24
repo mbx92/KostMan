@@ -108,6 +108,16 @@ const defaultNavigation: NavItem[] = [
     ]
   },
   {
+    label: 'Manajemen Pengguna',
+    icon: 'i-heroicons-user-group',
+    to: '/users'
+  },
+  {
+    label: 'Profil Saya',
+    icon: 'i-heroicons-user-circle',
+    to: '/account'
+  },
+  {
     label: 'Settings',
     icon: 'i-heroicons-cog-6-tooth',
     to: '/settings'
@@ -131,6 +141,11 @@ const staffNavigation: NavItem[] = [
         to: '/meter-readings'
       }
     ]
+  },
+  {
+    label: 'Profil Saya',
+    icon: 'i-heroicons-user-circle',
+    to: '/account'
   }
 ]
 

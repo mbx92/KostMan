@@ -27,3 +27,16 @@ export function requireRole(event: H3Event, allowedRoles: RoleType[]) {
 
     return user;
 }
+
+export function requireLogin(event: H3Event) {
+    const user = event.context.user;
+
+    if (!user) {
+        throw createError({
+            statusCode: 401,
+            statusMessage: 'Unauthorized: No user found',
+        });
+    }
+
+    return user;
+}

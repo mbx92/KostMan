@@ -17,7 +17,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   try {
     // Fetch current user
-    const { data } = await useFetch('/api/auth/me')
+    const { data } = await useFetch('/api/auth/me', {
+      headers: useRequestHeaders(['cookie']) as any
+    })
     const user = data.value?.user
 
     // If no user, let auth middleware handle it
@@ -26,10 +28,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
     // Check if user is staff
     if (user.role === 'staff') {
       // Allowed paths for staff
-      const allowedPaths = ['/', '/meter-readings']
-      
+      const allowedPaths = ['/', '/meter-readings', '/account', '/my-profile']
+
       // Check if current path is allowed
-      const isAllowed = allowedPaths.some(path => 
+      const isAllowed = allowedPaths.some(path =>
         to.path === path || to.path.startsWith(path + '/')
       )
 
