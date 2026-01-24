@@ -9,6 +9,8 @@ interface User {
   updatedAt: string
 }
 
+
+const toast = useToast()
 const page = ref(1)
 const pageCount = ref(10)
 const search = ref('')
@@ -26,7 +28,7 @@ const { data: userData, pending: loading, refresh } = await useFetch<any>('/api/
   watch: [page, debouncedSearch]
 })
 
-const users = computed(() => userData.value?.users || [])
+const users = computed<User[]>(() => userData.value?.users || [])
 const totalUsers = computed(() => userData.value?.pagination?.total || 0)
 
 // Reset page when search changes
