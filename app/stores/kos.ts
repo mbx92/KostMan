@@ -20,6 +20,9 @@ export interface Property {
     settings?: PropertySettings | null
     createdAt?: string
     updatedAt?: string
+    roomCount?: number
+    occupantCount?: number
+    occupantPercentage?: number
 }
 
 export interface Room {
@@ -421,20 +424,20 @@ export const useKosStore = defineStore('kos', () => {
                 method: 'PUT',
                 body: payload
             })
-            
+
             // Update local store
             const index = rooms.value.findIndex(r => r.id === id)
             if (index !== -1) {
                 rooms.value[index] = { ...updated, price: Number(updated.price) }
             }
-            
+
             // Re-fetch to get complete data with relations (property, tenant, etc.)
             // This ensures room.property and other joined data are available
             const completeRoom = await fetchRoomById(id)
             if (completeRoom && index !== -1) {
                 rooms.value[index] = completeRoom
             }
-            
+
             return updated
         } catch (err: any) {
             roomsError.value = err?.data?.message || err?.message || 'Failed to update room'
@@ -851,8 +854,8 @@ export const useKosStore = defineStore('kos', () => {
         meterReadingsLoading.value = true
         meterReadingsError.value = null
         try {
-            await $fetch(`/api/meter-readings/${id}`, {
-                method: 'DELETE'
+            await $fetch<MeterReading>(`/api/meter-readings/${id}`, {
+                method: 'DELETE' as 'DELETE'
             })
             meterReadings.value = meterReadings.value.filter(r => r.id !== id)
         } catch (err: any) {

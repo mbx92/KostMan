@@ -104,7 +104,7 @@ const onModalClose = () => {
             <div class="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <div class="flex items-center gap-2 text-sm text-gray-500">
                     <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                    <span>{{ store.getRoomsByPropertyId(property.id).length }} Kamar</span>
+                    <span>{{ property.roomCount || 0 }} Kamar</span>
                 </div>
                 
                 <UButton :to="`/properties/${property.id}`" variant="ghost" color="primary" trailing-icon="i-heroicons-arrow-right">

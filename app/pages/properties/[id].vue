@@ -15,7 +15,7 @@ const property = ref<Property | null>(null);
 const isLoading = ref(true);
 const isSaving = ref(false);
 
-const rooms = computed(() => store.getRoomsByPropertyId(propertyId.value));
+
 
 async function loadProperty() {
   isLoading.value = true;
@@ -63,9 +63,9 @@ watch(
       form.image = p.image || "";
       form.mapUrl = p.mapUrl || "";
       form.useCustomSettings = !!p.settings;
-      form.costPerKwh = Number(p.settings?.costPerKwh) || store.settings.costPerKwh;
-      form.trashFee = Number(p.settings?.trashFee) || store.settings.trashFee;
-      form.waterFee = Number(p.settings?.waterFee) || store.settings.waterFee;
+      form.costPerKwh = Number(p.settings?.costPerKwh) || Number(store.settings.costPerKwh);
+      form.trashFee = Number(p.settings?.trashFee) || Number(store.settings.trashFee);
+      form.waterFee = Number(p.settings?.waterFee) || Number(store.settings.waterFee);
     }
   },
   { immediate: true }
@@ -117,6 +117,7 @@ const saveChanges = async () => {
       title: "Perubahan Disimpan",
       description: "Detail properti berhasil diperbarui.",
       color: "success",
+      icon: "i-heroicons-check-circle"
     });
   } catch (err: any) {
     toast.add({
@@ -132,7 +133,7 @@ const saveChanges = async () => {
 const deleteProperty = async () => {
   const confirmed = await confirmDialog.value?.confirm({
     title: 'Hapus Properti?',
-    message: `Apakah Anda yakin ingin menghapus "${property.value?.name}"? Ini juga akan menghapus ${rooms.value.length} kamar.`,
+    message: `Apakah Anda yakin ingin menghapus "${property.value?.name}"? Ini juga akan menghapus ${property.value?.roomCount || 0} kamar.`,
     confirmText: 'Ya, Hapus',
     confirmColor: 'error'
   })
@@ -156,9 +157,6 @@ try {
     }
 };
 
-const occupiedRooms = computed(
-  () => rooms.value.filter((r) => r.status === "occupied").length
-);
 </script>
 
 <template>
@@ -184,8 +182,9 @@ const occupiedRooms = computed(
         <UButton
           to="/properties"
           variant="ghost"
-          color="white"
+          color="neutral"
           icon="i-heroicons-arrow-left"
+          class="text-white hover:text-gray-100"
           >Kembali ke Properti</UButton
         >
       </div>
@@ -240,7 +239,7 @@ const occupiedRooms = computed(
             class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 p-4 text-center"
           >
             <div class="text-2xl font-bold text-gray-900 dark:text-white">
-              {{ rooms.length }}
+              {{ property?.roomCount || 0 }}
             </div>
             <div
               class="text-xs text-gray-500 uppercase tracking-wide font-medium"
@@ -252,7 +251,7 @@ const occupiedRooms = computed(
             class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 p-4 text-center"
           >
             <div class="text-2xl font-bold text-primary-500">
-              {{ occupiedRooms }}
+              {{ property?.occupantCount || 0 }}
             </div>
             <div
               class="text-xs text-gray-500 uppercase tracking-wide font-medium"
@@ -264,7 +263,7 @@ const occupiedRooms = computed(
             class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 p-4 text-center"
           >
             <div class="text-2xl font-bold text-green-500">
-              {{ Math.round((occupiedRooms / (rooms.length || 1)) * 100) }}%
+              {{ Math.round(property?.occupantPercentage || 0) }}%
             </div>
             <div
               class="text-xs text-gray-500 uppercase tracking-wide font-medium"
@@ -279,7 +278,7 @@ const occupiedRooms = computed(
         >
           <div class="text-center">
             <div class="text-3xl font-bold text-gray-900 dark:text-white">
-              {{ rooms.length }}
+              {{ property?.roomCount || 0 }}
             </div>
             <div
               class="text-sm text-gray-500 uppercase tracking-wide font-medium"
@@ -290,7 +289,7 @@ const occupiedRooms = computed(
           <div class="w-px h-12 bg-gray-200 dark:bg-gray-800"></div>
           <div class="text-center">
             <div class="text-3xl font-bold text-primary-500">
-              {{ occupiedRooms }}
+              {{ property?.occupantCount || 0 }}
             </div>
             <div
               class="text-sm text-gray-500 uppercase tracking-wide font-medium"
@@ -301,7 +300,7 @@ const occupiedRooms = computed(
           <div class="w-px h-12 bg-gray-200 dark:bg-gray-800"></div>
           <div class="text-center">
             <div class="text-3xl font-bold text-green-500">
-              {{ Math.round((occupiedRooms / (rooms.length || 1)) * 100) }}%
+              {{ Math.round(property?.occupantPercentage || 0) }}%
             </div>
             <div
               class="text-sm text-gray-500 uppercase tracking-wide font-medium"
@@ -351,7 +350,7 @@ const occupiedRooms = computed(
               >
               <UButton
                 size="xs"
-                color="gray"
+                color="neutral"
                 variant="ghost"
                 icon="i-heroicons-eye"
                 @click="isPreviewOpen = true"
@@ -476,7 +475,7 @@ const occupiedRooms = computed(
               <span
                 class="bg-white/10 text-xs font-bold px-3 py-1 rounded-full backdrop-blur-md border border-white/20"
               >
-                {{ rooms.length }} Kamar
+                {{ property?.roomCount || 0 }} Kamar
               </span>
             </div>
 
@@ -495,7 +494,7 @@ const occupiedRooms = computed(
             Aksi Properti
           </h3>
           <UButton
-            color="black"
+            color="neutral"
             variant="solid"
             block
             size="lg"
@@ -560,7 +559,7 @@ const occupiedRooms = computed(
     <!-- Image Preview Modal -->
     <UModal
       v-model:open="isPreviewOpen"
-      :ui="{ width: 'w-full sm:max-w-4xl' }"
+      :ui="{ content: 'sm:max-w-4xl' }"
       title="Pratinjau Gambar Cover"
       description="Tampilan ukuran penuh dari gambar cover properti"
     >
