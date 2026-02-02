@@ -1,7 +1,25 @@
 
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import { users, whatsappTemplates } from './schema';
+import {
+    users,
+    whatsappTemplates,
+    properties,
+    propertySettings,
+    tenants,
+    rooms,
+    rentBills,
+    utilityBills,
+    meterReadings,
+    globalSettings,
+    integrationSettings,
+    expenseCategories,
+    expenses,
+    systemLogs,
+    systemSettings,
+    backups,
+    payments
+} from './schema';
 import bcrypt from 'bcrypt';
 import 'dotenv/config';
 
@@ -9,6 +27,37 @@ const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
 });
 const db = drizzle(pool);
+
+async function wipeData() {
+    if (process.env.NODE_ENV !== 'development') {
+        throw new Error('❌ wipeData can ONLY be run in development environment!');
+    }
+    console.log('Wiping data...');
+
+    // Delete in reverse order of dependencies to avoid foreign key constraints
+    await db.delete(payments);
+    await db.delete(rentBills);
+    await db.delete(utilityBills);
+    await db.delete(meterReadings);
+    await db.delete(rooms);
+    await db.delete(propertySettings);
+    await db.delete(expenses);
+    await db.delete(tenants);
+    await db.delete(properties);
+
+    // Delete user-related settings and logs
+    await db.delete(expenseCategories);
+    await db.delete(integrationSettings);
+    await db.delete(globalSettings);
+    await db.delete(whatsappTemplates);
+    await db.delete(systemLogs);
+    await db.delete(backups);
+
+    // Independent tables
+    await db.delete(systemSettings);
+
+    console.log('Data wiped successfully (keeping users)');
+}
 
 async function seedUsers() {
     console.log('Seeding users...');
@@ -41,7 +90,7 @@ async function seedUsers() {
 
 export async function seedWhatsAppTemplates(userId: string) {
     console.log('Seeding WhatsApp templates...');
-    
+
     const templates = [
         {
             userId,
@@ -115,14 +164,15 @@ Terima kasih.`
             .values(template)
             .onConflictDoNothing();
     }
-    
+
     console.log(`${templates.length} WhatsApp templates seeded successfully`);
 }
 
 async function main() {
-    console.log('Seeding database...');
+    console.log('Starting seed process...');
 
     try {
+        await wipeData();
         await seedUsers();
     } catch (error) {
         console.error('Error seeding database:', error);

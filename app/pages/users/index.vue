@@ -25,7 +25,8 @@ const queryParams = computed(() => ({
 
 const { data: userData, pending: loading, refresh } = await useFetch<any>('/api/users', {
   query: queryParams,
-  watch: [page, debouncedSearch]
+  watch: [page, debouncedSearch],
+  lazy: true
 })
 
 const users = computed<User[]>(() => userData.value?.users || [])
@@ -171,7 +172,22 @@ const getRoleColor = (role: string) => {
 
     <!-- Users Table -->
     <UCard>
-        <UTable :data="users" :columns="columns" :loading="loading">
+        <div v-if="loading && users.length === 0" class="p-4 space-y-4">
+            <div v-for="i in 5" :key="i" class="flex items-center justify-between gap-4">
+                <div class="space-y-2 flex-1 max-w-sm">
+                    <USkeleton class="h-4 w-3/4" />
+                    <USkeleton class="h-3 w-1/2" />
+                </div>
+                <USkeleton class="h-6 w-20" />
+                <USkeleton class="h-6 w-20" />
+                <div class="flex gap-2">
+                    <USkeleton class="h-8 w-8" :ui="{ rounded: 'rounded-full' }" />
+                    <USkeleton class="h-8 w-8" :ui="{ rounded: 'rounded-full' }" />
+                    <USkeleton class="h-8 w-8" :ui="{ rounded: 'rounded-full' }" />
+                </div>
+            </div>
+        </div>
+        <UTable v-else :data="users" :columns="columns" :loading="loading">
             <template #role-cell="{ row }">
                 <UBadge :color="getRoleColor(row.original.role)" variant="subtle" class="capitalize">
                     {{ row.original.role }}

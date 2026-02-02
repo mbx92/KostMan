@@ -7,6 +7,9 @@ import { and, eq, ilike, or, sql, desc } from 'drizzle-orm';
 export default defineEventHandler(async (event) => {
     requireRole(event, [Role.ADMIN, Role.OWNER]);
 
+    // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const query = getQuery(event);
     const validatedQuery = userQuerySchema.parse(query);
 

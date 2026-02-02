@@ -6,11 +6,11 @@ import bcrypt from 'bcrypt'
 // Validation Schema
 const importDataSchema = z.object({
     data: z.array(z.object({
-        users_email: z.string().email(),
-        property_name: z.string(),
-        property_address: z.string().optional().nullable(),
-        property_description: z.string().optional().nullable(),
-        rooms_name: z.string(),
+        users_email: z.string().email().transform(v => v.toLowerCase().trim()),
+        property_name: z.string().transform(v => v.trim()),
+        property_address: z.string().optional().nullable().transform(v => v?.trim() || null),
+        property_description: z.string().optional().nullable().transform(v => v?.trim() || null),
+        rooms_name: z.string().transform(v => v.trim()),
         rooms_price: z.number(),
         property_settings_cost_per_kwh: z.number(),
         water: z.number(),
@@ -19,21 +19,26 @@ const importDataSchema = z.object({
         use_trash_service: z.boolean(),
         move_in_date: z.number().optional().nullable(),
         ocupant_count: z.number().optional().default(1),
-        tenant_name: z.string().optional().nullable(),
+        tenant_name: z.string().optional().nullable().transform(v => v?.trim() || null),
         // Coerce numbers to strings for NIK and phone (Excel parses them as numbers)
-        tenant_id_card_number: z.union([z.string(), z.number()]).transform(val => String(val)).optional().nullable(),
-        tenant_phone: z.union([z.string(), z.number()]).transform(val => String(val)).optional().nullable(),
+        tenant_id_card_number: z.union([z.string(), z.number()]).transform(val => String(val).trim()).optional().nullable(),
+        tenant_phone: z.union([z.string(), z.number()]).transform(val => String(val).trim()).optional().nullable(),
         meter_start: z.number().optional().nullable(),
         meter_end: z.number().optional().nullable(),
-        recorder_by: z.string().optional().nullable()
+        recorder_by: z.string().optional().nullable().transform(v => v?.trim().toLowerCase() || null)
     })),
     options: z.object({
-        skipDuplicates: z.boolean().optional().default(true),
-        updateExisting: z.boolean().optional().default(false),
-        generateDefaultPassword: z.boolean().optional().default(true),
-        generateDefaultPin: z.boolean().optional().default(true),
+        skipDuplicates: z.boolean().default(true),
+        updateExisting: z.boolean().default(false),
+        generateDefaultPassword: z.boolean().default(true),
+        generateDefaultPin: z.boolean().default(true),
         targetPeriod: z.string().optional()
-    }).optional()
+    }).default({
+        skipDuplicates: true,
+        updateExisting: false,
+        generateDefaultPassword: true,
+        generateDefaultPin: true
+    })
 })
 
 export default defineEventHandler(async (event) => {
@@ -50,7 +55,7 @@ export default defineEventHandler(async (event) => {
 
         const validated = importDataSchema.parse(body)
 
-        const { data: excelData, options = {} } = validated
+        const { data: excelData, options } = validated
 
         // Initialize stats
         const stats = {
@@ -72,6 +77,27 @@ export default defineEventHandler(async (event) => {
         const propertyIdMap = new Map<string, string>()
         const tenantIdMap = new Map<string, string>()
 
+        // Helper to normalize phone number
+        const normalizePhoneNumber = (phone: string | null | undefined): string => {
+            if (!phone) return '081000000000' // Default dummy
+
+            let clean = phone.toString().replace(/\D/g, '')
+
+            // Handle dummy data specifically
+            if (/^0+$/.test(clean) || clean === '0' || clean.length < 5) {
+                return '081000000000'
+            }
+
+            // Normalize prefix
+            if (clean.startsWith('62')) {
+                clean = '0' + clean.slice(2)
+            } else if (!clean.startsWith('0')) {
+                clean = '0' + clean
+            }
+
+            return clean
+        }
+
         // Start transaction
         await db.transaction(async (tx) => {
             // Step 1: Import Users
@@ -84,22 +110,15 @@ export default defineEventHandler(async (event) => {
                 })
 
                 if (existingUser) {
-                    // Update existing user if needed (e.g. name)
-                    // But keep password/role intact unless maybe empty
-                    await tx.update(users)
-                        .set({
-                            name: email.split('@')[0],
-                            status: 'active'
-                        })
-                        .where(eq(users.id, existingUser.id))
-
+                    // Update existing user if needed
+                    // Only update simple fields, preserve complex status if not critical
                     userIdMap.set(email, existingUser.id)
-                    stats.updated++
+                    stats.updated++ // Count as processed
                 } else {
                     // Create new user
                     const defaultPassword = options.generateDefaultPassword
                         ? await bcrypt.hash('password123', 10)
-                        : await bcrypt.hash('changeme', 10)
+                        : await bcrypt.hash('password123', 10)
 
                     const [newUser] = await tx.insert(users).values({
                         email,
@@ -120,10 +139,18 @@ export default defineEventHandler(async (event) => {
             const propertiesMap = new Map<string, any>()
 
             excelData.forEach(row => {
-                const key = `${row.users_email}::${row.property_name}`
+                const userId = userIdMap.get(row.users_email)
+                if (!userId) {
+                    console.error(`Skipping property for missing user: ${row.users_email}`)
+                    return
+                }
+
+                // Create a composite key that is robust
+                const key = `${row.users_email}::${row.property_name.toLowerCase()}`
+
                 if (!propertiesMap.has(key)) {
                     propertiesMap.set(key, {
-                        userId: userIdMap.get(row.users_email)!,
+                        userId: userId,
                         name: row.property_name,
                         address: row.property_address || 'Alamat belum diisi',
                         description: row.property_description || null,
@@ -133,6 +160,8 @@ export default defineEventHandler(async (event) => {
                     })
                 }
             })
+
+            console.log(`Processing ${propertiesMap.size} properties...`)
 
             for (const [key, propData] of propertiesMap) {
                 // Check if property exists
@@ -145,7 +174,6 @@ export default defineEventHandler(async (event) => {
 
                 if (existingProperty) {
                     // Update existing property
-                    // Always update to reflect latest Excel data
                     const [updated] = await tx.update(properties)
                         .set({
                             address: propData.address,
@@ -192,27 +220,6 @@ export default defineEventHandler(async (event) => {
                 }
             }
 
-            // Helper to normalize phone number
-            const normalizePhoneNumber = (phone: string | null | undefined) => {
-                if (!phone) return '081000000000' // Default dummy
-
-                let clean = phone.toString().replace(/\D/g, '')
-
-                // Handle dummy data specifically
-                if (/^0+$/.test(clean) || clean === '0') {
-                    return '081000000000'
-                }
-
-                // Normalize prefix
-                if (clean.startsWith('62')) {
-                    clean = '0' + clean.slice(2)
-                } else if (!clean.startsWith('0')) {
-                    clean = '0' + clean
-                }
-
-                return clean
-            }
-
             // Step 3: Import Tenants
             // Extract unique tenants
             const tenantsMap = new Map<string, any>()
@@ -220,10 +227,11 @@ export default defineEventHandler(async (event) => {
             excelData.forEach(row => {
                 if (row.tenant_name && row.room_status === 'occupied') {
                     // Normalize phone first for key generation to handle duplicates correctly
-                    const rawPhone = row.tenant_phone ? String(row.tenant_phone) : '000000000000'
+                    const rawPhone = row.tenant_phone ? String(row.tenant_phone) : null
                     const normalizedPhone = normalizePhoneNumber(rawPhone)
 
-                    const key = `${row.tenant_name}::${normalizedPhone}`
+                    // Use a composite key that is robust
+                    const key = `${row.tenant_name.toLowerCase()}::${normalizedPhone}`
 
                     if (!tenantsMap.has(key)) {
                         tenantsMap.set(key, {
@@ -236,6 +244,8 @@ export default defineEventHandler(async (event) => {
                 }
             })
 
+            console.log(`Processing ${tenantsMap.size} tenants...`)
+
             for (const [key, tenantData] of tenantsMap) {
                 // Check if tenant exists
                 const existingTenant = await tx.query.tenants.findFirst({
@@ -246,7 +256,6 @@ export default defineEventHandler(async (event) => {
                 })
 
                 if (existingTenant) {
-                    // Update existing tenant
                     await tx.update(tenants)
                         .set({
                             idCardNumber: tenantData.idCardNumber,
@@ -258,7 +267,6 @@ export default defineEventHandler(async (event) => {
                     stats.updated++
                     details.tenants++
                 } else {
-                    // Generate default PIN
                     const defaultPin = options.generateDefaultPin
                         ? await bcrypt.hash('1234', 10)
                         : null
@@ -279,34 +287,49 @@ export default defineEventHandler(async (event) => {
             }
 
             // Step 4: Import Rooms
+            console.log(`Processing rooms...`)
             for (const row of excelData) {
-                const propertyKey = `${row.users_email}::${row.property_name}`
+                const propertyKey = `${row.users_email}::${row.property_name.toLowerCase()}`
                 const propertyId = propertyIdMap.get(propertyKey)
 
                 if (!propertyId) {
-                    console.error(`Property not found for room: ${row.rooms_name}`)
+                    console.error(`Property not found for room: ${row.rooms_name} (Key: ${propertyKey})`)
+                    // Attempt to find it in the map - maybe some case issue persisted?
+                    console.log('Available keys:', Array.from(propertyIdMap.keys()))
                     continue
                 }
 
                 // Get tenant ID if occupied
                 let tenantId = null
                 if (row.room_status === 'occupied' && row.tenant_name) {
-                    // Must use same normalization logic to find the key
-                    const rawPhone = row.tenant_phone ? String(row.tenant_phone) : '000000000000'
+                    const rawPhone = row.tenant_phone ? String(row.tenant_phone) : null
                     const normalizedPhone = normalizePhoneNumber(rawPhone)
 
-                    const tenantKey = `${row.tenant_name}::${normalizedPhone}`
+                    const tenantKey = `${row.tenant_name.toLowerCase()}::${normalizedPhone}`
                     tenantId = tenantIdMap.get(tenantKey) || null
+
+                    if (!tenantId) {
+                        console.warn(`Tenant not found for room ${row.rooms_name}: ${row.tenant_name} (Key: ${tenantKey})`)
+                    }
                 }
 
                 // Convert move_in_date from number to Date
                 let moveInDate = null
                 if (row.move_in_date) {
-                    const dateStr = row.move_in_date.toString()
-                    const year = dateStr.substring(0, 4)
-                    const month = dateStr.substring(4, 6)
-                    const day = dateStr.substring(6, 8)
-                    moveInDate = `${year}-${month}-${day}`
+                    try {
+                        const dateStr = row.move_in_date.toString()
+                        if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            moveInDate = `${year}-${month}-${day}`
+                        } else {
+                            // Fallback for weird formats if any
+                            console.warn(`Invalid date format for room ${row.rooms_name}: ${dateStr}`)
+                        }
+                    } catch (e) {
+                        console.warn(`Error parsing date for room ${row.rooms_name}`, e)
+                    }
                 }
 
                 // Check if room exists
@@ -320,8 +343,6 @@ export default defineEventHandler(async (event) => {
                 let roomId = null
 
                 if (existingRoom) {
-                    // Update existing room
-                    // Always update
                     await tx.update(rooms)
                         .set({
                             tenantId,
@@ -337,7 +358,6 @@ export default defineEventHandler(async (event) => {
                     stats.updated++
                     details.rooms++
                 } else {
-                    // Create new room
                     const [newRoom] = await tx.insert(rooms).values({
                         propertyId,
                         tenantId,
@@ -356,22 +376,18 @@ export default defineEventHandler(async (event) => {
 
                 // Step 5: Import Meter Readings (if provided)
                 if (roomId && (row.meter_start !== undefined || row.meter_end !== undefined)) {
-                    // Normalize values (handle null/undefined)
+                    // Normalize values
                     const startRaw = row.meter_start
                     const endRaw = row.meter_end
 
-                    // Only proceed if we have valid numbers (even if 0)
                     if (startRaw !== null && startRaw !== undefined && endRaw !== null && endRaw !== undefined) {
-                        // Get recorder user ID
                         const recorderEmail = row.recorder_by
                         const recorderId = recorderEmail ? userIdMap.get(recorderEmail) : null
 
-                        // Determine period (from options or current month)
                         const now = new Date()
                         const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
                         const period = options.targetPeriod || defaultPeriod
 
-                        // Check if reading exists for this period
                         const existingReading = await tx.query.meterReadings.findFirst({
                             where: and(
                                 eq(meterReadings.roomId, roomId),
@@ -380,7 +396,6 @@ export default defineEventHandler(async (event) => {
                         })
 
                         if (existingReading) {
-                            // Update existing reading
                             await tx.update(meterReadings)
                                 .set({
                                     meterStart: Math.round(startRaw),
@@ -390,7 +405,6 @@ export default defineEventHandler(async (event) => {
                                 })
                                 .where(eq(meterReadings.id, existingReading.id))
                         } else {
-                            // Create new reading
                             await tx.insert(meterReadings).values({
                                 roomId,
                                 period,
@@ -416,7 +430,6 @@ export default defineEventHandler(async (event) => {
         console.error('Import error:', error)
 
         if (error.name === 'ZodError' || error.issues) {
-            // Format Zod errors for better readability
             const errorMessages = error.issues?.map((issue: any) => {
                 const path = issue.path.join('.')
                 return `${path}: ${issue.message}`
