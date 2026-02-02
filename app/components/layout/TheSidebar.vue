@@ -159,20 +159,31 @@ const navigation = computed(() => {
     return staffNavigation
   }
   
-  // Admin/Owner: Full navigation with Catat Meter added
+  // Admin/Owner: Full navigation with Catat Meter & Import Data (Admin only)
   const baseNav = appConfig.navigation?.sidebar || defaultNavigation
   return baseNav.map((item: NavItem) => {
     if (item.label === 'Kelola Properti' && item.children) {
+      const children = [...item.children]
+      
+      // Add Catat Meter
+      children.push({
+        label: 'Catat Meter',
+        icon: 'i-heroicons-bolt',
+        to: '/meter-readings'
+      })
+
+      // Add Import Data (Admin only)
+      if (userRole === 'admin') {
+        children.push({
+          label: 'Import Data',
+          icon: 'i-heroicons-arrow-down-tray',
+          to: '/admin/import'
+        })
+      }
+      
       return {
         ...item,
-        children: [
-          ...item.children,
-          {
-            label: 'Catat Meter',
-            icon: 'i-heroicons-bolt',
-            to: '/meter-readings'
-          }
-        ]
+        children
       }
     }
     return item
