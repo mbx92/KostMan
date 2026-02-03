@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rooms, properties } from '../../database/schema';
+import { tenants, rooms, properties } from '../../database/schema';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -17,10 +17,12 @@ export default defineEventHandler(async (event) => {
     // 3. Fetch Room with Property Info for Ownership Check
     const roomResult = await db.select({
         room: rooms,
-        property: properties
+        property: properties,
+        tenant: tenants
     })
         .from(rooms)
         .innerJoin(properties, eq(rooms.propertyId, properties.id))
+        .leftJoin(tenants, eq(rooms.tenantId, tenants.id))
         .where(eq(rooms.id, id))
         .limit(1);
 
@@ -28,7 +30,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Room not found' });
     }
 
-    const { room, property } = roomResult[0];
+    const { room, property, tenant } = roomResult[0];
 
     // 4. Ownership Verification
     if (user.role === Role.OWNER) {
@@ -43,5 +45,8 @@ export default defineEventHandler(async (event) => {
     // The previous prompt context: "auditor: restrict to all units within their assigned site."
     // Let's keep it simple: Owner restricts to own property. Admin sees all. Staff sees all (or unrestricted for now as we don't have staff-property mapping yet other than bills).
 
-    return room;
+    return {
+        ...room,
+        tenant
+    };
 });

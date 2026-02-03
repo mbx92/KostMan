@@ -12,15 +12,13 @@ const { tenants, tenantsLoading } = storeToRefs(store)
 
 const searchQuery = ref('')
 
-// Filter tenants based on search
-const filteredTenants = computed(() => {
-  const activeTenants = tenants.value.filter(t => t.status === 'active')
-  if (!searchQuery.value) return activeTenants
-  const query = searchQuery.value.toLowerCase()
-  return activeTenants.filter(t => 
-    t.name.toLowerCase().includes(query) ||
-    t.contact.toLowerCase().includes(query)
-  )
+// Server-side search with debounce
+let searchTimeout: NodeJS.Timeout
+watch(searchQuery, (newVal) => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    store.fetchTenants({ search: newVal, status: 'active' })
+  }, 400)
 })
 
 const isOpen = computed({
@@ -41,8 +39,8 @@ const createNewTenant = () => {
 // Fetch tenants when modal opens
 watch(isOpen, (open) => {
   if (open) {
-    store.fetchTenants()
     searchQuery.value = ''
+    store.fetchTenants({ status: 'active' })
   }
 })
 </script>
@@ -76,7 +74,7 @@ watch(isOpen, (open) => {
         <!-- Tenant List -->
         <div v-else class="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
           <button
-            v-for="tenant in filteredTenants"
+            v-for="tenant in tenants"
             :key="tenant.id"
             @click="selectTenant(tenant)"
             class="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left rounded-lg"
@@ -90,7 +88,7 @@ watch(isOpen, (open) => {
           </button>
 
           <!-- Empty State -->
-          <div v-if="filteredTenants.length === 0" class="py-8 text-center">
+          <div v-if="tenants.length === 0" class="py-8 text-center">
             <UIcon name="i-heroicons-user-group" class="w-10 h-10 text-gray-300 mx-auto" />
             <p class="text-sm text-gray-500 mt-2">
               {{ searchQuery ? 'Tidak ada penghuni yang cocok.' : 'Tidak ada penghuni aktif.' }}

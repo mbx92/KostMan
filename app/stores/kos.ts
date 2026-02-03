@@ -37,6 +37,7 @@ export interface Room {
     moveInDate?: string | null
     occupantCount?: number
     property?: Property
+    tenant?: Tenant | null
 }
 
 export interface MeterReading {

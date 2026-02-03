@@ -74,11 +74,20 @@ const newTenantContact = ref('')
 const newTenantIdCard = ref('')
 const isTenantModalOpen = ref(false)
 
-// Get selected tenant name from tenants list
+// Get selected tenant from room or list
+const selectedTenant = computed(() => {
+  if (!selectedTenantId.value) return null
+  
+  // Check if it matches the loaded room's tenant
+  if (room.value?.tenant && room.value.tenant.id === selectedTenantId.value) {
+    return room.value.tenant
+  }
+  
+  return tenants.value.find(t => t.id === selectedTenantId.value) || null
+})
+
 const selectedTenantName = computed(() => {
-  if (!selectedTenantId.value) return ''
-  const tenant = tenants.value.find(t => t.id === selectedTenantId.value)
-  return tenant?.name || room.value?.tenantName || ''
+  return selectedTenant.value?.name || room.value?.tenantName || ''
 })
 
 // Handle tenant selection from modal
@@ -553,6 +562,7 @@ const goBack = () => {
                                         <UAvatar :alt="selectedTenantName" size="sm" class="bg-primary-100 text-primary-600" />
                                         <div>
                                             <div class="text-sm font-medium">{{ selectedTenantName }}</div>
+                                            <div v-if="selectedTenant?.contact" class="text-xs text-gray-500">{{ selectedTenant.contact }}</div>
                                             <div v-if="moveInDate" class="text-xs text-gray-500">
                                                 Move-in: {{ new Date(moveInDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) }}
                                             </div>
