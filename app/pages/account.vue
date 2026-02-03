@@ -95,7 +95,7 @@ const getRoleColor = (role: string) => {
             </UBadge>
           </div>
           
-          <UDivider />
+          <USeparator />
           
           <div class="space-y-2 text-sm">
              <div class="flex justify-between">
@@ -121,7 +121,7 @@ const getRoleColor = (role: string) => {
             <UInput v-model="state.currentPassword" type="password" placeholder="Masukkan password saat ini" icon="i-heroicons-lock-closed" class="w-full" />
           </div>
 
-          <UDivider label="Password Baru" class="py-2" />
+          <USeparator label="Password Baru" class="py-2" />
 
           <div class="space-y-6">
             <div class="space-y-2">

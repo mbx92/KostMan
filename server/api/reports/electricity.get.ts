@@ -56,7 +56,9 @@ export default defineEventHandler(async (event) => {
                 lowestUsageRoom: null
             },
             byPeriod: [],
-            byRoom: [],
+            byRoom: {
+                data: []
+            },
             unusualUsage: []
         };
     }
