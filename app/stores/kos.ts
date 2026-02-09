@@ -358,11 +358,12 @@ export const useKosStore = defineStore('kos', () => {
     }
 
     // Rooms - API Integration
-    async function fetchRooms(params?: { propertyId?: string; status?: string; search?: string; page?: number; pageSize?: number }) {
+    async function fetchRooms(params?: { propertyId?: string; status?: string; search?: string; page?: number; pageSize?: number; all?: boolean }) {
         roomsLoading.value = true
         roomsError.value = null
         try {
             const query = new URLSearchParams()
+            if (params?.all) query.append('all', 'true')
             if (params?.propertyId) query.append('propertyId', params.propertyId)
             if (params?.status) query.append('status', params.status)
             if (params?.search) query.append('search', params.search)
