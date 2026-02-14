@@ -617,6 +617,26 @@ onMounted(async () => {
       </UCard>
     </section>
 
+    <!-- Database Configuration Section -->
+    <section class="space-y-6">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Database Configuration</h2>
+          <p class="text-sm text-gray-500">Manage database connections for different environments.</p>
+        </div>
+      </div>
+
+      <UCard class="flex items-center justify-between">
+        <div>
+          <h3 class="font-medium text-gray-900 dark:text-white">Multi-Environment Database Setup</h3>
+          <p class="text-sm text-gray-500 mt-1 mb-2">Configure and switch between Development, Staging, and Production databases.</p>
+        </div>
+        <UButton to="/settings/database-config" icon="i-heroicons-circle-stack" variant="soft" color="primary">
+          Configure Databases
+        </UButton>
+      </UCard>
+    </section>
+
     <!-- Database Backup Section -->
     <section class="space-y-6">
       <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
