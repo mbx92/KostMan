@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
 
     // 2. Query Params
     const query = getQuery(event);
+    const fetchAll = query.all === 'true'; // If true, skip pagination
     const page = Number(query.page) || 1;
     const pageSize = Number(query.pageSize) || 10;
     const offset = (page - 1) * pageSize;
@@ -86,8 +87,10 @@ export default defineEventHandler(async (event) => {
     const totalResult = await countQuery;
     const total = totalResult[0].count;
 
-    // 6. Execute Main Query with Pagination
-    const results = await baseQuery.limit(pageSize).offset(offset);
+    // 6. Execute Main Query - skip pagination if fetchAll is true
+    const results = fetchAll 
+        ? await baseQuery 
+        : await baseQuery.limit(pageSize).offset(offset);
 
     // 7. Format Response
     return {
@@ -100,10 +103,10 @@ export default defineEventHandler(async (event) => {
             }
         })),
         meta: {
-            page,
-            pageSize,
+            page: fetchAll ? 1 : page,
+            pageSize: fetchAll ? total : pageSize,
             total,
-            totalPages: Math.ceil(total / pageSize)
+            totalPages: fetchAll ? 1 : Math.ceil(total / pageSize)
         }
     };
 });

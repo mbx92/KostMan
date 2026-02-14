@@ -61,7 +61,7 @@ onMounted(async () => {
   await Promise.all([
     store.fetchRentBills(),
     store.fetchUtilityBills(),
-    store.fetchRooms(),
+    store.fetchRooms({ all: true }),
     store.fetchProperties(),
     store.fetchSettings(),
     store.fetchTenants(),
@@ -609,7 +609,7 @@ watch(isGenerating, async (newVal) => {
   if (newVal) {
     // Refresh rooms, properties, and tenants when modal opens
     await Promise.all([
-      store.fetchRooms(),
+      store.fetchRooms({ all: true }),
       store.fetchProperties(),
       store.fetchTenants(),
     ]);
