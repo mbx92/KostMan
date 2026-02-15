@@ -98,6 +98,8 @@ export default defineEventHandler(async (event) => {
     message: `Database environment switched to ${environment}`,
     activeEnvironment: environment,
     databaseUrl: maskDatabaseUrl(newDatabaseUrl),
+    platform: process.platform,
+    env: process.env.NODE_ENV,
     note: 'Server restart is REQUIRED for changes to take effect. The .env file has been updated automatically.'
   }
 })

@@ -135,8 +135,11 @@ const switchEnvironment = async (environment: string, autoRestart = true) => {
 
     config.value.activeEnvironment = environment
 
-    if (autoRestart) {
-      // Auto-restart server to apply changes
+    // Check if running on Windows in dev mode
+    const isWindowsDev = (response as any).platform === 'win32' && (response as any).env === 'development'
+
+    if (autoRestart && !isWindowsDev) {
+      // Auto-restart server to apply changes (only on Linux/production)
       toast.add({
         title: 'Restarting Server',
         description: '.env file updated. Server will restart automatically...',
@@ -149,11 +152,16 @@ const switchEnvironment = async (environment: string, autoRestart = true) => {
       // Trigger restart
       await restartServer()
     } else {
-      // Manual restart required
+      // Manual restart required (Windows dev mode or autoRestart=false)
+      const message = isWindowsDev 
+        ? '.env file has been updated. Please manually restart the server with: npm run dev'
+        : '.env file has been updated. Click "Restart Server" button below to apply changes.'
+      
       toast.add({
-        title: 'Restart Required',
-        description: '.env file has been updated. Click "Restart Server" button below to apply changes.',
-        color: 'warning'
+        title: 'Manual Restart Required',
+        description: message,
+        color: 'warning',
+        timeout: 8000
       })
     }
   } catch (error: any) {
@@ -175,6 +183,31 @@ const displayUrl = (env: string) => {
   return showPasswords[env as keyof typeof showPasswords] 
     ? envData.url 
     : envData.masked
+}
+
+// Check if database name matches the expected pattern for the environment
+const shouldShowMismatchWarning = () => {
+  if (!dbInfo.value?.connection?.database) return false
+  
+  const currentDb = dbInfo.value.connection.database.toLowerCase()
+  const env = config.value.activeEnvironment.toLowerCase()
+  
+  // Expected patterns: kostMan_dev, kostMan_staging, kostMan_prod (or kostman_production)
+  const expectedPatterns = [
+    `kostman_${env}`,
+    `kostMan_${env}`,
+    env === 'development' ? 'kostman_dev' : null,
+    env === 'development' ? 'kostMan_dev' : null,
+    env === 'staging' ? 'kostman_staging' : null,
+    env === 'staging' ? 'kostMan_staging' : null,
+    env === 'production' ? 'kostman_prod' : null,
+    env === 'production' ? 'kostMan_prod' : null,
+    env === 'production' ? 'kostman_production' : null,
+    env === 'production' ? 'kostMan_production' : null,
+  ].filter(Boolean) as string[]
+  
+  // If database matches any expected pattern, no warning
+  return !expectedPatterns.some(pattern => currentDb === pattern.toLowerCase())
 }
 
 // Database copy functionality
@@ -318,11 +351,23 @@ const restartServer = async () => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`
       }
-    })
+    }) as any
+
+    // Check if restart is not supported (Windows dev mode)
+    if (response.cannotRestart) {
+      toast.add({
+        title: 'Manual Restart Required',
+        description: response.note || 'Please manually restart the server',
+        color: 'warning',
+        timeout: 10000
+      })
+      restartingServer.value = false
+      return
+    }
 
     toast.add({
       title: 'Server Restarting',
-      description: (response as any).message || 'Server is restarting...',
+      description: response.message || 'Server is restarting...',
       color: 'success'
     })
 
@@ -340,12 +385,24 @@ const restartServer = async () => {
       window.location.reload()
     }, 5000)
   } catch (error: any) {
-    toast.add({
-      title: 'Error',
-      description: error.data?.message || 'Failed to restart server',
-      color: 'error'
-    })
-    restartingServer.value = false
+    // If error is connection error, server might be restarting
+    if (error.message?.includes('fetch')) {
+      toast.add({
+        title: 'Server Restarting',
+        description: 'Connection lost. Page will reload automatically.',
+        color: 'info'
+      })
+      setTimeout(() => {
+        window.location.reload()
+      }, 5000)
+    } else {
+      toast.add({
+        title: 'Error',
+        description: error.data?.message || 'Failed to restart server',
+        color: 'error'
+      })
+      restartingServer.value = false
+    }
   }
 }
 
@@ -442,7 +499,7 @@ const loadDbInfo = async () => {
           </div>
 
           <UAlert
-            v-if="dbInfo.connection?.database !== config.activeEnvironment + '_db' && !dbInfo.connection?.database?.toLowerCase().includes(config.activeEnvironment)"
+            v-if="shouldShowMismatchWarning()"
             icon="i-heroicons-exclamation-triangle"
             color="warning"
             variant="soft"
@@ -610,7 +667,7 @@ const loadDbInfo = async () => {
 
         <UForm :schema="schema" :state="formState" @submit="onSubmit" class="space-y-4">
           <!-- Development -->
-          <UFormGroup 
+          <UFormField 
             label="Development Database" 
             name="development"
             help="PostgreSQL connection URL for development environment"
@@ -630,10 +687,10 @@ const loadDbInfo = async () => {
                 @click="showPasswords.development = !showPasswords.development"
               />
             </div>
-          </UFormGroup>
+          </UFormField>
 
           <!-- Staging -->
-          <UFormGroup 
+          <UFormField 
             label="Staging Database" 
             name="staging"
             help="PostgreSQL connection URL for staging environment"
@@ -653,10 +710,10 @@ const loadDbInfo = async () => {
                 @click="showPasswords.staging = !showPasswords.staging"
               />
             </div>
-          </UFormGroup>
+          </UFormField>
 
           <!-- Production -->
-          <UFormGroup 
+          <UFormField 
             label="Production Database" 
             name="production"
             help="PostgreSQL connection URL for production environment"
@@ -676,7 +733,7 @@ const loadDbInfo = async () => {
                 @click="showPasswords.production = !showPasswords.production"
               />
             </div>
-          </UFormGroup>
+          </UFormField>
 
           <UAlert
             icon="i-heroicons-shield-exclamation"
@@ -724,21 +781,21 @@ const loadDbInfo = async () => {
           </p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UFormGroup label="Source Database" help="Database to copy from">
+            <UFormField label="Source Database" help="Database to copy from">
               <UInput
                 v-model="copyForm.sourceDb"
                 placeholder="kostMan_dev"
-                icon="i-heroicons-database"
+                icon="i-heroicons-circle-stack"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="Target Database" help="New database name">
+            <UFormField label="Target Database" help="New database name">
               <UInput
                 v-model="copyForm.targetDb"
                 placeholder="kostman_prod"
-                icon="i-heroicons-database"
+                icon="i-heroicons-circle-stack"
               />
-            </UFormGroup>
+            </UFormField>
           </div>
 
           <UAlert
