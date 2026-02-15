@@ -37,6 +37,21 @@ const showPasswords = reactive({
   production: false
 })
 
+// Toggle password visibility and switch between masked/full URL
+const togglePasswordVisibility = (env: 'development' | 'staging' | 'production') => {
+  showPasswords[env] = !showPasswords[env]
+  
+  const envData = config.value.environments[env]
+  if (!envData) return
+  
+  // Switch between masked and full URL
+  if (showPasswords[env]) {
+    formState[env] = envData.url || ''
+  } else {
+    formState[env] = envData.masked || ''
+  }
+}
+
 // Schema
 const schema = z.object({
   development: z.string().url('Invalid database URL').optional().or(z.literal('')),
@@ -64,10 +79,11 @@ const loadConfig = async () => {
     })
     config.value = response as any
 
-    // Populate form with actual URLs for editing
-    formState.development = response.environments.development?.url || ''
-    formState.staging = response.environments.staging?.url || ''
-    formState.production = response.environments.production?.url || ''
+    // Populate form with masked/database name only for security
+    // User needs to click eye icon to see/edit full URL
+    formState.development = response.environments.development?.masked || ''
+    formState.staging = response.environments.staging?.masked || ''
+    formState.production = response.environments.production?.masked || ''
   } catch (error: any) {
     toast.add({
       title: 'Error',
@@ -193,6 +209,32 @@ const displayUrl = (env: string) => {
   return showPasswords[env as keyof typeof showPasswords] 
     ? envData.url 
     : envData.masked
+}
+
+// Extract database name from URL (secure display)
+const getDbNameOnly = (env: string) => {
+  const envData = config.value.environments[env as keyof typeof config.value.environments]
+  if (!envData?.url) return 'Not configured'
+  
+  try {
+    // Extract database name from URL
+    // Format: postgresql://user:pass@host:port/dbname
+    const match = envData.url.match(/\/([^/?]+)(\?|$)/)
+    const dbName = match?.[1]
+    
+    if (dbName) {
+      // Also extract host for context
+      const urlObj = new URL(envData.url)
+      const host = urlObj.hostname
+      const port = urlObj.port || '5432'
+      
+      return `${dbName} (${host}:${port})`
+    }
+    
+    return 'Invalid URL'
+  } catch {
+    return 'Invalid URL'
+  }
 }
 
 // Check if database name matches the expected pattern for the environment
@@ -574,8 +616,8 @@ const loadDbInfo = async () => {
                   Active
                 </UBadge>
               </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 break-all">
-                {{ config.environments.development?.masked || 'Not configured' }}
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 font-mono">
+                {{ getDbNameOnly('development') }}
               </p>
               <UButton
                 v-if="config.activeEnvironment !== 'development' && config.environments.development"
@@ -608,8 +650,8 @@ const loadDbInfo = async () => {
                   Active
                 </UBadge>
               </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 break-all">
-                {{ config.environments.staging?.masked || 'Not configured' }}
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 font-mono">
+                {{ getDbNameOnly('staging') }}
               </p>
               <UButton
                 v-if="config.activeEnvironment !== 'staging' && config.environments.staging"
@@ -642,8 +684,8 @@ const loadDbInfo = async () => {
                   Active
                 </UBadge>
               </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 break-all">
-                {{ config.environments.production?.masked || 'Not configured' }}
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 font-mono">
+                {{ getDbNameOnly('production') }}
               </p>
               <UButton
                 v-if="config.activeEnvironment !== 'production' && config.environments.production"
@@ -694,7 +736,7 @@ const loadDbInfo = async () => {
                 :icon="showPasswords.development ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
                 color="neutral"
                 variant="ghost"
-                @click="showPasswords.development = !showPasswords.development"
+                @click="togglePasswordVisibility('development')"
               />
             </div>
           </UFormField>
@@ -717,7 +759,7 @@ const loadDbInfo = async () => {
                 :icon="showPasswords.staging ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
                 color="neutral"
                 variant="ghost"
-                @click="showPasswords.staging = !showPasswords.staging"
+                @click="togglePasswordVisibility('staging')"
               />
             </div>
           </UFormField>
@@ -740,7 +782,7 @@ const loadDbInfo = async () => {
                 :icon="showPasswords.production ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
                 color="neutral"
                 variant="ghost"
-                @click="showPasswords.production = !showPasswords.production"
+                @click="togglePasswordVisibility('production')"
               />
             </div>
           </UFormField>
