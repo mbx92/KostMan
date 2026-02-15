@@ -75,9 +75,14 @@ export default defineEventHandler(async (event) => {
   }
 
   // Update .env file with new DATABASE_URL
+  let envUpdateSuccess = false
+  let envUpdateError = null
   try {
     const envPath = join(process.cwd(), '.env')
+    console.log(`[Database Config] Updating .env file at: ${envPath}`)
+    
     const envContent = await readFile(envPath, 'utf-8')
+    console.log(`[Database Config] Current DATABASE_URL: ${envContent.match(/DATABASE_URL=.*/)?.[0]}`)
     
     // Replace DATABASE_URL line
     const updatedEnvContent = envContent.replace(
@@ -86,10 +91,14 @@ export default defineEventHandler(async (event) => {
     )
     
     await writeFile(envPath, updatedEnvContent, 'utf-8')
+    envUpdateSuccess = true
     
-    console.log(`[Database Config] Updated .env file with ${environment} database URL`)
-  } catch (error) {
-    console.error('[Database Config] Failed to update .env file:', error)
+    console.log(`[Database Config] ✓ Successfully updated .env file with ${environment} database URL`)
+    console.log(`[Database Config] New DATABASE_URL: ${maskDatabaseUrl(newDatabaseUrl)}`)
+  } catch (error: any) {
+    envUpdateError = error.message
+    console.error('[Database Config] ✗ Failed to update .env file:', error)
+    console.error('[Database Config] Error details:', error.message)
     // Continue anyway, user can manually update .env
   }
 
@@ -100,7 +109,11 @@ export default defineEventHandler(async (event) => {
     databaseUrl: maskDatabaseUrl(newDatabaseUrl),
     platform: process.platform,
     env: process.env.NODE_ENV,
-    note: 'Server restart is REQUIRED for changes to take effect. The .env file has been updated automatically.'
+    envUpdated: envUpdateSuccess,
+    envUpdateError: envUpdateError,
+    note: envUpdateSuccess 
+      ? 'Server restart is REQUIRED for changes to take effect. The .env file has been updated automatically.'
+      : `Warning: Failed to update .env file (${envUpdateError}). Please manually update DATABASE_URL in .env and restart server.`
   }
 })
 

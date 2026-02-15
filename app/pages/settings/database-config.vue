@@ -133,6 +133,16 @@ const switchEnvironment = async (environment: string, autoRestart = true) => {
       color: 'success'
     })
 
+    // Show warning if .env update failed
+    if (!(response as any).envUpdated) {
+      toast.add({
+        title: 'Warning',
+        description: (response as any).note,
+        color: 'warning',
+        timeout: 10000
+      })
+    }
+
     config.value.activeEnvironment = environment
 
     // Check if running on Windows in dev mode
