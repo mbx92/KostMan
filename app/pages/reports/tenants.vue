@@ -14,7 +14,7 @@ const statusOptions = [
 ]
 
 // -- Fetch Properties --
-const { data: propertiesData } = await useFetch('/api/properties')
+const { data: propertiesData } = await useAuthFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 const propertyOptions = computed(() => [
   { label: 'Semua Properti', value: 'all' },

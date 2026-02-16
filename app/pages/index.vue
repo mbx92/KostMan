@@ -6,7 +6,7 @@ const kosStore = useKosStore();
 const { reminders } = storeToRefs(kosStore);
 
 // Check authentication from API (cookie-based)
-const { data: authData, error } = await useFetch('/api/auth/me');
+const { data: authData, error } = await useAuthFetch('/api/auth/me');
 
 if (error.value || !authData.value) {
   await navigateTo('/login');

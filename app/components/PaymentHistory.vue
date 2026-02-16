@@ -10,7 +10,7 @@ const toast = useToast()
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 // Fetch payments
-const { data: paymentsData, refresh: refreshPayments } = await useFetch('/api/payments', {
+const { data: paymentsData, refresh: refreshPayments } = await useAuthFetch('/api/payments', {
   query: {
     billId: props.billId,
     billType: props.billType,

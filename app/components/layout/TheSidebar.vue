@@ -18,7 +18,7 @@ const appConfig = useAppConfig()
 const route = useRoute()
 
 // Fetch current user
-const { data: authData } = await useFetch('/api/auth/me')
+const { data: authData } = await useAuthFetch('/api/auth/me')
 const currentUser = computed(() => authData.value?.user)
 
 interface NavItem {

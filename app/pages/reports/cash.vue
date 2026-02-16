@@ -34,7 +34,7 @@ const monthOptions = [
 const queryMonth = computed(() => `${selectedYear.value}-${selectedMonth.value}`)
 
 // -- Fetch Properties for filter --
-const { data: propertiesData } = await useFetch('/api/properties')
+const { data: propertiesData } = await useAuthFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 
 const propertyOptions = computed(() => [

@@ -15,7 +15,7 @@ const router = useRouter()
 const toast = useToast()
 
 // Fetch current user
-const { data: authData, refresh: refreshUser } = await useFetch('/api/auth/me')
+const { data: authData, refresh: refreshUser } = await useAuthFetch('/api/auth/me')
 const currentUser = computed(() => authData.value?.user)
 
 // Search

@@ -9,7 +9,7 @@ const expenseModalOpen = ref(false)
 const selectedExpense = ref<any>(null)
 
 // Fetch properties for filter
-const { data: propertiesData } = useFetch('/api/properties')
+const { data: propertiesData } = useAuthFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 
 // Filters
@@ -19,7 +19,7 @@ const selectedCategory = ref('all')
 const selectedStatus = ref<'all' | 'paid' | 'unpaid'>('all')
 
 // Fetch categories
-const { data: categoriesData } = useFetch('/api/expenses/categories')
+const { data: categoriesData } = useAuthFetch('/api/expenses/categories')
 const allCategories = computed(() => {
   const defaults = categoriesData.value?.categories?.default || []
   const custom = categoriesData.value?.categories?.custom || []
@@ -73,7 +73,7 @@ watch([selectedPropertyId, selectedType, selectedCategory, selectedStatus], () =
 })
 
 // Fetch expenses
-const { data: expensesData, pending: expensesLoading, refresh: refreshExpenses } = useFetch('/api/expenses', {
+const { data: expensesData, pending: expensesLoading, refresh: refreshExpenses } = useAuthFetch('/api/expenses', {
   query: queryParams,
   watch: [page, selectedPropertyId, selectedType, selectedCategory, selectedStatus]
 })

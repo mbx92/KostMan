@@ -3,7 +3,7 @@ import { useKosStore } from '~/stores/kos'
 import { CalendarDate, DateFormatter, getLocalTimeZone } from '@internationalized/date'
 
 // Check authentication
-const { data: authData, error } = await useFetch('/api/auth/me')
+const { data: authData, error } = await useAuthFetch('/api/auth/me')
 if (error.value || !authData.value) {
   await navigateTo('/login')
 }
@@ -22,7 +22,7 @@ const formatNumber = (num: number | null | undefined): string => {
 }
 
 // Fetch properties for filter
-const { data: propertiesData } = await useFetch('/api/properties')
+const { data: propertiesData } = await useAuthFetch('/api/properties')
 const properties = computed(() => propertiesData.value || [])
 const propertyOptions = computed(() => [
   { label: 'Semua Properti', value: '__all__' },
@@ -47,7 +47,7 @@ const currentPeriod = computed(() => {
 // --- Server Side Data Fetching ---
 
 // 1. Fetch Stats
-const { data: statsData, refresh: refreshStats } = await useFetch('/api/meter-readings/stats', {
+const { data: statsData, refresh: refreshStats } = await useAuthFetch('/api/meter-readings/stats', {
   query: computed(() => ({
     propertyId: selectedPropertyId.value,
     period: currentPeriod.value
@@ -55,7 +55,7 @@ const { data: statsData, refresh: refreshStats } = await useFetch('/api/meter-re
 })
 
 // 2. Fetch Rooms (Paginated)
-const { data: roomsData, refresh: refreshRooms, pending: isLoading } = await useFetch('/api/meter-readings/rooms', {
+const { data: roomsData, refresh: refreshRooms, pending: isLoading } = await useAuthFetch('/api/meter-readings/rooms', {
   query: computed(() => ({
     page: currentPage.value,
     pageSize: pageSize,
