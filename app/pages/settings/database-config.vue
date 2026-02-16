@@ -37,8 +37,75 @@ const showPasswords = reactive({
   production: false
 })
 
-// Toggle password visibility and switch between masked/full URL
-const togglePasswordVisibility = (env: 'development' | 'staging' | 'production') => {
+const unlocked = ref(false) // Track if admin has verified password
+const showPasswordModal = ref(false)
+const adminPassword = ref('')
+const verifyingPassword = ref(false)
+const pendingAction = ref<{ type: 'toggle' | 'edit', env?: 'development' | 'staging' | 'production' } | null>(null)
+
+// Verify admin password
+const verifyAdminPassword = async () => {
+  if (!adminPassword.value) {
+    toast.add({
+      title: 'Error',
+      description: 'Please enter your admin password',
+      color: 'error'
+    })
+    return
+  }
+
+  verifyingPassword.value = true
+  try {
+    // Verify password with current user
+    await $fetch('/api/auth/verify-password', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      },
+      body: {
+        password: adminPassword.value
+      }
+    })
+
+    // Password correct - store pending action before closing modal
+    const actionToExecute = pendingAction.value
+    
+    // Clear modal state first
+    unlocked.value = true
+    showPasswordModal.value = false
+    adminPassword.value = ''
+    pendingAction.value = null
+    verifyingPassword.value = false
+
+    toast.add({
+      title: 'Access Granted',
+      description: 'You can now view and edit database URLs',
+      color: 'success'
+    })
+
+    // Wait for modal to fully close before executing action
+    await nextTick()
+    
+    // Execute pending action after modal is closed
+    if (actionToExecute) {
+      if (actionToExecute.type === 'toggle' && actionToExecute.env) {
+        executeTogglePassword(actionToExecute.env)
+      }
+    }
+  } catch (error: any) {
+    // Password incorrect or other error
+    toast.add({
+      title: 'Access Denied',
+      description: error.data?.statusMessage || 'Incorrect password',
+      color: 'error'
+    })
+    adminPassword.value = ''
+    verifyingPassword.value = false
+  }
+}
+
+// Execute the actual toggle after password verification
+const executeTogglePassword = (env: 'development' | 'staging' | 'production') => {
   showPasswords[env] = !showPasswords[env]
   
   const envData = config.value.environments[env]
@@ -50,6 +117,28 @@ const togglePasswordVisibility = (env: 'development' | 'staging' | 'production')
   } else {
     formState[env] = envData.masked || ''
   }
+}
+
+// Toggle password visibility - requires admin password if not unlocked
+const togglePasswordVisibility = (env: 'development' | 'staging' | 'production') => {
+  if (!unlocked.value) {
+    // Need to verify password first
+    pendingAction.value = { type: 'toggle', env }
+    showPasswordModal.value = true
+    return
+  }
+
+  executeTogglePassword(env)
+}
+
+// Check if editing is allowed
+const requestEditAccess = () => {
+  if (!unlocked.value) {
+    pendingAction.value = { type: 'edit' }
+    showPasswordModal.value = true
+    return false
+  }
+  return true
 }
 
 // Schema
@@ -97,6 +186,12 @@ const loadConfig = async () => {
 
 // Save configuration
 const onSubmit = async (event: FormSubmitEvent<Schema>) => {
+  if (!unlocked.value) {
+    // Request access first
+    requestEditAccess()
+    return
+  }
+
   loading.value = true
   try {
     // Only send non-empty values
@@ -154,8 +249,7 @@ const switchEnvironment = async (environment: string, autoRestart = true) => {
       toast.add({
         title: 'Warning',
         description: (response as any).note,
-        color: 'warning',
-        timeout: 10000
+        color: 'warning'
       })
     }
 
@@ -186,8 +280,7 @@ const switchEnvironment = async (environment: string, autoRestart = true) => {
       toast.add({
         title: 'Manual Restart Required',
         description: message,
-        color: 'warning',
-        timeout: 8000
+        color: 'warning'
       })
     }
   } catch (error: any) {
@@ -410,8 +503,7 @@ const restartServer = async () => {
       toast.add({
         title: 'Manual Restart Required',
         description: response.note || 'Please manually restart the server',
-        color: 'warning',
-        timeout: 10000
+        color: 'warning'
       })
       restartingServer.value = false
       return
@@ -464,6 +556,18 @@ onMounted(() => {
   loadDbInfo()
 })
 
+// Watch for modal close to ensure cleanup
+watch(showPasswordModal, (newVal) => {
+  if (!newVal) {
+    // Modal closed - cleanup
+    adminPassword.value = ''
+    if (!unlocked.value) {
+      // If closed without unlocking, clear pending action
+      pendingAction.value = null
+    }
+  }
+})
+
 // Database connection info
 const dbInfo = ref<any>(null)
 const loadingDbInfo = ref(false)
@@ -486,9 +590,9 @@ const loadDbInfo = async () => {
 </script>
 
 <template>
-  <div class="p-4 md:p-6 max-w-7xl mx-auto">
+  <div class="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
     <!-- Header -->
-    <div class="mb-6">
+    <div>
       <UButton to="/settings" variant="ghost" icon="i-heroicons-arrow-left" class="mb-4">
         Back to Settings
       </UButton>
@@ -504,7 +608,7 @@ const loadDbInfo = async () => {
       </div>
     </UCard>
 
-    <div v-else class="space-y-6">
+    <template v-else>
       <!-- Current Database Connection Info -->
       <UCard>
         <template #header>
@@ -600,7 +704,7 @@ const loadDbInfo = async () => {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Development -->
             <div 
-              class="border dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all"
+              class="border dark:border-gray-700 rounded-lg p-4 transition-all"
               :class="config.activeEnvironment === 'development' ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950' : 'hover:border-blue-400'"
             >
               <div class="flex items-center justify-between mb-2">
@@ -634,7 +738,7 @@ const loadDbInfo = async () => {
 
             <!-- Staging -->
             <div 
-              class="border dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all"
+              class="border dark:border-gray-700 rounded-lg p-4 transition-all"
               :class="config.activeEnvironment === 'staging' ? 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950' : 'hover:border-amber-400'"
             >
               <div class="flex items-center justify-between mb-2">
@@ -668,7 +772,7 @@ const loadDbInfo = async () => {
 
             <!-- Production -->
             <div 
-              class="border dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all"
+              class="border dark:border-gray-700 rounded-lg p-4 transition-all"
               :class="config.activeEnvironment === 'production' ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-950' : 'hover:border-red-400'"
             >
               <div class="flex items-center justify-between mb-2">
@@ -718,6 +822,16 @@ const loadDbInfo = async () => {
         </template>
 
         <UForm :schema="schema" :state="formState" @submit="onSubmit" class="space-y-4">
+          <UAlert
+            v-if="!unlocked"
+            icon="i-heroicons-lock-closed"
+            color="warning"
+            variant="soft"
+            title="Protected Configuration"
+            description="Click the eye icon or try to edit to unlock with your admin password."
+            class="mb-4"
+          />
+
           <!-- Development -->
           <UFormField 
             label="Development Database" 
@@ -731,6 +845,7 @@ const loadDbInfo = async () => {
                 placeholder="postgresql://user:password@localhost:5432/dbname"
                 class="flex-1"
                 icon="i-heroicons-code-bracket"
+                :readonly="!unlocked"
               />
               <UButton
                 :icon="showPasswords.development ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
@@ -754,6 +869,7 @@ const loadDbInfo = async () => {
                 placeholder="postgresql://user:password@staging-host:5432/dbname"
                 class="flex-1"
                 icon="i-heroicons-beaker"
+                :readonly="!unlocked"
               />
               <UButton
                 :icon="showPasswords.staging ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
@@ -777,6 +893,7 @@ const loadDbInfo = async () => {
                 placeholder="postgresql://user:password@production-host:5432/dbname"
                 class="flex-1"
                 icon="i-heroicons-server"
+                :readonly="!unlocked"
               />
               <UButton
                 :icon="showPasswords.production ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
@@ -807,9 +924,16 @@ const loadDbInfo = async () => {
             <UButton
               type="submit"
               :loading="loading"
+              :disabled="!unlocked"
               icon="i-heroicons-check"
             >
-              Save Configuration
+              <template v-if="unlocked">
+                Save Configuration
+              </template>
+              <template v-else>
+                <UIcon name="i-heroicons-lock-closed" class="mr-1" />
+                Unlock to Save
+              </template>
             </UButton>
           </div>
         </UForm>
@@ -974,6 +1098,57 @@ const loadDbInfo = async () => {
           />
         </div>
       </UCard>
-    </div>
+    </template>
+
+    <!-- Admin Password Verification Modal -->
+    <UModal 
+      v-model:open="showPasswordModal"
+      title="Admin Verification Required"
+      :prevent-close="verifyingPassword"
+    >
+      <template #content>
+        <div class="p-6 space-y-4">
+          <UAlert
+            icon="i-heroicons-shield-exclamation"
+            color="warning"
+            variant="soft"
+            title="Protected Access"
+            description="Database connection URLs contain sensitive credentials. Please enter your admin password to continue."
+          />
+
+          <UFormField 
+            label="Admin Password" 
+            help="Enter your account password to unlock database URLs"
+          >
+            <UInput
+              v-model="adminPassword"
+              type="password"
+              placeholder="Enter your password"
+              icon="i-heroicons-key"
+              :disabled="verifyingPassword"
+              @keyup.enter="verifyAdminPassword"
+            />
+          </UFormField>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              :disabled="verifyingPassword"
+              @click="showPasswordModal = false; adminPassword = ''; pendingAction = null"
+            >
+              Cancel
+            </UButton>
+            <UButton
+              color="primary"
+              :loading="verifyingPassword"
+              @click="verifyAdminPassword"
+            >
+              Verify & Unlock
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
