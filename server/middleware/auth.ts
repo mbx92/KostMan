@@ -8,7 +8,7 @@ export default defineEventHandler((event) => {
 
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.NUXT_SESSION_PASSWORD || 'default_secret');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || process.env.NUXT_SESSION_PASSWORD || 'default_secret');
             event.context.user = decoded;
         } catch (e) {
             // Token invalid or expired, clear the cookie and ignore

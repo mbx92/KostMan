@@ -2,11 +2,8 @@
 import { useKosStore } from '~/stores/kos'
 import { CalendarDate, DateFormatter, getLocalTimeZone } from '@internationalized/date'
 
-// Check authentication
-const { data: authData, error } = await useAuthFetch('/api/auth/me')
-if (error.value || !authData.value) {
-  await navigateTo('/login')
-}
+// Get current user info (auth already verified by middleware)
+const { data: authData } = await useAuthFetch('/api/auth/me')
 
 const currentUser = computed(() => authData.value?.user)
 const kosStore = useKosStore()

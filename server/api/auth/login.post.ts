@@ -48,13 +48,17 @@ export default defineEventHandler(async (event) => {
 
     const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        process.env.NUXT_SESSION_PASSWORD || 'default_secret',
+        process.env.JWT_SECRET || process.env.NUXT_SESSION_PASSWORD || 'default_secret',
         { expiresIn: '7d' }
     );
 
+    // Detect if request came over HTTPS
+    const isSecure = getRequestURL(event).protocol === 'https:' || 
+                     getRequestHeader(event, 'x-forwarded-proto') === 'https'
+
     setCookie(event, 'auth_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isSecure,
         maxAge: 60 * 60 * 24 * 7, // 7 days
         sameSite: 'lax',
         path: '/',

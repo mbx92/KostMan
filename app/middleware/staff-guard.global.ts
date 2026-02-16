@@ -16,11 +16,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path === '/login') return
 
   try {
-    // Fetch current user
-    const { data } = await useFetch('/api/auth/me', {
-      headers: useRequestHeaders(['cookie']) as any
+    // Fetch current user using $fetch to avoid caching issues in middleware
+    const response = await $fetch<{ user: any }>('/api/auth/me', {
+      credentials: 'include',
     })
-    const user = data.value?.user
+    const user = response?.user
 
     // If no user, let auth middleware handle it
     if (!user) return

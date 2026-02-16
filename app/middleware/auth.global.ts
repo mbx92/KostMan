@@ -1,7 +1,7 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-    // Add '/my-profile' and '/account' to public paths if needed, or handle them in restricted
     const publicPaths = ['/login', '/register', '/tenant-portal/login']
-
+    
+    // Allow public paths
     if (publicPaths.includes(to.path)) {
         return
     }
@@ -11,28 +11,37 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return
     }
 
-    // Check for auth token (Server-side only optimization)
-    // On client, cookie is HttpOnly and invisible to JS, so we must verify via API
-    const token = useCookie('auth_token')
-    if (import.meta.server && !token.value) {
-        return navigateTo('/login')
+    // Allow invoice public paths
+    if (to.path.startsWith('/invoice/')) {
+        return
     }
 
-    // Fetch user to verify session and role (optional but safer)
-    // On server-side: forward cookie headers for SSR
-    // On client-side: browser automatically sends HttpOnly cookies
-    try {
-        const headers = import.meta.server ? useRequestHeaders(['cookie']) : {}
-        const { data, error } = await useFetch('/api/auth/me', {
-            credentials: 'include',
-            headers: headers as any
-        })
-
-        if (error.value || !data.value) {
-            // Token invalid or expired
+    // On server: check cookie directly, if missing redirect immediately
+    if (import.meta.server) {
+        const token = useCookie('auth_token')
+        if (!token.value) {
             return navigateTo('/login')
         }
-    } catch (e) {
+    }
+
+    // Verify session by calling API
+    // Use $fetch (not useFetch) to avoid caching/deduplication issues in middleware
+    try {
+        const headers: Record<string, string> = {}
+        
+        // On server-side, forward cookie headers from the original browser request
+        if (import.meta.server) {
+            const reqHeaders = useRequestHeaders(['cookie'])
+            if (reqHeaders.cookie) {
+                headers['cookie'] = reqHeaders.cookie
+            }
+        }
+
+        await $fetch('/api/auth/me', {
+            headers,
+            credentials: 'include',
+        })
+    } catch (e: any) {
         return navigateTo('/login')
     }
 })

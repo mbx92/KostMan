@@ -5,12 +5,8 @@ import { storeToRefs } from 'pinia';
 const kosStore = useKosStore();
 const { reminders } = storeToRefs(kosStore);
 
-// Check authentication from API (cookie-based)
-const { data: authData, error } = await useAuthFetch('/api/auth/me');
-
-if (error.value || !authData.value) {
-  await navigateTo('/login');
-}
+// Get current user info (auth already verified by middleware)
+const { data: authData } = await useAuthFetch('/api/auth/me');
 
 // Current user and role check
 const currentUser = computed(() => authData.value?.user)
