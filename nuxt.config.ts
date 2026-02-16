@@ -75,4 +75,16 @@ export default defineNuxtConfig({
       port: parseInt(process.env.PORT || '3004'),
     },
   },
+
+  // Ensure cookies are properly handled in production
+  experimental: {
+    payloadExtraction: false,
+  },
+
+  // Global fetch configuration for SSR
+  $production: {
+    routeRules: {
+      '/**': { ssr: true },
+    },
+  },
 })

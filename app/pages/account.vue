@@ -3,9 +3,7 @@ import { z } from 'zod'
 import type { FormSubmitEvent } from '#ui/types'
 
 // Retrieve current user from auth state
-const { data: session } = await useFetch('/api/auth/me', {
-  headers: useRequestHeaders(['cookie']) as any
-})
+const { data: session } = await useAuthFetch('/api/auth/me')
 const user = computed(() => session.value?.user)
 
 const toast = useToast()

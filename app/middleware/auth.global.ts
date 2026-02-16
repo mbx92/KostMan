@@ -19,10 +19,13 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
 
     // Fetch user to verify session and role (optional but safer)
-    // We use useFetch with headers to ensure cookies are passed on SSR
+    // On server-side: forward cookie headers for SSR
+    // On client-side: browser automatically sends HttpOnly cookies
     try {
+        const headers = import.meta.server ? useRequestHeaders(['cookie']) : {}
         const { data, error } = await useFetch('/api/auth/me', {
-            headers: useRequestHeaders(['cookie']) as any
+            credentials: 'include',
+            headers: headers as any
         })
 
         if (error.value || !data.value) {

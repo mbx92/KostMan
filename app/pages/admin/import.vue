@@ -929,7 +929,7 @@ const startImport = async () => {
     }
     
     // Call actual import API
-    const { data, error } = await useFetch('/api/import/excel', {
+    const { data, error } = await useAuthFetch('/api/import/excel', {
       method: 'POST',
       body: {
         data: previewData.value.rawData,
