@@ -67,11 +67,13 @@ const login = async () => {
         color: 'success',
       })
 
-      // Redirect based on whether PIN is default
+      // Redirect with full page reload for iOS compatibility
+      // Small delay to ensure cookie is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
       if (response.isDefaultPin) {
-        router.push('/tenant-portal/change-pin')
+        window.location.href = '/tenant-portal/change-pin';
       } else {
-        router.push('/tenant-portal')
+        window.location.href = '/tenant-portal';
       }
     }
   } catch (e: any) {

@@ -52,8 +52,10 @@ const handleLogin = async () => {
       color: "success",
     });
 
-    // Redirect to homepage
-    await router.push("/");
+    // Redirect to homepage with full page reload for iOS compatibility
+    // Small delay to ensure cookie is set before navigation
+    await new Promise(resolve => setTimeout(resolve, 100));
+    window.location.href = "/";
   } catch (error: any) {
     // Handle error
     const message = error.data?.statusMessage || error.message || "Login failed";
