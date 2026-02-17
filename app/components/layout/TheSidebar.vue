@@ -94,7 +94,7 @@ const defaultNavigation: NavItem[] = [
         to: '/reports/income'
       },
       {
-        label: 'Laporan Penyewa',
+        label: 'Laporan Penghuni',
         to: '/reports/tenants'
       },
       {

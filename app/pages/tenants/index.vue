@@ -74,6 +74,59 @@ const getAssignedRoom = (tenant: any) => {
   return tenant.assignedRoom || null
 }
 
+// Group tenants by property
+interface PropertyGroup {
+  propertyId: string
+  propertyName: string
+  tenants: any[]
+}
+
+const collapsedGroups = ref<Set<string>>(new Set())
+
+const toggleGroup = (propertyId: string) => {
+  const newSet = new Set(collapsedGroups.value)
+  if (newSet.has(propertyId)) {
+    newSet.delete(propertyId)
+  } else {
+    newSet.add(propertyId)
+  }
+  collapsedGroups.value = newSet
+}
+
+const isGroupCollapsed = (propertyId: string) => {
+  return collapsedGroups.value.has(propertyId)
+}
+
+const groupedTenants = computed<PropertyGroup[]>(() => {
+  const groups = new Map<string, PropertyGroup>()
+  const NO_PROPERTY_KEY = '__no_property__'
+
+  for (const tenant of tenants.value) {
+    const room = getAssignedRoom(tenant)
+    const propertyId = room?.propertyId || NO_PROPERTY_KEY
+    const propertyName = room?.propertyName || 'Belum Ada Kamar'
+
+    if (!groups.has(propertyId)) {
+      groups.set(propertyId, {
+        propertyId,
+        propertyName,
+        tenants: []
+      })
+    }
+    groups.get(propertyId)!.tenants.push(tenant)
+  }
+
+  // Sort: properties with names first, then "Belum Ada Kamar" last
+  const result = Array.from(groups.values())
+  result.sort((a, b) => {
+    if (a.propertyId === NO_PROPERTY_KEY) return 1
+    if (b.propertyId === NO_PROPERTY_KEY) return -1
+    return a.propertyName.localeCompare(b.propertyName)
+  })
+
+  return result
+})
+
 // Status filter options
 const statusOptions = [
   { label: 'Semua Status', value: '__all__' },
@@ -213,17 +266,20 @@ const onModalClose = () => {
     </div>
 
     <!-- Loading State -->
-    <div v-if="tenantsLoading && tenants.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      <UCard v-for="i in 4" :key="i">
-        <div class="space-y-3">
-          <USkeleton class="h-10 w-10 rounded-full" />
-          <USkeleton class="h-4 w-32" />
-          <USkeleton class="h-3 w-24" />
+    <div v-if="tenantsLoading && tenants.length === 0" class="space-y-4">
+      <div v-for="i in 3" :key="i" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+        <USkeleton class="h-6 w-48 mb-4" />
+        <div v-for="j in 3" :key="j" class="flex items-center gap-3 py-3 border-t border-gray-100 dark:border-gray-800">
+          <USkeleton class="h-8 w-8 rounded-full" />
+          <div class="space-y-1 flex-1">
+            <USkeleton class="h-4 w-32" />
+            <USkeleton class="h-3 w-24" />
+          </div>
         </div>
-      </UCard>
+      </div>
     </div>
 
-    <!-- Tenants Grid -->
+    <!-- Tenants List Grouped by Property -->
     <div v-else-if="tenants.length > 0" class="relative">
       <!-- Loading Overlay for pagination -->
       <div v-if="tenantsLoading" class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-10 rounded-xl flex items-center justify-center">
@@ -233,50 +289,103 @@ const onModalClose = () => {
         </div>
       </div>
       
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200" :class="{ 'opacity-50': tenantsLoading }">
-      <UCard 
-        v-for="tenant in tenants" 
-        :key="tenant.id"
-        class="group hover:ring-2 hover:ring-primary-500/50 transition-all"
-      >
-        <div class="flex items-start justify-between mb-2">
+      <div class="space-y-4 transition-opacity duration-200" :class="{ 'opacity-50': tenantsLoading }">
+        <div 
+          v-for="group in groupedTenants" 
+          :key="group.propertyId"
+          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden"
+        >
+          <!-- Property Group Header -->
+          <button 
+            class="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+            @click="toggleGroup(group.propertyId)"
+          >
             <div class="flex items-center gap-3">
-                 <UAvatar :alt="tenant.name" size="md" />
-                 <div>
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white leading-tight">{{ tenant.name }}</h3>
-                    <UBadge :color="tenant.status === 'active' ? 'success' : 'neutral'" variant="subtle" size="xs">
-                      {{ tenant.status === 'active' ? 'Aktif' : 'Tidak Aktif' }}
-                    </UBadge>
-                 </div>
+              <div class="p-1.5 rounded-lg" :class="group.propertyId === '__no_property__' ? 'bg-gray-100 dark:bg-gray-800' : 'bg-primary-50 dark:bg-primary-900/30'">
+                <UIcon 
+                  :name="group.propertyId === '__no_property__' ? 'i-heroicons-question-mark-circle' : 'i-heroicons-building-office-2'" 
+                  class="w-5 h-5" 
+                  :class="group.propertyId === '__no_property__' ? 'text-gray-400' : 'text-primary-500'"
+                />
+              </div>
+              <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ group.propertyName }}</h2>
+              <UBadge color="neutral" variant="subtle" size="xs">{{ group.tenants.length }} penghuni</UBadge>
             </div>
-            <div class="flex gap-1">
-                <UButton color="warning" variant="ghost" icon="i-heroicons-key" size="xs" @click="openResetPinModal(tenant)" title="Reset PIN" />
-                <UButton color="neutral" variant="ghost" icon="i-heroicons-pencil-square" size="xs" @click="openEditModal(tenant)" />
-                <UButton color="error" variant="ghost" icon="i-heroicons-trash" size="xs" @click="openDeleteModal(tenant)" />
+            <UIcon 
+              name="i-heroicons-chevron-down" 
+              class="w-5 h-5 text-gray-400 transition-transform duration-200" 
+              :class="{ '-rotate-90': isGroupCollapsed(group.propertyId) }"
+            />
+          </button>
+
+          <!-- Tenant List -->
+          <div v-show="!isGroupCollapsed(group.propertyId)">
+            <div class="divide-y divide-gray-100 dark:divide-gray-800">
+              <div 
+                v-for="tenant in group.tenants" 
+                :key="tenant.id" 
+                class="relative flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group/row"
+              >
+                <!-- Avatar & Main Info -->
+                <div class="flex items-start gap-4 flex-1 min-w-0 w-full sm:w-auto">
+                  <UAvatar :alt="tenant.name" size="md" />
+
+                  <div class="space-y-1 min-w-0 flex-1">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="font-bold text-gray-900 dark:text-white truncate text-base min-w-0">{{ tenant.name }}</span>
+                      <UBadge :color="tenant.status === 'active' ? 'success' : 'neutral'" variant="subtle" size="xs" class="flex-shrink-0">
+                        {{ tenant.status === 'active' ? 'Aktif' : 'Tidak Aktif' }}
+                      </UBadge>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <UIcon name="i-heroicons-phone" class="w-4 h-4 flex-shrink-0" />
+                            <span class="truncate">{{ tenant.contact }}</span>
+                        </div>
+                        <div v-if="tenant.idCardNumber" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-500 font-mono text-xs">
+                           <UIcon name="i-heroicons-identification" class="w-4 h-4 flex-shrink-0" />
+                           <span class="truncate">{{ tenant.idCardNumber }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Room Info (Visible only on mobile) -->
+                    <div class="sm:hidden flex items-center gap-2 text-sm mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <UIcon name="i-heroicons-home" class="w-4 h-4 flex-shrink-0" :class="getAssignedRoom(tenant) ? 'text-primary-500' : 'text-gray-300'" />
+                      <span v-if="getAssignedRoom(tenant)" class="text-primary-600 dark:text-primary-400 font-medium">
+                        {{ getAssignedRoom(tenant).name }}
+                      </span>
+                      <span v-else class="text-gray-400 italic text-xs">Belum ada kamar</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Desktop Room Info -->
+                <div class="hidden sm:flex items-center gap-2 text-sm w-48 shrink-0">
+                  <UIcon name="i-heroicons-home" class="w-4 h-4" :class="getAssignedRoom(tenant) ? 'text-primary-500' : 'text-gray-300'" />
+                  <span v-if="getAssignedRoom(tenant)" class="text-primary-600 dark:text-primary-400 font-medium truncate">
+                    {{ getAssignedRoom(tenant).name }}
+                  </span>
+                  <span v-else class="text-gray-400 italic text-xs">Belum ada kamar</span>
+                </div>
+
+                <!-- Desktop Actions (Hover) -->
+                <div class="hidden sm:flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                  <!-- <UButton color="warning" variant="ghost" icon="i-heroicons-key" size="sm" @click.stop="openResetPinModal(tenant)" title="Reset PIN" /> -->
+                  <UButton color="neutral" variant="ghost" icon="i-heroicons-pencil-square" size="sm" @click.stop="openEditModal(tenant)" />
+                  <UButton color="error" variant="ghost" icon="i-heroicons-trash" size="sm" @click.stop="openDeleteModal(tenant)" />
+                </div>
+
+                <!-- Mobile Actions (Bottom Row) -->
+                <div class="sm:hidden w-full flex items-center justify-end gap-2 pt-3 mt-1 border-t border-gray-100 dark:border-gray-800">
+                    <!-- <UButton color="warning" variant="soft" icon="i-heroicons-key" size="xs" @click.stop="openResetPinModal(tenant)">Reset PIN</UButton> -->
+                    <UButton color="neutral" variant="soft" icon="i-heroicons-pencil-square" size="xs" @click.stop="openEditModal(tenant)">Edit</UButton>
+                    <UButton color="error" variant="soft" icon="i-heroicons-trash" size="xs" @click.stop="openDeleteModal(tenant)">Hapus</UButton>
+                </div>
+              </div>
             </div>
+          </div>
         </div>
-        
-        <div class="space-y-2 mt-4 text-sm">
-            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <UIcon name="i-heroicons-phone" class="w-4 h-4" />
-                <span>{{ tenant.contact }}</span>
-            </div>
-            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <UIcon name="i-heroicons-identification" class="w-4 h-4" />
-                <span class="font-mono text-xs">{{ tenant.idCardNumber }}</span>
-            </div>
-            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300" v-if="getAssignedRoom(tenant)">
-                <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                <span class="text-primary-600 dark:text-primary-400 font-medium">
-                  {{ getAssignedRoom(tenant).propertyName }} - {{ getAssignedRoom(tenant).name }}
-                </span>
-            </div>
-            <div class="flex items-center gap-2 text-gray-400 italic" v-else>
-                <UIcon name="i-heroicons-home" class="w-4 h-4" />
-                <span>Belum ada kamar</span>
-            </div>
-        </div>
-      </UCard>
       </div>
     </div>
     
