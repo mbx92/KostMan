@@ -17,7 +17,7 @@ let searchTimeout: NodeJS.Timeout
 watch(searchQuery, (newVal) => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    store.fetchTenants({ search: newVal, status: 'active' })
+    store.fetchTenants({ search: newVal, status: 'active', all: true })
   }, 400)
 })
 
@@ -40,7 +40,7 @@ const createNewTenant = () => {
 watch(isOpen, (open) => {
   if (open) {
     searchQuery.value = ''
-    store.fetchTenants({ status: 'active' })
+    store.fetchTenants({ status: 'active', all: true })
   }
 })
 </script>

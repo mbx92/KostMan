@@ -653,11 +653,12 @@ export const useKosStore = defineStore('kos', () => {
 
 
     // Tenants - API Integration
-    async function fetchTenants(params?: { status?: 'active' | 'inactive'; search?: string; page?: number; pageSize?: number }) {
+    async function fetchTenants(params?: { status?: 'active' | 'inactive'; search?: string; page?: number; pageSize?: number; all?: boolean }) {
         tenantsLoading.value = true
         tenantsError.value = null
         try {
             const query = new URLSearchParams()
+            if (params?.all) query.append('all', 'true')
             if (params?.status) query.append('status', params.status)
             if (params?.search) query.append('search', params.search)
             if (params?.page) query.append('page', params.page.toString())

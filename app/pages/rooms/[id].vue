@@ -47,7 +47,7 @@ async function loadRoom() {
 }
 
 onMounted(async () => {
-  await store.fetchTenants() // Fetch tenants on mount
+  await store.fetchTenants({ all: true }) // Fetch tenants on mount
   await store.fetchProperties() // Fetch properties for settings
   await loadRoom()
   // Fetch meter readings and bills for this room

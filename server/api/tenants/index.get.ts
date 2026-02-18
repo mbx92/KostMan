@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
     requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
     const query = getQuery(event);
+    const fetchAll = query.all === 'true';
     const status = query.status as string | undefined;
     const search = query.search as string | undefined;
     const page = parseInt(query.page as string) || 1;
@@ -44,8 +45,7 @@ export default defineEventHandler(async (event) => {
         .from(tenants)
         .where(whereClause);
 
-    // Get paginated data with room and property info
-    const data = await db
+    const baseQuery = db
         .select({
             tenant: tenants,
             room: rooms,
@@ -55,9 +55,11 @@ export default defineEventHandler(async (event) => {
         .leftJoin(rooms, and(eq(tenants.id, rooms.tenantId), eq(rooms.status, 'occupied')))
         .leftJoin(properties, eq(rooms.propertyId, properties.id))
         .where(whereClause)
-        .limit(pageSize)
-        .offset(offset)
         .orderBy(tenants.name);
+
+    const data = fetchAll
+        ? await baseQuery
+        : await baseQuery.limit(pageSize).offset(offset);
 
     // Format the response
     const formattedData = data.map(row => ({
@@ -73,10 +75,10 @@ export default defineEventHandler(async (event) => {
     return {
         data: formattedData,
         meta: {
-            page,
-            pageSize,
+            page: fetchAll ? 1 : page,
+            pageSize: fetchAll ? Number(total) : pageSize,
             total: Number(total),
-            totalPages: Math.ceil(Number(total) / pageSize)
+            totalPages: fetchAll ? 1 : Math.ceil(Number(total) / pageSize)
         }
     };
 });

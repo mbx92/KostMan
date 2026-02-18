@@ -10,7 +10,7 @@ const selectedTenant = ref(undefined)
 
 // Pagination and Filter state
 const currentPage = ref(1)
-const pageSize = ref(20)
+
 const searchQuery = ref('')
 const statusFilter = ref<string>('__all__')
 
@@ -26,9 +26,9 @@ const deleteLoading = ref(false)
 
 // Load tenants with current filters
 async function loadTenants() {
-  const params: { status?: 'active' | 'inactive'; search?: string; page?: number; pageSize?: number } = {
+  const params: { status?: 'active' | 'inactive'; search?: string; page?: number; pageSize?: number; all?: boolean } = {
     page: currentPage.value,
-    pageSize: pageSize.value
+    all: true
   }
   if (statusFilter.value !== '__all__') {
     params.status = statusFilter.value as 'active' | 'inactive'
@@ -64,10 +64,7 @@ watch(currentPage, () => {
   loadTenants()
 })
 
-watch(pageSize, () => {
-  currentPage.value = 1
-  loadTenants()
-})
+
 
 // Get assigned room from tenant data (already included in API response)
 const getAssignedRoom = (tenant: any) => {
@@ -135,12 +132,7 @@ const statusOptions = [
 ]
 
 // Page size options
-const pageSizeOptions = [
-  { label: '10 per halaman', value: 10 },
-  { label: '20 per halaman', value: 20 },
-  { label: '50 per halaman', value: 50 },
-  { label: '100 per halaman', value: 100 }
-]
+
 
 const openAddModal = () => {
   selectedTenant.value = undefined
@@ -245,25 +237,13 @@ const onModalClose = () => {
         label-key="label"
         class="w-full md:w-40"
       />
-      <!-- Page Size -->
-      <USelect 
-        v-model="pageSize" 
-        :items="pageSizeOptions" 
-        value-key="value" 
-        label-key="label"
-        class="w-full md:w-36"
-      />
       <span v-if="tenantsMeta.total > 0" class="text-sm text-gray-500 ml-auto">
-        {{ tenantsMeta.total }} penghuni
+        Total {{ tenantsMeta.total }} penghuni
       </span>
       </div>
     </div>
 
-    <!-- Results Info -->
-    <div v-if="tenantsMeta.total > 0 && tenantsMeta.totalPages > 1" class="flex items-center justify-between text-sm text-gray-500">
-      <span>Halaman {{ tenantsMeta.page }} dari {{ tenantsMeta.totalPages }}</span>
-      <span>Menampilkan {{ tenants.length }} data</span>
-    </div>
+
 
     <!-- Loading State -->
     <div v-if="tenantsLoading && tenants.length === 0" class="space-y-4">
@@ -401,15 +381,7 @@ const onModalClose = () => {
         <UButton v-if="!searchQuery && statusFilter === '__all__'" icon="i-heroicons-plus" @click="openAddModal">Tambah Penghuni</UButton>
     </div>
 
-    <!-- Pagination -->
-    <div v-if="tenantsMeta.totalPages > 1" class="flex justify-center pt-4">
-      <UPagination 
-        :page="currentPage" 
-        :total="tenantsMeta.total" 
-        :items-per-page="pageSize"
-        @update:page="(p) => currentPage = p"
-      />
-    </div>
+
 
     <!-- Modal -->
     <TenantModal v-model="isModalOpen" :tenant="selectedTenant" @update:modelValue="onModalClose" />
