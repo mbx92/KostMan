@@ -46,6 +46,11 @@ export default defineEventHandler(async (event) => {
             if (room.length > 0) {
                 const roomData = room[0];
 
+                // Jangan buat/update utility bill jika kamar belum ada penghuni
+                if (!roomData.tenantId) {
+                    return { meterReading, utilityBill };
+                }
+
                 const propSettings = await tx.select()
                     .from(propertySettings)
                     .where(eq(propertySettings.propertyId, roomData.propertyId))
