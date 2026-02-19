@@ -773,55 +773,18 @@ export const useKosStore = defineStore('kos', () => {
         meterReadingsLoading.value = true
         meterReadingsError.value = null
         try {
-            const newReading = await $fetch<MeterReading>('/api/meter-readings', {
+            const response = await $fetch<{ meterReading: MeterReading; utilityBill: UtilityBill | null }>('/api/meter-readings', {
                 method: 'POST',
                 body: reading
             })
-            meterReadings.value.unshift(newReading)
+            meterReadings.value.unshift(response.meterReading)
 
-            // Auto-Generate Bills
-            try {
-                const room = rooms.value.find(r => r.id === reading.roomId)
-                if (room) {
-                    const property = properties.value.find(p => p.id === room.propertyId)
-                    const effectiveSettings = property?.settings || settings.value
-
-                    if (effectiveSettings) {
-                        // 1. Create utility bill for this meter reading
-                        await createUtilityBill({
-                            roomId: reading.roomId,
-                            period: reading.period,
-                            meterStart: reading.meterStart,
-                            meterEnd: reading.meterEnd,
-                            costPerKwh: Number(effectiveSettings.costPerKwh),
-                            waterFee: Number(effectiveSettings.waterFee),
-                            trashFee: room.useTrashService ? Number(effectiveSettings.trashFee) : 0,
-                            additionalCost: 0
-                        })
-
-                        // 2. Check if rent bill exists for this period, if not create one
-                        const existingRentBills = await $fetch<RentBill[]>('/api/rent-bills', {
-                            params: { roomId: reading.roomId, period: reading.period }
-                        })
-
-                        if (existingRentBills.length === 0) {
-                            // No rent bill for this period, create one
-                            // Convert period (YYYY-MM) to periodStartDate (YYYY-MM-DD)
-                            const periodStartDate = reading.period + '-01'
-                            await generateRentBill({
-                                roomId: reading.roomId,
-                                periodStartDate: periodStartDate,
-                                monthsCovered: 1,
-                                roomPrice: Number(room.price)
-                            })
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('Auto bill creation failed:', e)
+            // Add the auto-generated utility bill to local store if present
+            if (response.utilityBill) {
+                utilityBills.value.unshift(response.utilityBill)
             }
 
-            return newReading
+            return response.meterReading
         } catch (err: any) {
             meterReadingsError.value = err?.data?.message || err?.message || 'Failed to add meter reading'
             console.error('addMeterReading error:', err)
@@ -835,15 +798,24 @@ export const useKosStore = defineStore('kos', () => {
         meterReadingsLoading.value = true
         meterReadingsError.value = null
         try {
-            const updatedReading = await $fetch<MeterReading>(`/api/meter-readings/${id}`, {
+            const response = await $fetch<{ meterReading: MeterReading; utilityBill: UtilityBill | null }>(`/api/meter-readings/${id}`, {
                 method: 'PATCH',
                 body: updates
             })
             const index = meterReadings.value.findIndex(r => r.id === id)
             if (index !== -1) {
-                meterReadings.value[index] = updatedReading
+                meterReadings.value[index] = response.meterReading
             }
-            return updatedReading
+
+            // Sync updated utility bill in local store
+            if (response.utilityBill) {
+                const billIndex = utilityBills.value.findIndex(b => b.id === response.utilityBill!.id)
+                if (billIndex !== -1) {
+                    utilityBills.value[billIndex] = response.utilityBill
+                }
+            }
+
+            return response.meterReading
         } catch (err: any) {
             meterReadingsError.value = err?.data?.message || err?.message || 'Failed to update meter reading'
             console.error('updateMeterReading error:', err)
@@ -857,10 +829,22 @@ export const useKosStore = defineStore('kos', () => {
         meterReadingsLoading.value = true
         meterReadingsError.value = null
         try {
-            await $fetch<MeterReading>(`/api/meter-readings/${id}`, {
-                method: 'DELETE' as 'DELETE'
+            // Find the reading before deleting so we can remove the associated bill
+            const reading = meterReadings.value.find(r => r.id === id)
+
+            await $fetch(`/api/meter-readings/${id}`, {
+                method: 'DELETE'
             })
+
+            // Remove meter reading from local store
             meterReadings.value = meterReadings.value.filter(r => r.id !== id)
+
+            // Remove associated utility bill from local store (backend deletes it too)
+            if (reading) {
+                utilityBills.value = utilityBills.value.filter(
+                    b => !(b.roomId === reading.roomId && b.period === reading.period)
+                )
+            }
         } catch (err: any) {
             meterReadingsError.value = err?.data?.message || err?.message || 'Failed to delete meter reading'
             console.error('deleteMeterReading error:', err)

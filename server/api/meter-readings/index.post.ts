@@ -1,8 +1,9 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { meterReadings } from '../../database/schema';
+import { meterReadings, rooms, propertySettings } from '../../database/schema';
 import { meterReadingSchema } from '../../validations/meter-reading';
 import { eq, and } from 'drizzle-orm';
+import { createUtilityBill } from '../../services/utilityBillService';
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
@@ -28,23 +29,64 @@ export default defineEventHandler(async (event) => {
     }
 
     try {
-        const result = await db.insert(meterReadings).values({
-            ...validatedData,
-            recordedAt: new Date(),
-            recordedBy: user.id
-        }).returning();
+        const result = await db.transaction(async (tx) => {
+            // Insert meter reading
+            const meterResult = await tx.insert(meterReadings).values({
+                ...validatedData,
+                recordedAt: new Date(),
+                recordedBy: user.id
+            }).returning();
 
-        return result[0];
+            const meterReading = meterResult[0];
+
+            // Auto-create utility bill from meter reading
+            const room = await tx.select()
+                .from(rooms)
+                .where(eq(rooms.id, validatedData.roomId))
+                .limit(1);
+
+            let utilityBill = null;
+
+            if (room.length > 0) {
+                const roomData = room[0];
+
+                const propSettings = await tx.select()
+                    .from(propertySettings)
+                    .where(eq(propertySettings.propertyId, roomData.propertyId))
+                    .limit(1);
+
+                if (propSettings.length > 0) {
+                    const settings = propSettings[0];
+                    const trashFee = roomData.useTrashService ? Number(settings.trashFee) : 0;
+
+                    utilityBill = await createUtilityBill({
+                        roomId: validatedData.roomId,
+                        period: validatedData.period,
+                        meterStart: validatedData.meterStart,
+                        meterEnd: validatedData.meterEnd,
+                        costPerKwh: Number(settings.costPerKwh),
+                        waterFee: Number(settings.waterFee),
+                        trashFee: trashFee,
+                    }, user, tx);
+                }
+            }
+
+            return { meterReading, utilityBill };
+        });
+
+        return result;
     } catch (error: any) {
-        // Log the error for debugging
         console.error('Meter reading insert error:', error);
-        
-        // Robust check for unique constraint violation
-        // Check both object properties and string representation
-        const isDuplicate = 
-            error?.code === '23505' || 
+
+        // Re-throw H3 errors (createError) as-is
+        if (error.statusCode) {
+            throw error;
+        }
+
+        const isDuplicate =
+            error?.code === '23505' ||
             (error?.message && typeof error.message === 'string' && (
-                error.message.toLowerCase().includes('unique') || 
+                error.message.toLowerCase().includes('unique') ||
                 error.message.toLowerCase().includes('duplicate')
             )) ||
             String(error).toLowerCase().includes('unique constraint');
@@ -56,7 +98,7 @@ export default defineEventHandler(async (event) => {
                 message: `Meter reading untuk periode "${validatedData.period}" pada kamar ini sudah ada (mungkin di sampah/deleted). Hapus permanen data lama jika ingin input ulang.`
             });
         }
-        
+
         throw createError({
             statusCode: 500,
             statusMessage: 'Internal Server Error',
@@ -64,3 +106,5 @@ export default defineEventHandler(async (event) => {
         });
     }
 });
+
+
