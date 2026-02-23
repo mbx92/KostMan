@@ -185,11 +185,12 @@ const totalTenants = computed(() => kosStore.tenants.length);
           <template #header>
             <h3 class="font-semibold">Aksi Cepat</h3>
           </template>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
              <UButton to="/properties" icon="i-heroicons-building-office-2" block variant="soft">Kelola Properti</UButton>
              <UButton to="/tenants" icon="i-heroicons-users" block variant="soft">Kelola Penghuni</UButton>
              <UButton to="/billing" icon="i-heroicons-banknotes" block variant="soft">Buat Tagihan</UButton>
              <UButton to="/meter-readings" icon="i-heroicons-bolt" block variant="soft">Catat Meter</UButton>
+             <UButton to="/reminders" icon="i-heroicons-bell-alert" block variant="soft">Pengingat Tagihan</UButton>
           </div>
         </UCard>
          <UCard>
