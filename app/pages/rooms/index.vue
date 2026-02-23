@@ -272,7 +272,7 @@ const onModalClose = () => {
                         </div>
                     </div>
                     <UBadge :color="getStatusColor(room.status)" variant="subtle" class="capitalize">
-                        {{ room.status }}
+                        {{ room.status === 'available' ? 'Tersedia' : room.status === 'occupied' ? 'Terisi' : 'Perbaikan' }}
                     </UBadge>
                 </div>
 

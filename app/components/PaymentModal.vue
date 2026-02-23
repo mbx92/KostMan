@@ -99,7 +99,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <UCard>
+  <UCard class="max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
     <template #header>
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold">Catat Pembayaran</h3>

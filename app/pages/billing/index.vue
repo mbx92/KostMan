@@ -2272,7 +2272,7 @@ const sendReminder = async (reminder: any) => {
   <!-- Generate Rent Bill Modal -->
   <UModal :open="isGenerating" @close="isGenerating = false">
     <template #content>
-      <UCard>
+      <UCard class="max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="font-semibold text-lg">Buat Tagihan Sewa</h3>
@@ -2507,7 +2507,7 @@ const sendReminder = async (reminder: any) => {
   <!-- Payment History Modal -->
   <UModal :open="paymentHistoryOpen" @close="paymentHistoryOpen = false">
     <template #content>
-      <UCard>
+      <UCard class="max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Riwayat Pembayaran</h3>

@@ -9,13 +9,14 @@ export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
     const query = getQuery(event);
+    const fetchAll = query.all === 'true' || query.all === true;
     const page = Number(query.page) || 1;
     const pageSize = Number(query.pageSize) || 10;
     const offset = (page - 1) * pageSize;
 
     const propertyId = query.propertyId as string | undefined;
     const search = query.search as string | undefined;
-    const status = query.status as string | undefined; // 'recorded' | 'unrecorded' | 'all'
+    const occupancy = query.occupancy as string | undefined || 'occupied'; // 'all' | 'occupied'
 
     // Default to current month YYYY-MM if not provided
     const now = new Date();
@@ -57,7 +58,12 @@ export default defineEventHandler(async (event) => {
         conditions.push(eq(properties.userId, user.id));
     }
 
-    // 3. Search Filter (Room Name, Property Name, or Tenant Name)
+    // 3. Occupancy Filter
+    if (occupancy === 'occupied') {
+        conditions.push(eq(rooms.status, 'occupied'));
+    }
+
+    // 4. Search Filter (Room Name, Property Name, or Tenant Name)
     if (search) {
         const lowerSearch = `%${search.toLowerCase()}%`;
         conditions.push(or(
@@ -65,13 +71,6 @@ export default defineEventHandler(async (event) => {
             like(sql`lower(${properties.name})`, lowerSearch),
             like(sql`lower(${tenants.name})`, lowerSearch)
         ));
-    }
-
-    // 4. Status Filter
-    if (status === 'recorded') {
-        conditions.push(isNotNull(currentReadings.id));
-    } else if (status === 'unrecorded') {
-        conditions.push(isNull(currentReadings.id));
     }
 
     // Apply conditions
@@ -105,10 +104,12 @@ export default defineEventHandler(async (event) => {
 
     // --- Execute Main Query ---
     // Add sorting (default by room Name)
-    const results = await baseQuery
-        .orderBy(asc(rooms.name))
-        .limit(pageSize)
-        .offset(offset);
+    let finalQuery = baseQuery.orderBy(asc(rooms.name));
+    if (!fetchAll) {
+        finalQuery = finalQuery.limit(pageSize).offset(offset) as any;
+    }
+
+    const results = await finalQuery;
 
     // --- Fetch Latest Readings for these rooms ---
     // We need the "Last Inserted Record" (Periode Terakhir) regardless of the current period filter.
