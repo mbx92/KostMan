@@ -594,7 +594,7 @@ function formatDate(dateStr: string | null) {
     <!-- Meter Recording Modal -->
     <UModal v-model:open="showModal">
       <template #content>
-        <UCard>
+        <UCard class="max-h-[90dvh] flex flex-col overflow-hidden" :ui="{ body: 'overflow-y-auto flex-1 min-h-0' }">
           <template #header>
             <div class="flex items-center justify-between">
               <div>
