@@ -173,13 +173,13 @@ const navigation = computed(() => {
       })
 
       // Add Import Data (Admin only)
-      if (userRole === 'admin') {
-        children.push({
-          label: 'Import Data',
-          icon: 'i-heroicons-arrow-down-tray',
-          to: '/admin/import'
-        })
-      }
+      // if (userRole === 'admin') {
+      //   children.push({
+      //     label: 'Import Data',
+      //     icon: 'i-heroicons-arrow-down-tray',
+      //     to: '/admin/import'
+      //   })
+      // }
       
       return {
         ...item,

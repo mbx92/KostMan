@@ -111,30 +111,212 @@ const openEditRoomModal = (room: Room) => {
 }
 
 const deleteRoom = async (room: Room) => {
-    const confirmed = await confirmDialog.value?.confirm({
-      title: 'Hapus Kamar?',
-      message: `Apakah Anda yakin ingin menghapus "${room.name}"? Ini juga akan menghapus riwayat billing-nya.`,
-      confirmText: 'Ya, Hapus',
-      confirmColor: 'error'
+  const confirmed = await confirmDialog.value?.confirm({
+    title: 'Hapus Kamar?',
+    message: `Apakah Anda yakin ingin menghapus "${room.name}"? Ini juga akan menghapus riwayat billing-nya.`,
+    confirmText: 'Ya, Hapus',
+    confirmColor: 'error'
+  })
+  
+  if (!confirmed) return
+  
+  try {
+    await store.deleteRoom(room.id)
+    toast.add({ title: 'Kamar Dihapus', color: 'success' })
+  } catch (err: any) {
+    toast.add({ 
+        title: 'Error', 
+        description: err?.data?.message || err?.message || 'Gagal menghapus kamar',
+        color: 'error' 
     })
-    
-    if (!confirmed) return
-    
-try {
-            await store.deleteRoom(room.id)
-            toast.add({ title: 'Kamar Dihapus', color: 'success' })
-        } catch (err: any) {
-            toast.add({ 
-                title: 'Error', 
-                description: err?.data?.message || err?.message || 'Gagal menghapus kamar',
-                color: 'error' 
-            })
-        }
+  }
 }
 
 const onModalClose = () => {
   loadRooms()
 }
+
+// Update Room Price Modal State
+const isUpdateRoomPriceModalOpen = ref(false)
+const priceChangeValue = ref<number | null>(null)
+const selectedModalPropertyId = ref<string>('__all__')
+const selectedModalRoomIds = ref<string[]>([])
+
+const modalRoomsLoading = ref(false)
+const modalRoomsError = ref<string | null>(null)
+const modalRoomsData = ref<Room[]>([])
+
+const isBulkUpdatingRoomPrices = ref(false)
+const bulkUpdateError = ref<string | null>(null)
+const bulkUpdateProgress = ref({
+  current: 0,
+  total: 0,
+  percentage: 0
+})
+
+const loadModalRooms = async () => {
+  modalRoomsLoading.value = true
+  modalRoomsError.value = null
+  try {
+    const query = new URLSearchParams()
+    query.append('all', 'true')
+    if (selectedModalPropertyId.value !== '__all__') {
+      query.append('propertyId', selectedModalPropertyId.value)
+    }
+    const response = await $fetch<{ data: Room[] }>(`/api/rooms?${query.toString()}`)
+    modalRoomsData.value = (response.data || []).map(r => ({
+      ...r,
+      price: Number((r as any).price)
+    }))
+  } catch (err: any) {
+    modalRoomsError.value = err?.data?.message || err?.message || 'Gagal memuat daftar kamar'
+  } finally {
+    modalRoomsLoading.value = false
+  }
+}
+
+const openUpdateRoomPriceModal = () => {
+  selectedModalPropertyId.value = selectedPropertyId.value !== '__all__'
+    ? selectedPropertyId.value
+    : '__all__'
+  selectedModalRoomIds.value = []
+  priceChangeValue.value = null
+  bulkUpdateError.value = null
+  bulkUpdateProgress.value = { current: 0, total: 0, percentage: 0 }
+  isUpdateRoomPriceModalOpen.value = true
+  loadModalRooms()
+}
+
+const modalRooms = computed(() => {
+  return modalRoomsData.value.map(room => {
+    const property = (room as any).property || properties.value.find(p => p.id === room.propertyId)
+    return {
+      ...room,
+      price: Number((room as any).price),
+      propertyName: property ? property.name : 'Unknown Property',
+      tenantName: (room as any).tenantName || ''
+    }
+  })
+})
+
+const selectedModalRooms = computed(() => {
+  const selected = new Set(selectedModalRoomIds.value)
+  return modalRooms.value.filter(r => selected.has(r.id))
+})
+
+const canApplyBulkUpdate = computed(() => {
+  return (
+    !isBulkUpdatingRoomPrices.value &&
+    priceChangeValue.value !== null &&
+    Number.isFinite(Number(priceChangeValue.value)) &&
+    Number(priceChangeValue.value) > 0 &&
+    selectedModalRoomIds.value.length > 0
+  )
+})
+
+const areAllModalRoomsSelected = computed(() => {
+  return modalRooms.value.length > 0 && selectedModalRoomIds.value.length === modalRooms.value.length
+})
+
+const toggleAllModalRooms = () => {
+  if (areAllModalRoomsSelected.value) {
+    selectedModalRoomIds.value = []
+  } else {
+    selectedModalRoomIds.value = modalRooms.value.map(r => r.id)
+  }
+}
+
+const applyBulkUpdateRoomPrices = async () => {
+  if (!canApplyBulkUpdate.value) return
+
+  const newPrice = Number(priceChangeValue.value)
+  if (!Number.isFinite(newPrice) || newPrice <= 0) {
+    toast.add({
+      title: 'Harga tidak valid',
+      description: 'Masukkan nominal harga baru yang valid.',
+      color: 'error'
+    })
+    return
+  }
+
+  isBulkUpdatingRoomPrices.value = true
+  bulkUpdateError.value = null
+
+  const roomsToUpdate = [...selectedModalRooms.value]
+  bulkUpdateProgress.value = {
+    current: 0,
+    total: roomsToUpdate.length,
+    percentage: 0
+  }
+
+  try {
+    for (const room of roomsToUpdate) {
+      await $fetch(`/api/rooms/${room.id}`, {
+        method: 'PUT',
+        body: {
+          price: newPrice
+        }
+      })
+
+      const idx = rooms.value.findIndex(r => r.id === room.id)
+      if (idx !== -1) {
+        rooms.value[idx] = { ...rooms.value[idx], price: newPrice }
+      }
+
+      const modalIdx = modalRoomsData.value.findIndex(r => r.id === room.id)
+      if (modalIdx !== -1) {
+        modalRoomsData.value[modalIdx] = { ...modalRoomsData.value[modalIdx], price: newPrice }
+      }
+
+      bulkUpdateProgress.value.current += 1
+      bulkUpdateProgress.value.percentage = Math.round(
+        (bulkUpdateProgress.value.current / bulkUpdateProgress.value.total) * 100
+      )
+    }
+
+    toast.add({
+      title: 'Harga Berhasil Diperbarui',
+      description: `Berhasil mengubah harga untuk ${bulkUpdateProgress.value.total} kamar.`,
+      color: 'success'
+    })
+
+    await loadRooms()
+    selectedModalRoomIds.value = []
+    await loadModalRooms()
+
+    setTimeout(() => {
+      bulkUpdateProgress.value = { current: 0, total: 0, percentage: 0 }
+      bulkUpdateError.value = null
+    }, 400)
+  } catch (err: any) {
+    const message = err?.data?.message || err?.message || 'Gagal memperbarui harga kamar'
+    bulkUpdateError.value = message
+    toast.add({
+      title: 'Gagal Memperbarui Harga',
+      description: message,
+      color: 'error'
+    })
+  } finally {
+    isBulkUpdatingRoomPrices.value = false
+  }
+}
+
+watch(selectedModalPropertyId, () => {
+  selectedModalRoomIds.value = []
+  if (isUpdateRoomPriceModalOpen.value && !isBulkUpdatingRoomPrices.value) {
+    loadModalRooms()
+  }
+})
+
+watch(isUpdateRoomPriceModalOpen, (open) => {
+  if (!process.client) return
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
+onBeforeUnmount(() => {
+  if (!process.client) return
+  document.body.style.overflow = ''
+})
 </script>
 
 <template>
@@ -149,9 +331,14 @@ const onModalClose = () => {
         <p class="text-gray-500 dark:text-gray-400 mt-1">Kelola hunian dan detail kamar.</p>
       </div>
       
-      <UButton icon="i-heroicons-plus" size="lg" @click="openAddRoomModal" :disabled="properties.length === 0">
-          Tambah Kamar
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButton icon="i-heroicons-pencil" size="lg" @click="openUpdateRoomPriceModal" :disabled="properties.length === 0">
+            Ubah Harga
+        </UButton>
+        <UButton icon="i-heroicons-plus" size="lg" @click="openAddRoomModal" :disabled="properties.length === 0">
+            Tambah Kamar
+        </UButton>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -330,6 +517,162 @@ const onModalClose = () => {
     <RoomModal v-model="isRoomModalOpen" :property-id="modalPropertyId" :room="selectedRoom" @update:modelValue="onModalClose" />
     
     <ConfirmDialog ref="confirmDialog" />
+
+    <!-- Update Room Price Modal -->
+    <UModal
+      v-model:open="isUpdateRoomPriceModalOpen"
+      title="Ubah Harga Kamar"
+      description="Perbarui harga kamar secara global berdasarkan properti yang dipilih"
+      :preventClose="isBulkUpdatingRoomPrices"
+      :ui="{ content: 'sm:max-w-4xl' }"
+    >
+      <template #content>
+        <div class="p-6 space-y-6">
+          <!-- Top section: Form + Property Checklist -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Price Change Form -->
+            <div class="space-y-3">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Harga Baru</h3>
+              <div class="relative">
+                <span class="absolute left-3 top-2 text-gray-500 text-sm">Rp</span>
+                <UInput
+                  v-model="priceChangeValue"
+                  type="number"
+                  placeholder="cth: 1500000"
+                  :disabled="isBulkUpdatingRoomPrices"
+                  class="pl-8 w-full"
+                />
+              </div>
+              <p class="text-xs text-gray-400">
+                Masukkan harga baru yang akan diterapkan ke kamar yang dipilih.
+              </p>
+            </div>
+
+            <!-- Property Checklist -->
+            <div class="space-y-3">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Terapkan ke Properti</h3>
+              <select 
+                v-model="selectedModalPropertyId"
+                :disabled="isBulkUpdatingRoomPrices"
+                class="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="__all__">Semua Properti</option>
+                <option v-for="property in properties" :key="property.id" :value="property.id">
+                  {{ property.name }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div v-if="isBulkUpdatingRoomPrices || bulkUpdateProgress.total > 0" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <div class="flex items-center justify-between text-sm mb-2">
+              <span class="text-gray-600 dark:text-gray-400">
+                {{ bulkUpdateProgress.current }} / {{ bulkUpdateProgress.total }}
+              </span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ bulkUpdateProgress.percentage }}%</span>
+            </div>
+            <UProgress :value="bulkUpdateProgress.percentage" size="lg" />
+            <p v-if="bulkUpdateError" class="text-xs text-red-500 mt-2">{{ bulkUpdateError }}</p>
+          </div>
+
+          <!-- Rooms Table -->
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Daftar Kamar Terdampak</h3>
+              <UBadge color="primary" variant="subtle" size="xs">{{ modalRooms.length }} kamar</UBadge>
+              <span v-if="modalRoomsLoading" class="text-xs text-gray-400 flex items-center gap-1">
+                <UIcon name="i-heroicons-arrow-path" class="w-3 h-3 animate-spin" />
+                Memuat...
+              </span>
+            </div>
+            <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+              <div class="overflow-y-auto overscroll-contain max-h-60">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                    <tr>
+                      <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-10">
+                        <button
+                          class="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          type="button"
+                          :disabled="isBulkUpdatingRoomPrices || modalRoomsLoading"
+                          @click="toggleAllModalRooms"
+                        >
+                          <input
+                            type="checkbox"
+                            class="accent-primary-500"
+                            :checked="areAllModalRoomsSelected"
+                            @change.prevent
+                          />
+                        </button>
+                      </th>
+                      <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-10">No</th>
+                      <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Nama Kamar</th>
+                      <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Properti</th>
+                      <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Harga Saat Ini</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
+                    <tr v-if="modalRoomsError">
+                      <td colspan="5" class="px-4 py-6">
+                        <div class="flex items-center gap-2 text-red-500 text-sm">
+                          <UIcon name="i-heroicons-exclamation-circle" class="w-5 h-5" />
+                          <span>{{ modalRoomsError }}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr v-if="modalRooms.length === 0">
+                      <td colspan="5" class="px-4 py-10 text-center">
+                        <UIcon name="i-heroicons-inbox" class="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                        <p class="text-sm text-gray-400">Tidak ada kamar untuk properti yang dipilih</p>
+                      </td>
+                    </tr>
+                    <tr
+                      v-for="(room, idx) in modalRooms"
+                      :key="room.id"
+                      class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    >
+                      <td class="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          :value="room.id"
+                          v-model="selectedModalRoomIds"
+                          :disabled="isBulkUpdatingRoomPrices || modalRoomsLoading"
+                          class="accent-primary-500"
+                        />
+                      </td>
+                      <td class="px-4 py-3 text-xs text-gray-400">{{ idx + 1 }}</td>
+                      <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ room.name }}</td>
+                      <td class="px-4 py-3">
+                        <UBadge color="neutral" variant="subtle" size="xs">{{ room.propertyName }}</UBadge>
+                      </td>
+                      <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
+                        {{ formatCurrency(room.price) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+            <UButton color="neutral" variant="outline" :disabled="isBulkUpdatingRoomPrices" @click="isUpdateRoomPriceModalOpen = false">
+              Batal
+            </UButton>
+            <UButton
+              icon="i-heroicons-check"
+              :disabled="!canApplyBulkUpdate"
+              :loading="isBulkUpdatingRoomPrices"
+              @click="applyBulkUpdateRoomPrices"
+            >
+              Terapkan Perubahan
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
 
     <!-- Pagination -->
     <div v-if="roomsMeta.totalPages > 1" class="flex justify-center pt-4">
