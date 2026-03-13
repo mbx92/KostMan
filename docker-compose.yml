@@ -6,8 +6,8 @@ services:
       dockerfile: Dockerfile
     container_name: kosman-app
     restart: unless-stopped
-    ports:
-      - "3004:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - NUXT_HOST=0.0.0.0
