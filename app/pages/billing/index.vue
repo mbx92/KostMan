@@ -64,7 +64,7 @@ onMounted(async () => {
     store.fetchRooms({ all: true }),
     store.fetchProperties(),
     store.fetchSettings(),
-    store.fetchTenants(),
+    store.fetchTenants({ all: true }),
     fetchDueSoonReminders(),
   ]);
 });
@@ -611,7 +611,7 @@ watch(isGenerating, async (newVal) => {
     await Promise.all([
       store.fetchRooms({ all: true }),
       store.fetchProperties(),
-      store.fetchTenants(),
+      store.fetchTenants({ all: true }),
     ]);
   }
 });

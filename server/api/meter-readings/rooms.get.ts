@@ -123,6 +123,8 @@ export default defineEventHandler(async (event) => {
         roomMap.set(r.room.id, {
             ...r.room,
             tenantName: r.tenant?.name || null,
+            tenantContact: r.tenant?.contact || null,
+            tenant: r.tenant ? { id: r.tenant.id, name: r.tenant.name, contact: r.tenant.contact } : null,
             property: r.property,
             // Info for current period
             currentPeriodStatus: r.currentReadingId ? 'recorded' : 'unrecorded',

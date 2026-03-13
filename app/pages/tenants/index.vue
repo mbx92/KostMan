@@ -349,8 +349,8 @@ const onModalClose = () => {
                   <span v-else class="text-gray-400 italic text-xs">Belum ada kamar</span>
                 </div>
 
-                <!-- Desktop Actions (Hover) -->
-                <div class="hidden sm:flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                <!-- Desktop Actions -->
+                <div class="hidden sm:flex items-center gap-1">
                   <!-- <UButton color="warning" variant="ghost" icon="i-heroicons-key" size="sm" @click.stop="openResetPinModal(tenant)" title="Reset PIN" /> -->
                   <UButton color="neutral" variant="ghost" icon="i-heroicons-pencil-square" size="sm" @click.stop="openEditModal(tenant)" />
                   <UButton color="error" variant="ghost" icon="i-heroicons-trash" size="sm" @click.stop="openDeleteModal(tenant)" />

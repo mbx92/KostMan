@@ -143,6 +143,17 @@ const staffNavigation: NavItem[] = [
     ]
   },
   {
+    label: 'Tagihan dan Pengeluaran',
+    icon: 'i-heroicons-banknotes',
+    children: [
+      {
+        label: 'Pengingat',
+        icon: 'i-heroicons-bell-alert',
+        to: '/reminders'
+      }
+    ]
+  },
+  {
     label: 'Profil Saya',
     icon: 'i-heroicons-user-circle',
     to: '/account'

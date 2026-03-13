@@ -6,6 +6,9 @@ const kosStore = useKosStore();
 const { properties, reminders, remindersLoading, rentBills, utilityBills } = storeToRefs(kosStore);
 const toast = useToast();
 
+const { data: authData } = await useAuthFetch('/api/auth/me');
+const isStaff = computed(() => (authData.value as any)?.user?.role === 'staff');
+
 onMounted(async () => {
     await Promise.all([
         kosStore.fetchProperties(),
@@ -519,6 +522,7 @@ const refreshAll = async () => {
                         <div class="flex items-center justify-between">
                             <span class="text-sm text-gray-500">Belum ada tagihan sewa</span>
                             <UButton 
+                                v-if="!isStaff"
                                 size="xs" 
                                 color="primary" 
                                 variant="soft"
