@@ -47,7 +47,7 @@ export async function verifyRoomExists(roomId: string, tx?: DbClient) {
  * Admins bypass this check. Throws 403 if the user is not the property owner.
  */
 export async function verifyRoomOwnership(roomData: { propertyId: string }, user: UtilityBillUser, tx?: DbClient) {
-    if (user.role !== Role.ADMIN) {
+    if (user.role !== Role.ADMIN && user.role !== Role.STAFF) {
         const client = tx || db;
         const property = await client.select()
             .from(properties)
@@ -132,10 +132,10 @@ export async function getUtilityBillById(id: string, tx?: DbClient) {
 
 /**
  * Verify that the user has ownership access to a utility bill (via room → property).
- * Admins bypass this check. Throws 403 if the user is not the property owner.
+ * Admins and staff bypass this check. Throws 403 if the user is not the property owner.
  */
 export async function verifyBillOwnership(bill: { roomId: string }, user: UtilityBillUser, tx?: DbClient) {
-    if (user.role !== Role.ADMIN) {
+    if (user.role !== Role.ADMIN && user.role !== Role.STAFF) {
         const client = tx || db;
         const room = await client.select()
             .from(rooms)
