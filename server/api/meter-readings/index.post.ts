@@ -1,9 +1,10 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { meterReadings, rooms, propertySettings } from '../../database/schema';
+import { meterReadings, rooms, propertySettings, rentBills } from '../../database/schema';
 import { meterReadingSchema } from '../../validations/meter-reading';
 import { eq, and } from 'drizzle-orm';
 import { createUtilityBill } from '../../services/utilityBillService';
+import { autoGenerateRentBill } from '../../utils/rentBillService';
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
@@ -76,7 +77,10 @@ export default defineEventHandler(async (event) => {
                 }
             }
 
-            return { meterReading, utilityBill };
+            // Auto-generate rent bill for this billing cycle (if not already exists)
+            const rentBill = await autoGenerateRentBill(validatedData.roomId, validatedData.period, tx);
+
+            return { meterReading, utilityBill, rentBill };
         });
 
         return result;

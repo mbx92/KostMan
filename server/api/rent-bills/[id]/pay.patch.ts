@@ -22,7 +22,8 @@ export default defineEventHandler(async (event) => {
 
     const result = await db.update(rentBills).set({
         isPaid: true,
-        paidAt: new Date()
+        paidAt: new Date(),
+        paymentMethod: 'cash',
     }).where(eq(rentBills.id, id)).returning();
 
     return result[0];

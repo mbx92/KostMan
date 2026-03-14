@@ -170,6 +170,7 @@ export async function updateUtilityBillPaid(id: string, tx?: DbClient) {
     const result = await client.update(utilityBills).set({
         isPaid: true,
         paidAt: new Date(),
+        paymentMethod: 'cash',
     }).where(eq(utilityBills.id, id)).returning();
 
     return result[0];

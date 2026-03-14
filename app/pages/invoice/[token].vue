@@ -21,6 +21,48 @@ const {
 const payingBill = ref(false);
 const downloadingPdf = ref(false);
 
+// Upload proof
+const uploadProofModal = ref(false);
+const uploadFile = ref<File | null>(null);
+const uploadingProof = ref(false);
+const proofUploaded = ref(false);
+
+const isMidtransEnabled = computed(() => billData.value?.midtransEnabled === true);
+
+const handleFileChange = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  uploadFile.value = input.files?.[0] ?? null;
+};
+
+const uploadProof = async () => {
+  if (!uploadFile.value || !billData.value) return;
+  uploadingProof.value = true;
+  try {
+    const formData = new FormData();
+    formData.append("file", uploadFile.value);
+    await $fetch(`/api/bills/upload-proof/${token}`, {
+      method: "POST",
+      body: formData,
+    });
+    proofUploaded.value = true;
+    uploadProofModal.value = false;
+    uploadFile.value = null;
+    toast.add({
+      title: "Berhasil",
+      description: "Bukti transfer berhasil dikirim",
+      color: "success",
+    });
+  } catch (e: any) {
+    toast.add({
+      title: "Gagal Upload",
+      description: e?.data?.message || "Terjadi kesalahan saat upload bukti",
+      color: "error",
+    });
+  } finally {
+    uploadingProof.value = false;
+  }
+};
+
 // Format currency
 const formatCurrency = (val: number | string) =>
   new Intl.NumberFormat("id-ID", {
@@ -445,7 +487,7 @@ declare global {
 
                 <!-- Water Fee (if included in rent bill) -->
                 <div
-                  v-if="Number(billData.rentBill.waterFee || 0) > 0"
+                  v-if="Number(billData.rentBill.waterFee || 0) > 0 && !billData.utilityBill"
                   class="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-700"
                 >
                   <div>
@@ -468,7 +510,7 @@ declare global {
 
                 <!-- Trash Fee (if included in rent bill) -->
                 <div
-                  v-if="Number(billData.rentBill.trashFee || 0) > 0"
+                  v-if="Number(billData.rentBill.trashFee || 0) > 0 && !billData.utilityBill"
                   class="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-700"
                 >
                   <div>
@@ -502,7 +544,7 @@ declare global {
                         billData.utilityBill.meterEnd -
                         billData.utilityBill.meterStart
                       }}
-                      kWh
+                      kWh × {{ formatCurrency(billData.utilityBill.costPerKwh) }}
                     </p>
                   </div>
                   <p class="font-semibold text-gray-900 dark:text-white">
@@ -515,20 +557,14 @@ declare global {
                 >
                   <div>
                     <p class="text-gray-700 dark:text-gray-300">Air</p>
-                    <p
-                      class="text-sm text-gray-500"
-                      v-if="
-                        billData.room?.occupantCount &&
-                        billData.room.occupantCount > 1
-                      "
-                    >
+                    <p class="text-sm text-gray-500">
                       {{
                         formatCurrency(
                           Number(billData.utilityBill.waterFee) /
-                            billData.room.occupantCount,
+                            (billData.room?.occupantCount || 1),
                         )
                       }}
-                      x {{ billData.room.occupantCount }} orang
+                      x {{ billData.room?.occupantCount || 1 }} orang
                     </p>
                   </div>
                   <p class="font-semibold text-gray-900 dark:text-white">
@@ -647,7 +683,7 @@ declare global {
                       {{
                         billData.bill.meterEnd - billData.bill.meterStart
                       }}
-                      kWh
+                      kWh × {{ formatCurrency(billData.bill.costPerKwh) }}
                     </p>
                   </div>
                   <p class="font-semibold text-gray-900 dark:text-white">
@@ -660,20 +696,14 @@ declare global {
                 >
                   <div>
                     <p class="text-gray-700 dark:text-gray-300">Air</p>
-                    <p
-                      class="text-sm text-gray-500"
-                      v-if="
-                        billData.room?.occupantCount &&
-                        billData.room.occupantCount > 1
-                      "
-                    >
+                    <p class="text-sm text-gray-500">
                       {{
                         formatCurrency(
                           Number(billData.bill.waterFee) /
-                            billData.room.occupantCount,
+                            (billData.room?.occupantCount || 1),
                         )
                       }}
-                      x {{ billData.room.occupantCount }} orang
+                      x {{ billData.room?.occupantCount || 1 }} orang
                     </p>
                   </div>
                   <p class="font-semibold text-gray-900 dark:text-white">
@@ -716,29 +746,54 @@ declare global {
               ? !billData.rentBill?.isPaid || !billData.utilityBill?.isPaid
               : !billData.bill?.isPaid
           "
-          class="grid grid-cols-2 gap-4"
+          class="space-y-3"
         >
-          <UButton
-            block
-            size="lg"
-            color="primary"
-            icon="i-heroicons-credit-card"
-            :loading="payingBill"
-            @click="payOnline"
+          <div
+            class="grid gap-3"
+            :class="isMidtransEnabled ? 'grid-cols-2' : 'grid-cols-1'"
           >
-            Bayar Sekarang
-          </UButton>
-          <UButton
-            block
-            size="lg"
-            color="gray"
-            variant="outline"
-            icon="i-heroicons-arrow-down-tray"
-            :loading="downloadingPdf"
-            @click="downloadPdf"
+            <UButton
+              v-if="isMidtransEnabled"
+              block
+              size="lg"
+              color="primary"
+              icon="i-heroicons-credit-card"
+              :loading="payingBill"
+              @click="payOnline"
+            >
+              Bayar Sekarang
+            </UButton>
+            <UButton
+              block
+              size="lg"
+              color="gray"
+              variant="outline"
+              icon="i-heroicons-arrow-down-tray"
+              :loading="downloadingPdf"
+              @click="downloadPdf"
+            >
+              Download PDF
+            </UButton>
+          </div>
+          <div v-if="!proofUploaded">
+            <UButton
+              block
+              size="lg"
+              color="success"
+              variant="outline"
+              icon="i-heroicons-paper-clip"
+              @click="uploadProofModal = true"
+            >
+              Upload Bukti Transfer
+            </UButton>
+          </div>
+          <div
+            v-else
+            class="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 text-sm py-2"
           >
-            Download PDF
-          </UButton>
+            <UIcon name="i-heroicons-check-circle" class="w-5 h-5" />
+            <span>Bukti transfer sudah dikirim, menunggu konfirmasi</span>
+          </div>
         </div>
         <div v-else class="flex justify-center">
           <UButton
@@ -761,4 +816,60 @@ declare global {
       </div>
     </div>
   </div>
+
+  <!-- Upload Proof Modal -->
+  <UModal v-model:open="uploadProofModal" title="Upload Bukti Transfer">
+    <template #body>
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          Upload foto atau screenshot bukti transfer pembayaran Anda. Format yang
+          didukung: JPG, PNG, WebP, GIF, PDF (maks. 5MB).
+        </p>
+        <div
+          class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center"
+        >
+          <UIcon
+            name="i-heroicons-arrow-up-tray"
+            class="w-8 h-8 mx-auto text-gray-400 mb-2"
+          />
+          <label class="cursor-pointer">
+            <span class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline">
+              Pilih file
+            </span>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              class="hidden"
+              @change="handleFileChange"
+            />
+          </label>
+          <p class="text-xs text-gray-500 mt-1">atau drag & drop di sini</p>
+        </div>
+        <div
+          v-if="uploadFile"
+          class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2"
+        >
+          <UIcon name="i-heroicons-paper-clip" class="w-4 h-4 shrink-0" />
+          <span class="truncate">{{ uploadFile.name }}</span>
+        </div>
+      </div>
+    </template>
+    <template #footer>
+      <div class="flex gap-3 justify-end w-full">
+        <UButton
+          label="Batal"
+          color="neutral"
+          variant="outline"
+          @click="uploadProofModal = false"
+        />
+        <UButton
+          label="Kirim Bukti"
+          icon="i-heroicons-paper-airplane"
+          :disabled="!uploadFile"
+          :loading="uploadingProof"
+          @click="uploadProof"
+        />
+      </div>
+    </template>
+  </UModal>
 </template>

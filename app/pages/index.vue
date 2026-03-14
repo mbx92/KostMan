@@ -20,7 +20,15 @@ onMounted(async () => {
     kosStore.fetchTenants(),
     kosStore.fetchReminders()
   ])
+
+  if (isStaff.value) {
+    const stats = await $fetch<{ total: number; recorded: number; pending: number }>('/api/meter-readings/stats')
+    meterStats.value = stats
+  }
 })
+
+// Meter stats for staff
+const meterStats = ref({ total: 0, recorded: 0, pending: 0 })
 
 // Summary Data
 const totalProperties = computed(() => kosStore.properties.length);
@@ -33,13 +41,13 @@ const totalTenants = computed(() => kosStore.tenants.length);
   <div class="p-8">
     <div class="mb-8">
       <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-      <p v-if="isStaff" class="text-gray-600 dark:text-gray-400">Selamat datang, Staff. Silakan catat meter listrik dari menu di samping.</p>
+      <p v-if="isStaff" class="text-gray-600 dark:text-gray-400">Selamat datang, Staff. Silakan catat meter listrik atau lihat pengingat tagihan dari menu di samping.</p>
       <p v-else class="text-gray-600 dark:text-gray-400">Ringkasan dan informasi penting tentang properti kos Anda.</p>
     </div>
 
     <!-- Staff Dashboard View -->
     <template v-if="isStaff">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <UCard>
           <template #header>
             <div class="flex items-center gap-2">
@@ -60,6 +68,25 @@ const totalTenants = computed(() => kosStore.tenants.length);
           </template>
           <div class="text-3xl font-bold">{{ totalRooms }}</div>
           <p class="text-sm text-gray-500">Semua Kamar di semua properti</p>
+        </UCard>
+
+        <UCard :class="meterStats.pending > 0 ? 'ring-2 ring-orange-400 dark:ring-orange-500' : ''">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-bolt" :class="meterStats.pending > 0 ? 'w-5 h-5 text-orange-500' : 'w-5 h-5 text-green-500'" />
+              <h3 class="font-semibold">Belum Dicatat Bulan Ini</h3>
+            </div>
+          </template>
+          <div :class="meterStats.pending > 0 ? 'text-3xl font-bold text-orange-500' : 'text-3xl font-bold text-green-500'">
+            {{ meterStats.pending }}
+          </div>
+          <p class="text-sm text-gray-500">dari {{ meterStats.total }} kamar ({{ meterStats.recorded }} sudah dicatat)</p>
+          <div class="mt-3">
+            <UButton v-if="meterStats.pending > 0" to="/meter-readings" size="xs" color="warning" variant="soft" icon="i-heroicons-arrow-right">
+              Catat Sekarang
+            </UButton>
+            <UBadge v-else color="success" variant="soft" icon="i-heroicons-check-circle">Semua Sudah Dicatat</UBadge>
+          </div>
         </UCard>
       </div>
 

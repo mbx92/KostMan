@@ -252,7 +252,7 @@ async function submitMeterReading() {
   isSubmitting.value = true
   try {
     // Use PUT to allow Upsert (Update if exists, Insert if new)
-    await $fetch('/api/meter-readings', {
+    const result = await $fetch<{ meterReading: any; utilityBill: any; rentBill: any }>('/api/meter-readings', {
       method: 'PUT',
       body: {
         roomId: selectedRoom.value.id,
@@ -262,9 +262,12 @@ async function submitMeterReading() {
       }
     })
     
+    const rentGenerated = !!result.rentBill
     toast.add({
       title: 'Berhasil',
-      description: `Meter reading untuk ${selectedRoom.value.name} berhasil dicatat`,
+      description: rentGenerated
+        ? `Meter listrik ${selectedRoom.value.name} dicatat. Tagihan sewa & utilitas bulan ini otomatis dibuat.`
+        : `Meter reading untuk ${selectedRoom.value.name} berhasil dicatat`,
       color: 'success'
     })
     

@@ -12,7 +12,13 @@ const route = useRoute()
 const selectedPropertyId = ref<string>((route.query.propertyId as string) || '__all__')
 const searchQuery = ref('')
 const currentPage = ref(1)
-const pageSize = 20
+const pageSize = ref(20)
+
+const pageSizeOptions = [
+  { label: '20', value: 20 },
+  { label: '40', value: 40 },
+  { label: '60', value: 60 },
+]
 
 // Room Modal State
 const isRoomModalOpen = ref(false)
@@ -29,7 +35,7 @@ onMounted(async () => {
 async function loadRooms() {
   const params: { propertyId?: string; search?: string; page?: number; pageSize?: number } = { 
     page: currentPage.value,
-    pageSize: pageSize 
+    pageSize: pageSize.value 
   }
   if (selectedPropertyId.value !== '__all__') {
     params.propertyId = selectedPropertyId.value
@@ -81,11 +87,24 @@ const enrichedRooms = computed(() => {
     })
 })
 
+// Group rooms by property when showing all
+const groupedRooms = computed(() => {
+  if (selectedPropertyId.value !== '__all__') return null
+  const groups = new Map<string, { propertyId: string; propertyName: string; rooms: typeof enrichedRooms.value }>()
+  for (const room of enrichedRooms.value) {
+    if (!groups.has(room.propertyId)) {
+      groups.set(room.propertyId, { propertyId: room.propertyId, propertyName: room.propertyName, rooms: [] })
+    }
+    groups.get(room.propertyId)!.rooms.push(room)
+  }
+  return Array.from(groups.values())
+})
+
 const getStatusColor = (status: string) => {
     switch(status) {
         case 'available': return 'success'
-        case 'occupied': return 'primary'
-        case 'maintenance': return 'warning'
+        case 'occupied': return 'info'
+        case 'maintenance': return 'error'
         default: return 'neutral'
     }
 }
@@ -429,7 +448,81 @@ onBeforeUnmount(() => {
             <span class="text-sm text-gray-600 dark:text-gray-400">Memuat data...</span>
           </div>
         </div>
-        
+
+        <!-- Grouped by property (when Semua Properti selected) -->
+        <template v-if="groupedRooms">
+          <div v-for="group in groupedRooms" :key="group.propertyId" class="mb-8">
+            <div class="flex items-center gap-2 mb-4">
+              <UIcon name="i-heroicons-building-office-2" class="w-5 h-5 text-primary-500" />
+              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ group.propertyName }}</h2>
+              <UBadge color="neutral" variant="subtle" size="xs">{{ group.rooms.length }} kamar</UBadge>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200" :class="{ 'opacity-50': roomsLoading }">
+              <div
+                v-for="room in group.rooms"
+                :key="room.id"
+                class="group relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-primary-500/50 transition-all duration-200 overflow-hidden flex flex-col"
+              >
+                <!-- Status Line -->
+                <div
+                  class="h-1 w-full absolute top-0 left-0"
+                  :class="{
+                    'bg-green-500': room.status === 'available',
+                    'bg-blue-500': room.status === 'occupied',
+                    'bg-red-500': room.status === 'maintenance'
+                  }"
+                ></div>
+
+                <div class="p-5 flex-1 flex flex-col gap-4">
+                  <!-- Header: Name & Badge -->
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <h3 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">{{ room.name }}</h3>
+                    </div>
+                    <UBadge :color="getStatusColor(room.status)" variant="solid" class="capitalize">
+                      {{ room.status === 'available' ? 'Tersedia' : room.status === 'occupied' ? 'Terisi' : 'Perbaikan' }}
+                    </UBadge>
+                  </div>
+
+                  <!-- Price -->
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                    {{ formatCurrency(room.price) }}
+                    <span class="text-xs font-normal text-gray-500">/bulan</span>
+                  </div>
+
+                  <!-- Tenant Info -->
+                  <div class="mt-auto pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <div v-if="room.status === 'occupied'" class="flex items-center gap-3">
+                      <UAvatar :alt="room.tenantName" size="sm" class="bg-primary-100 text-primary-600 ring-2 ring-white dark:ring-gray-900" />
+                      <div>
+                        <div class="text-xs text-gray-500">Ditempati oleh</div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[150px]">{{ room.tenantName }}</div>
+                      </div>
+                    </div>
+                    <div v-else-if="room.status === 'available'" class="flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <UIcon name="i-heroicons-check-circle" class="w-5 h-5" />
+                      <span class="text-sm font-medium">Siap untuk penghuni</span>
+                    </div>
+                    <div v-else class="flex items-center gap-2 text-red-500">
+                      <UIcon name="i-heroicons-wrench-screwdriver" class="w-5 h-5" />
+                      <span class="text-sm font-medium">Dalam perbaikan</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="p-2 bg-gray-50 dark:bg-gray-800/50 flex gap-2">
+                  <UButton :to="`/rooms/${room.id}`" class="flex-1" color="neutral" variant="outline" icon="i-heroicons-adjustments-horizontal">Kelola</UButton>
+                  <UButton icon="i-heroicons-pencil-square" color="neutral" variant="ghost" @click.stop="openEditRoomModal(room)" />
+                  <UButton icon="i-heroicons-trash" color="error" variant="ghost" @click.stop="deleteRoom(room)" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Flat grid (single property selected) -->
+        <template v-else>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200" :class="{ 'opacity-50': roomsLoading }">
         <div 
             v-for="room in enrichedRooms" 
@@ -458,7 +551,7 @@ onBeforeUnmount(() => {
                             {{ room.propertyName }}
                         </div>
                     </div>
-                    <UBadge :color="getStatusColor(room.status)" variant="subtle" class="capitalize">
+                    <UBadge :color="getStatusColor(room.status)" variant="solid" class="capitalize">
                         {{ room.status === 'available' ? 'Tersedia' : room.status === 'occupied' ? 'Terisi' : 'Perbaikan' }}
                     </UBadge>
                 </div>
@@ -501,6 +594,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
         </div>
+        </template>
     </div>
 
     <!-- Empty State -->
@@ -675,8 +769,21 @@ onBeforeUnmount(() => {
     </UModal>
 
     <!-- Pagination -->
-    <div v-if="roomsMeta.totalPages > 1" class="flex justify-center pt-4">
-      <UPagination 
+    <div v-if="roomsMeta.total > 0" class="flex items-center justify-center gap-4 pt-4">
+      <div class="flex items-center gap-2 text-sm text-gray-500">
+        <span>Tampilkan</span>
+        <USelect
+          v-model="pageSize"
+          :items="pageSizeOptions"
+          value-key="value"
+          class="w-20"
+          size="sm"
+          @update:model-value="() => { currentPage = 1; loadRooms() }"
+        />
+        <span>per halaman</span>
+      </div>
+      <UPagination
+        v-if="roomsMeta.totalPages > 1"
         :page="currentPage" 
         :total="roomsMeta.total" 
         :items-per-page="pageSize"

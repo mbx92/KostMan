@@ -29,7 +29,9 @@ const paymentMethods = [
   { label: 'Transfer', value: 'transfer' },
   { label: 'Kartu Kredit', value: 'credit_card' },
   { label: 'Kartu Debit', value: 'debit_card' },
-  { label: 'E-Wallet', value: 'e_wallet' }
+  { label: 'E-Wallet', value: 'e_wallet' },
+  { label: 'Lainnya / Manual', value: 'other' },
+  { label: 'Tidak Dicatat', value: 'unknown' },
 ]
 
 const billTypes = [
@@ -118,6 +120,7 @@ const formatDate = (dateString: string | null) => {
 }
 
 const getPaymentMethodLabel = (value: string) => {
+    if (value === 'unknown') return 'Tidak Dicatat'
     const found = paymentMethods.find(m => m.value === value)
     return found ? found.label : (value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' '))
 }

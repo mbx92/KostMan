@@ -176,7 +176,7 @@ const periodFormatted = computed(() => {
             }}</span>
           </div>
           <div v-if="Number(bill.waterFee) > 0" class="flex justify-between">
-            <span class="text-gray-500">Air:</span>
+            <span class="text-gray-500">Air ({{ bill.room?.occupantCount || 1 }} Orang × {{ formatCurrency(Number(bill.waterFee) / (bill.room?.occupantCount || 1)) }}):</span>
             <span class="font-medium">{{ formatCurrency(bill.waterFee) }}</span>
           </div>
           <div v-if="Number(bill.trashFee) > 0" class="flex justify-between">

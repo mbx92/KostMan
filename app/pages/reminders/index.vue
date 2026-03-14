@@ -270,24 +270,45 @@ const sendWhatsApp = async (room: any) => {
     }
 
     sendingWa.value = room.id;
-    let invoiceLinks: string[] = [];
+    let invoiceUrl = '';
 
-    // Generate links for unpaid bills
-    const unpaidBills: any[] = [];
-    for (const r of roomRentBills.value) {
-        if (!r.bill?.isPaid) unpaidBills.push({ id: r.bill.id, type: 'rent', ...r.bill });
-    }
-    for (const u of roomUtilityBills.value) {
-        if (!u.bill?.isPaid) unpaidBills.push({ id: u.bill.id, type: 'utility', ...u.bill });
-    }
+    // Collect unpaid bills
+    const unpaidRent = roomRentBills.value.filter(r => !r.bill?.isPaid);
+    const unpaidUtil = roomUtilityBills.value.filter(u => !u.bill?.isPaid);
 
     try {
-        for (const bill of unpaidBills) {
+        // Use combined link when both types exist for the same period
+        const rentPeriod = unpaidRent[0]?.bill?.period;
+        const utilPeriod = unpaidUtil[0]?.bill?.period;
+
+        if (unpaidRent.length > 0 && unpaidUtil.length > 0 && rentPeriod === utilPeriod) {
+            // Combined link (same period)
             const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
-                `/api/bills/public-link/${bill.id}`,
-                { method: 'POST', body: { billType: bill.type } }
+                `/api/bills/public-link/combined`,
+                { method: 'POST', body: { roomId: room.id, period: rentPeriod } }
             );
-            if (linkResponse.publicUrl) invoiceLinks.push(linkResponse.publicUrl);
+            invoiceUrl = linkResponse.publicUrl;
+        } else if (unpaidRent.length > 0 && unpaidUtil.length > 0) {
+            // Different periods - use dual bill ID format
+            const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+                `/api/bills/public-link/combined`,
+                { method: 'POST', body: { rentBillId: unpaidRent[0].bill.id, utilBillId: unpaidUtil[0].bill.id } }
+            );
+            invoiceUrl = linkResponse.publicUrl;
+        } else if (unpaidRent.length > 0) {
+            // Only rent
+            const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+                `/api/bills/public-link/${unpaidRent[0].bill.id}`,
+                { method: 'POST', body: { billType: 'rent' } }
+            );
+            invoiceUrl = linkResponse.publicUrl;
+        } else if (unpaidUtil.length > 0) {
+            // Only utility
+            const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
+                `/api/bills/public-link/${unpaidUtil[0].bill.id}`,
+                { method: 'POST', body: { billType: 'utility' } }
+            );
+            invoiceUrl = linkResponse.publicUrl;
         }
     } catch (e) {
         console.error('Failed to generate link', e);
@@ -328,9 +349,7 @@ const sendWhatsApp = async (room: any) => {
         utilityTotal: utilityTotal,
         isUtilityPaid: false,
         grandTotal: rentTotal + utilityTotal,
-        invoiceUrl: invoiceLinks.length > 0
-            ? invoiceLinks.map((link, i) => `Tagihan ${i+1}: ${link}`).join('\n')
-            : undefined
+        invoiceUrl: invoiceUrl || undefined
     };
 
     const message = buildMessage(template.message, billingData);
@@ -499,27 +518,66 @@ const refreshAll = async () => {
             </div>
 
             <template v-else>
+                <!-- Room Info Header -->
+                <div class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                    <UAvatar :alt="selectedRoom.tenantName || 'P'" size="md" class="bg-primary-100 text-primary-600 ring-2 ring-white dark:ring-gray-900 shrink-0" />
+                    <div class="min-w-0">
+                        <div class="font-semibold text-gray-900 dark:text-white">{{ selectedRoom.tenantName || 'Penghuni' }}</div>
+                        <div class="text-sm text-gray-500 flex items-center gap-1 flex-wrap">
+                            <UIcon name="i-heroicons-building-office-2" class="w-3.5 h-3.5 shrink-0" />
+                            <span>{{ selectedRoom.property?.name }}</span>
+                            <span class="text-gray-300 dark:text-gray-600">•</span>
+                            <UIcon name="i-heroicons-home" class="w-3.5 h-3.5 shrink-0" />
+                            <span>{{ selectedRoom.name }}</span>
+                            <span class="text-gray-300 dark:text-gray-600">•</span>
+                            <UIcon name="i-heroicons-users" class="w-3.5 h-3.5 shrink-0" />
+                            <span>{{ selectedRoom.occupantCount || 1 }} orang</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Rent Bill Section -->
-                <div class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-bold uppercase text-gray-500">Tagihan Sewa</span>
-                        <template v-if="roomRentBills.length > 0">
-                            <span class="text-xs text-gray-500">{{ formatPeriodMonth(roomRentBills[0].bill.period) }}</span>
-                        </template>
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="flex justify-between items-center px-4 py-2 bg-gray-100 dark:bg-gray-800">
+                        <span class="text-xs font-bold uppercase text-gray-500 tracking-wide">Tagihan Sewa</span>
+                        <span v-if="roomRentBills.length > 0" class="text-xs text-gray-500">{{ formatPeriodMonth(roomRentBills[0].bill?.period) }}</span>
                     </div>
                     
                     <template v-if="roomRentBills.length > 0">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="font-semibold text-gray-900 dark:text-white">{{ formatCurrency(roomRentBills[0].bill.totalAmount) }}</div>
+                        <div class="p-4 space-y-2 text-sm">
+                            <!-- Room Price -->
+                            <div class="flex justify-between text-gray-700 dark:text-gray-300">
+                                <span>Sewa Kamar
+                                    <span v-if="roomRentBills[0].bill?.monthsCovered > 1" class="text-gray-500">
+                                        ({{ roomRentBills[0].bill.monthsCovered }} bulan)
+                                    </span>
+                                </span>
+                                <span class="font-medium">{{ formatCurrency(roomRentBills[0].bill?.roomPrice || 0) }}</span>
                             </div>
-                            <UBadge :color="roomRentBills[0].bill.isPaid ? 'success' : 'warning'" variant="subtle" size="xs">
-                                {{ roomRentBills[0].bill.isPaid ? 'Lunas' : 'Belum Lunas' }}
-                            </UBadge>
+                            <div class="border-t border-gray-100 dark:border-gray-700 pt-2 flex justify-between items-center font-semibold">
+                                <span class="text-gray-900 dark:text-white">Total Sewa</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-900 dark:text-white">{{ formatCurrency(roomRentBills[0].bill.totalAmount) }}</span>
+                                    <UBadge :color="roomRentBills[0].bill.isPaid ? 'success' : (roomRentBills[0].bill.paidAmount && Number(roomRentBills[0].bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
+                                        {{ roomRentBills[0].bill.isPaid ? 'Lunas' : (roomRentBills[0].bill.paidAmount && Number(roomRentBills[0].bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                                    </UBadge>
+                                </div>
+                            </div>
+                            <!-- Partial paid info -->
+                            <div v-if="!roomRentBills[0].bill.isPaid && Number(roomRentBills[0].bill.paidAmount) > 0" class="text-xs text-gray-500 space-y-0.5">
+                                <div class="flex justify-between text-green-600 dark:text-green-400">
+                                    <span>Sudah dibayar</span>
+                                    <span>{{ formatCurrency(roomRentBills[0].bill.paidAmount) }}</span>
+                                </div>
+                                <div class="flex justify-between text-red-600 dark:text-red-400 font-medium">
+                                    <span>Sisa</span>
+                                    <span>{{ formatCurrency(Number(roomRentBills[0].bill.totalAmount) - Number(roomRentBills[0].bill.paidAmount)) }}</span>
+                                </div>
+                            </div>
                         </div>
                     </template>
                     <template v-else>
-                        <div class="flex items-center justify-between">
+                        <div class="p-4 flex items-center justify-between">
                             <span class="text-sm text-gray-500">Belum ada tagihan sewa</span>
                             <UButton 
                                 v-if="!isStaff"
@@ -537,47 +595,81 @@ const refreshAll = async () => {
                 </div>
 
                 <!-- Utility Bill Section -->
-                <div class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-bold uppercase text-gray-500">Tagihan Utilitas</span>
-                        <template v-if="roomUtilityBills.length > 0">
-                            <span class="text-xs text-gray-500">{{ formatPeriodMonth(roomUtilityBills[0].bill.period) }}</span>
-                        </template>
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="flex justify-between items-center px-4 py-2 bg-gray-100 dark:bg-gray-800">
+                        <span class="text-xs font-bold uppercase text-gray-500 tracking-wide">Tagihan Utilitas</span>
+                        <span v-if="roomUtilityBills.length > 0" class="text-xs text-gray-500">{{ formatPeriodMonth(roomUtilityBills[0].bill?.period) }}</span>
                     </div>
                     
                     <template v-if="roomUtilityBills.length > 0">
-                        <div class="space-y-1 text-sm mb-2">
-                            <div class="flex justify-between text-gray-600 dark:text-gray-400">
-                                <span>Listrik</span>
-                                <span>{{ formatCurrency(roomUtilityBills[0].bill.usageCost || 0) }}</span>
+                        <div class="p-4 space-y-2 text-sm">
+                            <!-- Meter reading -->
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="text-gray-700 dark:text-gray-300">Listrik</div>
+                                    <div class="text-xs text-gray-400 font-mono mt-0.5">
+                                        {{ roomUtilityBills[0].bill?.meterStart }} → {{ roomUtilityBills[0].bill?.meterEnd }}
+                                        = {{ (roomUtilityBills[0].bill?.meterEnd || 0) - (roomUtilityBills[0].bill?.meterStart || 0) }} kWh
+                                        × {{ formatCurrency(roomUtilityBills[0].bill?.costPerKwh || 0) }}
+                                    </div>
+                                </div>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill?.usageCost || 0) }}</span>
                             </div>
-                            <div class="flex justify-between text-gray-600 dark:text-gray-400">
-                                <span>Air</span>
-                                <span>{{ formatCurrency(roomUtilityBills[0].bill.waterFee || 0) }}</span>
+                            <!-- Water fee -->
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="text-gray-700 dark:text-gray-300">Air</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">
+                                        {{ selectedRoom.occupantCount || 1 }} orang × {{ formatCurrency(Number(roomUtilityBills[0].bill?.waterFee || 0) / (selectedRoom.occupantCount || 1)) }}/orang
+                                    </div>
+                                </div>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill?.waterFee || 0) }}</span>
                             </div>
-                            <div v-if="Number(roomUtilityBills[0].bill.trashFee) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                            <!-- Trash fee -->
+                            <div v-if="Number(roomUtilityBills[0].bill?.trashFee) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
                                 <span>Sampah</span>
                                 <span>{{ formatCurrency(roomUtilityBills[0].bill.trashFee) }}</span>
                             </div>
-                        </div>
-                        <div class="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <div class="font-semibold text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill.totalAmount) }}</div>
-                            <UBadge :color="roomUtilityBills[0].bill.isPaid ? 'success' : 'warning'" variant="subtle" size="xs">
-                                {{ roomUtilityBills[0].bill.isPaid ? 'Lunas' : 'Belum Lunas' }}
-                            </UBadge>
+                            <!-- Additional cost -->
+                            <div v-if="Number(roomUtilityBills[0].bill?.additionalCost) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                                <span>Biaya Lain</span>
+                                <span>{{ formatCurrency(roomUtilityBills[0].bill.additionalCost) }}</span>
+                            </div>
+                            <div class="border-t border-gray-100 dark:border-gray-700 pt-2 flex justify-between items-center font-semibold">
+                                <span class="text-gray-900 dark:text-white">Total Utilitas</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill.totalAmount) }}</span>
+                                    <UBadge :color="roomUtilityBills[0].bill.isPaid ? 'success' : (roomUtilityBills[0].bill.paidAmount && Number(roomUtilityBills[0].bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
+                                        {{ roomUtilityBills[0].bill.isPaid ? 'Lunas' : (roomUtilityBills[0].bill.paidAmount && Number(roomUtilityBills[0].bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                                    </UBadge>
+                                </div>
+                            </div>
+                            <!-- Partial paid info -->
+                            <div v-if="!roomUtilityBills[0].bill.isPaid && Number(roomUtilityBills[0].bill.paidAmount) > 0" class="text-xs space-y-0.5">
+                                <div class="flex justify-between text-green-600 dark:text-green-400">
+                                    <span>Sudah dibayar</span>
+                                    <span>{{ formatCurrency(roomUtilityBills[0].bill.paidAmount) }}</span>
+                                </div>
+                                <div class="flex justify-between text-red-600 dark:text-red-400 font-medium">
+                                    <span>Sisa</span>
+                                    <span>{{ formatCurrency(Number(roomUtilityBills[0].bill.totalAmount) - Number(roomUtilityBills[0].bill.paidAmount)) }}</span>
+                                </div>
+                            </div>
                         </div>
                     </template>
                     <template v-else>
-                        <span class="text-sm text-gray-500">Belum ada tagihan utilitas. Catat meter terlebih dahulu.</span>
+                        <div class="p-4">
+                            <span class="text-sm text-gray-500">Belum ada tagihan utilitas. Catat meter terlebih dahulu.</span>
+                        </div>
                     </template>
                 </div>
 
                 <!-- Grand Total -->
-                <div v-if="hasAnyBills" class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <span>Total</span>
-                    <span>{{ formatCurrency(
-                        (roomRentBills.length > 0 && !roomRentBills[0].bill.isPaid ? Number(roomRentBills[0].bill.totalAmount) : 0) +
-                        (roomUtilityBills.length > 0 && !roomUtilityBills[0].bill.isPaid ? Number(roomUtilityBills[0].bill.totalAmount) : 0)
+                <div v-if="hasAnyBills" class="flex justify-between items-center font-bold text-base pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <span class="text-gray-900 dark:text-white">Total Belum Lunas</span>
+                    <span class="text-lg text-primary-600 dark:text-primary-400">{{ formatCurrency(
+                        (roomRentBills.length > 0 && !roomRentBills[0].bill.isPaid ? Number(roomRentBills[0].bill.totalAmount) - Number(roomRentBills[0].bill.paidAmount || 0) : 0) +
+                        (roomUtilityBills.length > 0 && !roomUtilityBills[0].bill.isPaid ? Number(roomUtilityBills[0].bill.totalAmount) - Number(roomUtilityBills[0].bill.paidAmount || 0) : 0)
                     ) }}</span>
                 </div>
             </template>

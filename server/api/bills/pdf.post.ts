@@ -91,7 +91,8 @@ export default defineEventHandler(async (event) => {
       additionalCost: utilityBill.additionalCost,
       totalAmount: utilityBill.totalAmount,
       isPaid: utilityBill.isPaid,
-      generatedAt: utilityBill.generatedAt.toISOString()
+      generatedAt: utilityBill.generatedAt.toISOString(),
+      occupantCount: room.occupantCount || 1
     } : undefined
   }
 

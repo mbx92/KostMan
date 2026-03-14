@@ -33,6 +33,7 @@ interface BillData {
     totalAmount: number | string;
     isPaid: boolean;
     generatedAt: string;
+    occupantCount?: number;
   };
 }
 
@@ -165,9 +166,11 @@ export const generateCombinedPdf = (data: BillData): Buffer => {
       `${utilityBill.meterStart} -> ${utilityBill.meterEnd} (${utilityBill.meterEnd - utilityBill.meterStart} kWh)`,
       formatCurrency(utilityBill.usageCost),
     ]);
+    const occupants = utilityBill.occupantCount || 1;
+    const waterPerPerson = Number(utilityBill.waterFee) / occupants;
     tableBody.push([
       "Water Fee",
-      "Flat Rate",
+      `${formatCurrency(waterPerPerson)} x ${occupants} Person(s)`,
       formatCurrency(utilityBill.waterFee),
     ]);
     if (Number(utilityBill.trashFee) > 0) {

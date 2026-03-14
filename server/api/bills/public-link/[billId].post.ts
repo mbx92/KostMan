@@ -13,7 +13,27 @@ export default defineEventHandler(async (event) => {
   requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF])
 
   const billId = getRouterParam(event, 'billId')
-  const body = await readBody<{ billType?: 'rent' | 'utility'; roomId?: string; period?: string }>(event)
+  const body = await readBody<{ billType?: 'rent' | 'utility'; roomId?: string; period?: string; rentBillId?: string; utilBillId?: string }>(event)
+
+  // Support dual bill ID combined token (cross-period: rentBillId + utilBillId)
+  if (body.rentBillId && body.utilBillId) {
+    const [rentResult, utilResult] = await Promise.all([
+      db.select({ id: rentBills.id }).from(rentBills).where(eq(rentBills.id, body.rentBillId)).limit(1),
+      db.select({ id: utilityBills.id }).from(utilityBills).where(eq(utilityBills.id, body.utilBillId)).limit(1),
+    ])
+
+    if (rentResult.length === 0 && utilResult.length === 0) {
+      throw createError({ statusCode: 404, message: 'Bills not found' })
+    }
+
+    const tokenData = `${body.rentBillId}+${body.utilBillId}`
+    const token = Buffer.from(tokenData).toString('base64url')
+
+    return {
+      token,
+      publicUrl: `${getRequestURL(event).origin}/invoice/${token}`
+    }
+  }
 
   // Support combined bills (roomId + period)
   if (body.roomId && body.period) {

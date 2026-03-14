@@ -4,6 +4,8 @@
  * Restricts staff role to only access allowed pages:
  * - Dashboard (/)
  * - Meter Readings (/meter-readings)
+ * - Reminders (/reminders)
+ * - Account (/account, /my-profile)
  * - Login (/login)
  * 
  * Redirects to dashboard if staff tries to access other pages.

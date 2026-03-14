@@ -773,7 +773,7 @@ export const useKosStore = defineStore('kos', () => {
         meterReadingsLoading.value = true
         meterReadingsError.value = null
         try {
-            const response = await $fetch<{ meterReading: MeterReading; utilityBill: UtilityBill | null }>('/api/meter-readings', {
+            const response = await $fetch<{ meterReading: MeterReading; utilityBill: UtilityBill | null; rentBill: RentBill | null }>('/api/meter-readings', {
                 method: 'POST',
                 body: reading
             })
@@ -784,7 +784,12 @@ export const useKosStore = defineStore('kos', () => {
                 utilityBills.value.unshift(response.utilityBill)
             }
 
-            return response.meterReading
+            // Add the auto-generated rent bill to local store if present
+            if (response.rentBill) {
+                rentBills.value.unshift(response.rentBill)
+            }
+
+            return response
         } catch (err: any) {
             meterReadingsError.value = err?.data?.message || err?.message || 'Failed to add meter reading'
             console.error('addMeterReading error:', err)
@@ -798,7 +803,7 @@ export const useKosStore = defineStore('kos', () => {
         meterReadingsLoading.value = true
         meterReadingsError.value = null
         try {
-            const response = await $fetch<{ meterReading: MeterReading; utilityBill: UtilityBill | null }>(`/api/meter-readings/${id}`, {
+            const response = await $fetch<{ meterReading: MeterReading; utilityBill: UtilityBill | null; rentBill: RentBill | null }>(`/api/meter-readings/${id}`, {
                 method: 'PATCH',
                 body: updates
             })
@@ -812,6 +817,14 @@ export const useKosStore = defineStore('kos', () => {
                 const billIndex = utilityBills.value.findIndex(b => b.id === response.utilityBill!.id)
                 if (billIndex !== -1) {
                     utilityBills.value[billIndex] = response.utilityBill
+                }
+            }
+
+            // Add auto-generated rent bill if newly created
+            if (response.rentBill) {
+                const rbIndex = rentBills.value.findIndex(b => b.id === response.rentBill!.id)
+                if (rbIndex === -1) {
+                    rentBills.value.unshift(response.rentBill)
                 }
             }
 

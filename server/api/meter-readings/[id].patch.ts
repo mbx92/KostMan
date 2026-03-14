@@ -4,6 +4,7 @@ import { meterReadings, rooms, propertySettings } from '../../database/schema';
 import { meterReadingUpdateSchema } from '../../validations/meter-reading';
 import { eq } from 'drizzle-orm';
 import { findUtilityBillByRoomAndPeriod, updateUtilityBill } from '../../services/utilityBillService';
+import { autoGenerateRentBill } from '../../utils/rentBillService';
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
@@ -79,7 +80,10 @@ export default defineEventHandler(async (event) => {
                 }
             }
 
-            return { meterReading, utilityBill };
+            // Auto-generate rent bill for this billing cycle (if not already exists)
+            const rentBill = await autoGenerateRentBill(current.roomId, current.period, tx);
+
+            return { meterReading, utilityBill, rentBill };
         });
 
         return result;

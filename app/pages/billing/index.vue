@@ -71,6 +71,7 @@ onMounted(async () => {
 
 // Tab state
 const activeTab = ref<"rent" | "utility" | "summary">("rent");
+const viewMode = ref<"grid" | "list">("list");
 
 // Filters
 const selectedPropertyId = ref("all");
@@ -1174,13 +1175,15 @@ const sendReminder = async (reminder: any) => {
         );
         invoiceUrl = linkResponse.publicUrl;
       } else {
-        // Different periods, use first rent bill
-        const billId = reminder.unpaidRentBills[0].id;
+        // Different periods - use dual bill ID format for combined invoice
         const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
-          `/api/bills/public-link/${billId}`,
+          `/api/bills/public-link/combined`,
           {
             method: "POST",
-            body: { billType: "rent" },
+            body: {
+              rentBillId: reminder.unpaidRentBills[0].id,
+              utilBillId: reminder.unpaidUtilityBills[0].id,
+            },
           },
         );
         invoiceUrl = linkResponse.publicUrl;
@@ -1400,34 +1403,57 @@ const sendReminder = async (reminder: any) => {
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
-      <UButton
-        :color="activeTab === 'rent' ? 'primary' : 'neutral'"
-        variant="soft"
-        @click="activeTab = 'rent'"
-      >
-        Tagihan Sewa ({{ filteredRentBills.length }})
-      </UButton>
-      <UButton
-        :color="activeTab === 'utility' ? 'primary' : 'neutral'"
-        variant="soft"
-        @click="activeTab = 'utility'"
-      >
-        Tagihan Utilitas ({{ filteredUtilityBills.length }})
-      </UButton>
-      <UButton
-        :color="activeTab === 'summary' ? 'primary' : 'neutral'"
-        variant="soft"
-        @click="activeTab = 'summary'"
-      >
-        Ringkasan Bulanan
-      </UButton>
+    <div class="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+      <div class="flex gap-2">
+        <UButton
+          :color="activeTab === 'rent' ? 'primary' : 'neutral'"
+          variant="soft"
+          @click="activeTab = 'rent'"
+        >
+          Tagihan Sewa ({{ filteredRentBills.length }})
+        </UButton>
+        <UButton
+          :color="activeTab === 'utility' ? 'primary' : 'neutral'"
+          variant="soft"
+          @click="activeTab = 'utility'"
+        >
+          Tagihan Utilitas ({{ filteredUtilityBills.length }})
+        </UButton>
+        <UButton
+          :color="activeTab === 'summary' ? 'primary' : 'neutral'"
+          variant="soft"
+          @click="activeTab = 'summary'"
+        >
+          Ringkasan Bulanan
+        </UButton>
+      </div>
+      <!-- View Mode Toggle -->
+      <div class="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 p-0.5">
+        <UTooltip text="Tampilan Grid">
+          <UButton
+            :color="viewMode === 'grid' ? 'primary' : 'neutral'"
+            :variant="viewMode === 'grid' ? 'soft' : 'ghost'"
+            icon="i-heroicons-squares-2x2"
+            size="xs"
+            @click="viewMode = 'grid'"
+          />
+        </UTooltip>
+        <UTooltip text="Tampilan List">
+          <UButton
+            :color="viewMode === 'list' ? 'primary' : 'neutral'"
+            :variant="viewMode === 'list' ? 'soft' : 'ghost'"
+            icon="i-heroicons-list-bullet"
+            size="xs"
+            @click="viewMode = 'list'"
+          />
+        </UTooltip>
+      </div>
     </div>
 
     <!-- Rent Bills Table -->
     <UCard v-if="activeTab === 'rent'">
-      <!-- Mobile View: Accordion Cards -->
-      <div v-if="filteredRentBills.length > 0" class="lg:hidden p-4 space-y-3">
+      <!-- Grid View: Accordion Cards -->
+      <div v-if="filteredRentBills.length > 0 && viewMode === 'grid'" class="p-4 space-y-3">
         <!-- Search Filter Mobile -->
         <div class="mb-4">
           <UInput
@@ -1498,8 +1524,8 @@ const sendReminder = async (reminder: any) => {
         </div>
       </div>
 
-      <!-- Desktop View: UTable with Pagination -->
-      <div v-if="filteredRentBills.length > 0" class="hidden lg:block">
+      <!-- List View: UTable with Pagination -->
+      <div v-if="filteredRentBills.length > 0 && viewMode === 'list'">
         <!-- Search Filter -->
         <div
           class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700"
@@ -1706,10 +1732,10 @@ const sendReminder = async (reminder: any) => {
 
     <!-- Utility Bills Table -->
     <UCard v-if="activeTab === 'utility'">
-      <!-- Mobile View: Accordion Cards -->
+      <!-- Grid View: Accordion Cards -->
       <div
-        v-if="filteredUtilityBills.length > 0"
-        class="lg:hidden p-4 space-y-3"
+        v-if="filteredUtilityBills.length > 0 && viewMode === 'grid'"
+        class="p-4 space-y-3"
       >
         <!-- Search Filter Mobile -->
         <div class="mb-4">
@@ -1783,8 +1809,8 @@ const sendReminder = async (reminder: any) => {
         </div>
       </div>
 
-      <!-- Desktop View: UTable with Pagination -->
-      <div v-if="filteredUtilityBills.length > 0" class="hidden lg:block">
+      <!-- List View: UTable with Pagination -->
+      <div v-if="filteredUtilityBills.length > 0 && viewMode === 'list'">
         <!-- Search Filter -->
         <div
           class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700"
@@ -1985,8 +2011,8 @@ const sendReminder = async (reminder: any) => {
 
     <!-- Combined Statements Table -->
     <UCard v-if="activeTab === 'summary'">
-      <!-- Mobile View: Accordion Cards -->
-      <div v-if="combinedBills.length > 0" class="lg:hidden p-4 space-y-3">
+      <!-- Grid View: Accordion Cards -->
+      <div v-if="combinedBills.length > 0 && viewMode === 'grid'" class="p-4 space-y-3">
         <!-- Search Filter Mobile -->
         <div class="mb-4">
           <UInput
@@ -2057,8 +2083,8 @@ const sendReminder = async (reminder: any) => {
         </div>
       </div>
 
-      <!-- Desktop View: UTable with Pagination -->
-      <div v-if="combinedBills.length > 0" class="hidden lg:block">
+      <!-- List View: UTable with Pagination -->
+      <div v-if="combinedBills.length > 0 && viewMode === 'list'">
         <!-- Search Filter -->
         <div
           class="flex px-4 py-3.5 border-b border-gray-200 dark:border-gray-700"

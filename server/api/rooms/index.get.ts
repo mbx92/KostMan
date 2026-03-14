@@ -2,7 +2,7 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
 import { rooms, properties, propertySettings, tenants } from '../../database/schema';
-import { eq, and, like, count, sql } from 'drizzle-orm';
+import { eq, and, like, count, sql, asc } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
     // 1. Role Check
@@ -60,7 +60,8 @@ export default defineEventHandler(async (event) => {
         .from(rooms)
         .innerJoin(properties, eq(rooms.propertyId, properties.id))
         .leftJoin(propertySettings, eq(properties.id, propertySettings.propertyId))
-        .leftJoin(tenants, eq(rooms.tenantId, tenants.id));
+        .leftJoin(tenants, eq(rooms.tenantId, tenants.id))
+        .orderBy(asc(properties.createdAt), asc(rooms.name));
 
     // Apply Filters
 

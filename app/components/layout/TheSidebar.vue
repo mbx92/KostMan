@@ -71,6 +71,11 @@ const defaultNavigation: NavItem[] = [
         to: '/billing'
       },
       {
+        label: 'Konfirmasi Pembayaran',
+        icon: 'i-heroicons-check-badge',
+        to: '/payment-confirmations'
+      },
+      {
         label: 'Pengeluaran',
         icon: 'i-heroicons-receipt-percent',
         to: '/expenses'
