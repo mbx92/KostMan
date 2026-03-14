@@ -39,7 +39,7 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'apple-mobile-web-app-title', content: 'KostMan' },
         { name: 'mobile-web-app-capable', content: 'yes' },
-        { name: 'theme-color', content: '#3B82F6' },
+        { name: 'theme-color', content: '#22C55E' },
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
@@ -103,7 +103,7 @@ export default defineNuxtConfig({
       name: 'KostMan - Kelola Kost',
       short_name: 'KostMan',
       description: 'Aplikasi manajemen kost premium',
-      theme_color: '#3B82F6',
+      theme_color: '#22C55E',
       background_color: '#0f172a',
       display: 'standalone',
       orientation: 'portrait',

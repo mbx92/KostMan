@@ -254,12 +254,12 @@ onMounted(() => {
     <!-- Logo -->
     <div class="h-16 flex items-center px-4 border-b border-gray-200 dark:border-gray-800" :class="collapsed ? 'justify-center' : ''">
       <NuxtLink to="/" class="flex items-center gap-3 overflow-hidden">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shrink-0">
-          <UIcon name="i-heroicons-cube" class="w-5 h-5 text-white" />
+        <div class="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center shrink-0">
+          <UIcon name="i-heroicons-home-modern" class="w-5 h-5 text-white" />
         </div>
         <Transition name="slide-fade">
           <span v-if="!collapsed" class="font-bold text-lg text-gray-900 dark:text-white whitespace-nowrap">
-            {{ settings?.appName || appConfig.app?.name || 'NuxtBase' }}
+            {{ settings?.appName || appConfig.app?.name || 'KostMan' }}
           </span>
         </Transition>
       </NuxtLink>

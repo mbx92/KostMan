@@ -77,36 +77,28 @@ const onSaveMidtrans = async () => {
 // --- Backup Functions ---
 const backupLoading = ref(false)
 const backupHistory = ref<any[]>([])
-const showHistory = ref(false)
 
 async function createBackup() {
   backupLoading.value = true
   try {
-    const response = await $fetch('/api/backup/database', {
+    const result = await $fetch<{ success: boolean; backup: { id: string; filename: string } }>('/api/backup/database', {
       method: 'POST',
-      responseType: 'blob',
     })
-    
-    // Trigger download
-    const url = window.URL.createObjectURL(response as Blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `kostman-backup-${new Date().toISOString().split('T')[0]}.sql`
-    a.click()
-    window.URL.revokeObjectURL(url)
-    
+
+    // Open download link in new tab (session cookie is sent automatically)
+    window.open(`/api/backup/${result.backup.id}/download`, '_blank')
+
     toast.add({
       title: 'Backup Berhasil',
-      description: 'Database berhasil di-backup dan diunduh.',
+      description: 'Database berhasil di-backup dan sedang diunduh.',
       color: 'success',
     })
-    
-    // Refresh history
+
     await loadBackupHistory()
   } catch (error: any) {
     toast.add({
       title: 'Backup Gagal',
-      description: error.data?.message || 'Gagal membuat backup',
+      description: error.data?.message || 'Gagal membuat backup. Pastikan pg_dump tersedia di server.',
       color: 'error',
     })
   } finally {
@@ -114,39 +106,16 @@ async function createBackup() {
   }
 }
 
+async function downloadBackup(id: string) {
+  window.open(`/api/backup/${id}/download`, '_blank')
+}
+
 async function loadBackupHistory() {
   try {
-    const data = await $fetch('/api/backup/history')
+    const data = await $fetch<{ backups: any[]; total: number }>('/api/backup/history')
     backupHistory.value = data.backups
   } catch (error) {
     console.error('Failed to load backup history', error)
-  }
-}
-
-async function cleanupOldBackups() {
-  const confirmed = await confirmDialog.value?.confirm({
-    title: 'Hapus Backup Lama?',
-    message: 'Hapus backup yang lebih lama dari 30 hari?',
-    confirmText: 'Ya, Hapus',
-    confirmColor: 'warning',
-  })
-  
-  if (!confirmed) return
-  
-  try {
-    const result = await $fetch('/api/backup/cleanup', { method: 'POST' })
-    toast.add({
-      title: 'Berhasil',
-      description: result.message,
-      color: 'success',
-    })
-    await loadBackupHistory()
-  } catch (error) {
-    toast.add({
-      title: 'Gagal',
-      description: 'Gagal membersihkan backup lama',
-      color: 'error',
-    })
   }
 }
 
@@ -642,93 +611,81 @@ onMounted(async () => {
       <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
         <div>
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Database Backup</h2>
-          <p class="text-sm text-gray-500">Backup dan restore data aplikasi Anda.</p>
+          <p class="text-sm text-gray-500">Backup otomatis setiap jam 00:00 · Maks 5 file tersimpan.</p>
         </div>
       </div>
 
       <UCard>
         <div class="space-y-4">
-          <p class="text-sm text-gray-600 dark:text-gray-400">
-            Backup seluruh data aplikasi termasuk properti, kamar, penghuni, tagihan, dan pembayaran.
-            File backup akan diunduh dalam format SQL.
-          </p>
-          
-          <div class="flex flex-wrap gap-3">
-            <UButton 
-              color="primary" 
+          <div class="flex flex-wrap items-center gap-3">
+            <UButton
+              color="primary"
               icon="i-heroicons-arrow-down-tray"
               :loading="backupLoading"
               @click="createBackup"
             >
               Backup Sekarang
             </UButton>
-            
-            <UButton 
-              v-if="backupHistory.length > 0"
-              variant="soft"
-              icon="i-heroicons-clock"
-              @click="showHistory = !showHistory"
-            >
-              {{ showHistory ? 'Sembunyikan' : 'Lihat' }} Riwayat ({{ backupHistory.length }})
-            </UButton>
-            
-            <UButton 
-              v-if="backupHistory.length > 0"
-              variant="soft"
-              color="warning"
-              icon="i-heroicons-trash"
-              @click="cleanupOldBackups"
-            >
-              Bersihkan Lama
-            </UButton>
+            <p class="text-xs text-gray-400">
+              <UIcon name="i-heroicons-clock" class="w-3.5 h-3.5 inline align-text-bottom" />
+              Auto backup aktif setiap jam 00:00
+            </p>
           </div>
-          
-          <!-- Backup History -->
-          <div v-if="showHistory && backupHistory.length > 0" class="mt-6">
-            <div class="border-t border-gray-200 dark:border-gray-800 pt-4">
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                Riwayat Backup
-              </h4>
-              
-              <div class="space-y-2">
-                <div 
-                  v-for="backup in backupHistory" 
-                  :key="backup.id"
-                  class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
-                >
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <UIcon 
-                        :name="backup.type === 'manual' ? 'i-heroicons-hand-raised' : 'i-heroicons-clock'" 
-                        class="w-4 h-4 text-gray-400"
-                      />
-                      <span class="text-sm font-medium text-gray-900 dark:text-white">
-                        {{ backup.filename }}
-                      </span>
-                      <UBadge 
-                        :color="backup.type === 'manual' ? 'primary' : 'neutral'" 
-                        size="xs"
-                      >
-                        {{ backup.type }}
-                      </UBadge>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1">
-                      {{ formatFileSize(backup.size) }} • 
-                      {{ new Date(backup.createdAt).toLocaleString('id-ID') }}
-                      <span v-if="backup.duration"> • {{ (backup.duration / 1000).toFixed(2) }}s</span>
-                    </div>
+
+          <!-- Backup List -->
+          <div v-if="backupHistory.length > 0" class="border-t border-gray-200 dark:border-gray-800 pt-4">
+            <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              File Backup ({{ backupHistory.length }}/5)
+            </h4>
+            <div class="space-y-2">
+              <div
+                v-for="(backup, index) in backupHistory"
+                :key="backup.id"
+                class="flex items-center justify-between p-3 rounded-lg"
+                :class="index === 0 ? 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800' : 'bg-gray-50 dark:bg-gray-800/50'"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <UIcon
+                      :name="backup.type === 'manual' ? 'i-heroicons-hand-raised' : 'i-heroicons-clock'"
+                      class="w-4 h-4 text-gray-400 shrink-0"
+                    />
+                    <span class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {{ backup.filename }}
+                    </span>
+                    <UBadge :color="backup.type === 'manual' ? 'primary' : 'neutral'" size="xs">
+                      {{ backup.type === 'manual' ? 'Manual' : 'Otomatis' }}
+                    </UBadge>
+                    <UBadge v-if="index === 0" color="success" size="xs">Terbaru</UBadge>
+                  </div>
+                  <div class="text-xs text-gray-500 mt-1">
+                    {{ formatFileSize(backup.size) }} ·
+                    {{ new Date(backup.createdAt).toLocaleString('id-ID') }}
+                    <span v-if="backup.duration"> · {{ (backup.duration / 1000).toFixed(1) }}s</span>
                   </div>
                 </div>
+                <UButton
+                  size="xs"
+                  variant="ghost"
+                  icon="i-heroicons-arrow-down-tray"
+                  :disabled="!backup.storagePath"
+                  :title="backup.storagePath ? 'Download backup' : 'File tidak tersedia'"
+                  @click="downloadBackup(backup.id)"
+                />
               </div>
             </div>
           </div>
-          
+
+          <div v-else class="text-sm text-gray-400 italic">
+            Belum ada backup. Klik "Backup Sekarang" untuk membuat backup pertama.
+          </div>
+
           <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
             <div class="flex gap-2">
-              <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 flex-shrink-0" />
+              <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 shrink-0" />
               <div class="text-sm text-blue-700 dark:text-blue-300">
-                <strong>Tips:</strong> Simpan backup secara berkala di tempat yang aman. 
-                File SQL dapat di-restore menggunakan tools seperti pgAdmin atau psql.
+                <strong>Info:</strong> Backup tersimpan di server. File ke-6 akan otomatis menghapus yang terlama.
+                Restore menggunakan <code class="font-mono text-xs">psql</code> atau pgAdmin.
               </div>
             </div>
           </div>

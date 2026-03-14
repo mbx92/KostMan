@@ -102,16 +102,14 @@ const handleLogin = async () => {
     >
       <div class="w-full max-w-md space-y-8">
         <div class="text-center">
-          <div
-            class="w-12 h-12 bg-primary-500 rounded-xl mx-auto flex items-center justify-center mb-4 text-white"
-          >
-            <UIcon name="i-heroicons-home-modern" class="w-7 h-7" />
+          <div class="w-16 h-16 rounded-2xl bg-green-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <UIcon name="i-heroicons-home-modern" class="w-9 h-9 text-white" />
           </div>
           <h2 class="text-3xl font-bold text-gray-900 dark:text-white">
-            Welcome back
+            KostMan
           </h2>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            Please enter your details to sign in
+            Masuk ke akun Anda
           </p>
         </div>
 
