@@ -17,6 +17,7 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@pinia/nuxt',
     '@vueuse/nuxt',
+    '@vite-pwa/nuxt',
   ],
 
   css: ['~/assets/css/main.css'],
@@ -29,13 +30,20 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Kost Man  - Premium Starter Kit',
+      title: 'KostMan - Kelola Kost',
       meta: [
-        { name: 'description', content: 'A premium Nuxt UI starter kit with comprehensive component documentation' },
+        { name: 'description', content: 'Aplikasi manajemen kost premium' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        // iOS PWA
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-title', content: 'KostMan' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'theme-color', content: '#3B82F6' },
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
         { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap' }
       ],
       script: [
@@ -85,6 +93,76 @@ export default defineNuxtConfig({
   $production: {
     routeRules: {
       '/**': { ssr: true },
+    },
+  },
+
+  // PWA Configuration
+  pwa: {
+    registerType: 'autoUpdate',
+    manifest: {
+      name: 'KostMan - Kelola Kost',
+      short_name: 'KostMan',
+      description: 'Aplikasi manajemen kost premium',
+      theme_color: '#3B82F6',
+      background_color: '#0f172a',
+      display: 'standalone',
+      orientation: 'portrait',
+      scope: '/',
+      start_url: '/',
+      icons: [
+        {
+          src: '/icons/icon-192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+          purpose: 'any',
+        },
+        {
+          src: '/icons/icon-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any',
+        },
+        {
+          src: '/icons/icon-maskable-192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+          purpose: 'maskable',
+        },
+        {
+          src: '/icons/icon-maskable-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'maskable',
+        },
+      ],
+    },
+    workbox: {
+      // Cache API calls for offline fallback (GET only, not auth/mutations)
+      runtimeCaching: [
+        {
+          urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'google-fonts-cache',
+            expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+        {
+          urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'gstatic-fonts-cache',
+            expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+      ],
+      navigateFallback: null,
+    },
+    devOptions: {
+      enabled: true,
+      type: 'module',
     },
   },
 })
