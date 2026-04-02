@@ -1,6 +1,6 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rentBills, rooms, properties, propertySettings } from '../../database/schema';
+import { rentBills, rooms, properties } from '../../database/schema';
 import { rentBillGenerateSchema } from '../../validations/billing';
 import { eq, and, or, lte, gte } from 'drizzle-orm';
 
@@ -96,40 +96,24 @@ export default defineEventHandler(async (event) => {
     const periodEndDate = input.periodEndDate || calculatePeriodEndDate(periodStartDate, monthsCovered);
     const dueDate = input.dueDate || periodEndDate;
     const billingCycleDay = extractBillingCycleDay(roomData.moveInDate);
-    
+
     // Legacy period for backward compatibility
     const period = generateLegacyPeriod(periodStartDate);
 
-    // Calculate totals
+    // Calculate totals (waterFee & trashFee now handled by meter readings)
     const roomPrice = Number(input.roomPrice) * monthsCovered;
-
-    // Get property settings for water/trash fees
-    const propSettings = await db.select()
-        .from(propertySettings)
-        .where(eq(propertySettings.propertyId, roomData.propertyId))
-        .limit(1);
-
-    const occupantCount = roomData.occupantCount || 1;
-    const baseWaterFee = propSettings.length > 0 ? Number(propSettings[0].waterFee) : 0;
-    const baseTrashFee = propSettings.length > 0 ? Number(propSettings[0].trashFee) : 0;
-    
-    // Water fee multiplied by occupant count and months
-    const waterFee = baseWaterFee * occupantCount * monthsCovered;
-    // Trash fee only if room uses trash service
-    const trashFee = roomData.useTrashService ? baseTrashFee * monthsCovered : 0;
-
-    const totalAmount = roomPrice + waterFee + trashFee;
+    const totalAmount = roomPrice;
 
     // Check for overlapping rent bills using date ranges
     const existingBills = await db.select().from(rentBills).where(eq(rentBills.roomId, input.roomId));
-    
+
     for (const existingBill of existingBills) {
         const existingStart = existingBill.periodStartDate;
         const existingEnd = existingBill.periodEndDate;
-        
+
         if (dateRangesOverlap(periodStartDate, periodEndDate, existingStart, existingEnd)) {
-            const formatDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { 
-                day: 'numeric', month: 'short', year: 'numeric' 
+            const formatDate = (d: string) => new Date(d).toLocaleDateString('id-ID', {
+                day: 'numeric', month: 'short', year: 'numeric'
             });
             throw createError({
                 statusCode: 409,
@@ -143,21 +127,21 @@ export default defineEventHandler(async (event) => {
     const newBill = await db.insert(rentBills).values({
         roomId: input.roomId,
         tenantId: roomData.tenantId || null,
-        
+
         // Date-based fields (primary)
         periodStartDate: periodStartDate,
         periodEndDate: periodEndDate,
         dueDate: dueDate,
         billingCycleDay: billingCycleDay,
-        
+
         // Legacy fields (for backward compatibility)
         period: period,
         periodEnd: null, // No longer used for multi-month tracking
-        
+
         monthsCovered: monthsCovered,
         roomPrice: roomPrice.toString(),
-        waterFee: waterFee.toString(),
-        trashFee: trashFee.toString(),
+        waterFee: '0',
+        trashFee: '0',
         totalAmount: totalAmount.toString(),
         isPaid: false,
         generatedAt: new Date(),

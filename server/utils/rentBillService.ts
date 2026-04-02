@@ -1,5 +1,5 @@
 import { db } from './drizzle'
-import { rentBills, rooms, propertySettings } from '../database/schema'
+import { rentBills, rooms } from '../database/schema'
 import { eq } from 'drizzle-orm'
 import { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
@@ -13,7 +13,7 @@ type DbClient = NodePgDatabase<Record<string, never>>
  *  2. Compute periodStartDate = YYYY-MM-{billingCycleDay} (clamped to month length)
  *  3. Compute periodEndDate   = periodStartDate + 1 month
  *  4. If any existing rent bill overlaps → skip (idempotent)
- *  5. Otherwise insert the rent bill with water+trash from propertySettings
+ *  5. Otherwise insert the rent bill (waterFee & trashFee handled by utility bills)
  *
  * Returns the new rent bill, or null if already exists / prerequisites missing.
  */
@@ -74,25 +74,9 @@ export async function autoGenerateRentBill(
 
     if (hasOverlap) return null
 
-    // 5. Fetch property settings for water/trash
-    const settingsRows = await (client as any)
-        .select()
-        .from(propertySettings)
-        .where(eq(propertySettings.propertyId, room.propertyId))
-        .limit(1)
-
-    const settings = settingsRows[0] ?? null
-
+    // 5. Calculate totals (waterFee & trashFee now handled by utility bills)
     const roomPrice = Number(room.price)
-    const occupantCount = room.occupantCount || 1
-
-    const baseWaterFee = settings ? Number(settings.waterFee) : 0
-    const baseTrashFee = settings ? Number(settings.trashFee) : 0
-
-    const waterFee = baseWaterFee * occupantCount
-    const trashFee = room.useTrashService ? baseTrashFee : 0
-
-    const totalAmount = roomPrice + waterFee + trashFee
+    const totalAmount = roomPrice
 
     // 6. Insert rent bill
     const inserted = await (client as any).insert(rentBills).values({
@@ -106,8 +90,8 @@ export async function autoGenerateRentBill(
         periodEnd: null,
         monthsCovered: 1,
         roomPrice: roomPrice.toString(),
-        waterFee: waterFee.toString(),
-        trashFee: trashFee.toString(),
+        waterFee: '0',
+        trashFee: '0',
         totalAmount: totalAmount.toString(),
         isPaid: false,
         generatedAt: new Date(),
