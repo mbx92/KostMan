@@ -22,15 +22,23 @@ RUN npm run build
 FROM node:20-alpine AS production
 WORKDIR /app
 
-# Install runtime dependencies for better-sqlite3
+# Install runtime dependencies for better-sqlite3 and native modules copied from deps
 RUN apk add --no-cache libc6-compat
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nuxtjs
 
+# Copy runtime dependencies for migration runner
+COPY --from=deps /app/node_modules ./node_modules
+
 # Copy built application
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output ./.output
+COPY --from=builder --chown=nuxtjs:nodejs /app/server/database/migrations ./server/database/migrations
+COPY --from=builder --chown=nuxtjs:nodejs /app/scripts/run-migrations.mjs ./scripts/run-migrations.mjs
+COPY --from=builder --chown=nuxtjs:nodejs /app/scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
+
+RUN chmod +x ./scripts/docker-entrypoint.sh
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -43,5 +51,5 @@ USER nuxtjs
 # Expose port
 EXPOSE 3000
 
-# Start the application
-CMD ["node", ".output/server/index.mjs"]
+# Run migrations, then start the application
+CMD ["/app/scripts/docker-entrypoint.sh"]
