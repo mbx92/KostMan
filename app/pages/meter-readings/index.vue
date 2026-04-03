@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKosStore } from '~/stores/kos'
+import { getRoomStatusLabel } from '~/composables/useRoomStatus'
 import { CalendarDate, DateFormatter, getLocalTimeZone } from '@internationalized/date'
 
 // Get current user info (auth already verified by middleware)
@@ -456,7 +457,7 @@ function formatDate(dateStr: string | null) {
                        variant="subtle"
                        size="xs"
                     >
-                       {{ room.status === 'occupied' ? 'Terisi' : room.status === 'available' ? 'Tersedia' : 'Maintenance' }}
+                        {{ getRoomStatusLabel(room.status) }}
                     </UBadge>
                   </td>
                   <td class="py-3 px-5">
@@ -561,7 +562,7 @@ function formatDate(dateStr: string | null) {
                         size="xs"
                         class="px-1.5 py-0"
                      >
-                        {{ room.status === 'occupied' ? 'Terisi' : room.status === 'available' ? 'Tersedia' : 'Maintenance' }}
+                      {{ getRoomStatusLabel(room.status) }}
                      </UBadge>
                   </div>
                   <div class="mt-1 flex items-center gap-2 flex-wrap">

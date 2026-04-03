@@ -1,5 +1,5 @@
 import { db } from '../utils/drizzle';
-import { utilityBills, rooms, properties } from '../database/schema';
+import { utilityBills, rooms, properties, propertySettings, roomSettings, globalSettings } from '../database/schema';
 import { eq, and } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Role } from '../utils/permissions';
@@ -7,6 +7,12 @@ import { createError } from 'h3';
 
 // Type compatible with both db instance and transaction
 type DbClient = NodePgDatabase<Record<string, never>>;
+
+const DEFAULT_UTILITY_SETTINGS = {
+    costPerKwh: 1500,
+    waterFee: 50000,
+    trashFee: 25000,
+};
 
 export interface UtilityBillInput {
     roomId: string;
@@ -22,6 +28,13 @@ export interface UtilityBillInput {
 export interface UtilityBillUser {
     id: string;
     role: string;
+}
+
+export interface ResolvedUtilitySettings {
+    costPerKwh: number;
+    waterFee: number;
+    trashFee: number;
+    source: 'room' | 'property' | 'global' | 'default';
 }
 
 /**
@@ -58,6 +71,64 @@ export async function verifyRoomOwnership(roomData: { propertyId: string }, user
             throw createError({ statusCode: 403, statusMessage: 'Forbidden' });
         }
     }
+}
+
+/**
+ * Resolve utility settings with fallback order: room -> property -> global -> default.
+ */
+export async function resolveRoomUtilitySettings(roomId: string, tx?: DbClient): Promise<ResolvedUtilitySettings> {
+    const client = tx || db;
+    const result = await client.select({
+        room: rooms,
+        roomSettings,
+        propertySettings,
+        globalSettings,
+    })
+        .from(rooms)
+        .innerJoin(properties, eq(rooms.propertyId, properties.id))
+        .leftJoin(roomSettings, eq(roomSettings.roomId, rooms.id))
+        .leftJoin(propertySettings, eq(propertySettings.propertyId, properties.id))
+        .leftJoin(globalSettings, eq(globalSettings.userId, properties.userId))
+        .where(eq(rooms.id, roomId))
+        .limit(1);
+
+    if (result.length === 0) {
+        throw createError({ statusCode: 404, statusMessage: 'Room not found' });
+    }
+
+    const resolved = result[0].roomSettings || result[0].propertySettings || result[0].globalSettings;
+
+    if (result[0].roomSettings) {
+        return {
+            costPerKwh: Number(result[0].roomSettings.costPerKwh),
+            waterFee: Number(result[0].roomSettings.waterFee),
+            trashFee: Number(result[0].roomSettings.trashFee),
+            source: 'room',
+        };
+    }
+
+    if (result[0].propertySettings) {
+        return {
+            costPerKwh: Number(result[0].propertySettings.costPerKwh),
+            waterFee: Number(result[0].propertySettings.waterFee),
+            trashFee: Number(result[0].propertySettings.trashFee),
+            source: 'property',
+        };
+    }
+
+    if (result[0].globalSettings) {
+        return {
+            costPerKwh: Number(result[0].globalSettings.costPerKwh),
+            waterFee: Number(result[0].globalSettings.waterFee),
+            trashFee: Number(result[0].globalSettings.trashFee),
+            source: 'global',
+        };
+    }
+
+    return {
+        ...DEFAULT_UTILITY_SETTINGS,
+        source: 'default',
+    };
 }
 
 /**

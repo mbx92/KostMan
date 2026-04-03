@@ -1,10 +1,10 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { meterReadings, rooms, propertySettings } from '../../database/schema';
+import { meterReadings, rooms } from '../../database/schema';
 import { meterReadingSchema } from '../../validations/meter-reading';
 import { eq } from 'drizzle-orm';
-import { createUtilityBill, findUtilityBillByRoomAndPeriod, updateUtilityBill } from '../../services/utilityBillService';
+import { createUtilityBill, findUtilityBillByRoomAndPeriod, resolveRoomUtilitySettings, updateUtilityBill } from '../../services/utilityBillService';
 import { autoGenerateRentBill } from '../../utils/rentBillService';
 
 export default defineEventHandler(async (event) => {
@@ -52,33 +52,26 @@ export default defineEventHandler(async (event) => {
                     return { meterReading, utilityBill };
                 }
 
-                const propSettings = await tx.select()
-                    .from(propertySettings)
-                    .where(eq(propertySettings.propertyId, roomData.propertyId))
-                    .limit(1);
+                const resolvedSettings = await resolveRoomUtilitySettings(validatedData.roomId, tx);
+                const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
 
-                if (propSettings.length > 0) {
-                    const settings = propSettings[0];
-                    const trashFee = roomData.useTrashService ? Number(settings.trashFee) : 0;
+                const billInput = {
+                    roomId: validatedData.roomId,
+                    period: validatedData.period,
+                    meterStart: validatedData.meterStart,
+                    meterEnd: validatedData.meterEnd,
+                    costPerKwh: resolvedSettings.costPerKwh,
+                    waterFee: resolvedSettings.waterFee,
+                    trashFee,
+                };
 
-                    const billInput = {
-                        roomId: validatedData.roomId,
-                        period: validatedData.period,
-                        meterStart: validatedData.meterStart,
-                        meterEnd: validatedData.meterEnd,
-                        costPerKwh: Number(settings.costPerKwh),
-                        waterFee: Number(settings.waterFee),
-                        trashFee: trashFee,
-                    };
+                // Check if a utility bill already exists for this room+period
+                const existingBill = await findUtilityBillByRoomAndPeriod(validatedData.roomId, validatedData.period, tx);
 
-                    // Check if a utility bill already exists for this room+period
-                    const existingBill = await findUtilityBillByRoomAndPeriod(validatedData.roomId, validatedData.period, tx);
-
-                    if (existingBill) {
-                        utilityBill = await updateUtilityBill(existingBill.id, billInput, user, tx);
-                    } else {
-                        utilityBill = await createUtilityBill(billInput, user, tx);
-                    }
+                if (existingBill) {
+                    utilityBill = await updateUtilityBill(existingBill.id, billInput, user, tx);
+                } else {
+                    utilityBill = await createUtilityBill(billInput, user, tx);
                 }
             }
 

@@ -12,7 +12,7 @@ const props = defineProps<{
 const emit = defineEmits(['update:modelValue', 'saved'])
 
 const store = useKosStore()
-const { properties } = storeToRefs(store)
+const { properties, settings: globalSettings } = storeToRefs(store)
 const toast = useToast()
 
 const isSaving = ref(false)
@@ -22,6 +22,10 @@ const state = reactive({
   name: '',
   price: 0,
   status: 'available' as 'available' | 'occupied' | 'maintenance',
+  overrideSettings: false,
+  costPerKwh: 0,
+  waterFee: 0,
+  trashFee: 0,
 })
 
 // Status options - NO occupied option in modal (occupied can only be set in manage room page)
@@ -45,11 +49,21 @@ const propertyOptions = computed(() =>
   properties.value.map(p => ({ label: p.name, value: p.id }))
 )
 
+const selectedProperty = computed(() =>
+  properties.value.find((property) => property.id === state.propertyId) || null
+)
+
+const inheritedSettings = computed(() => selectedProperty.value?.settings || globalSettings.value)
+
 const schema = z.object({
   propertyId: z.string().min(1, 'Properti wajib dipilih'),
   name: z.string().min(1, 'Nama kamar wajib diisi'),
   price: z.number().min(0, 'Harga harus positif'),
   status: z.enum(['available', 'occupied', 'maintenance']),
+  overrideSettings: z.boolean(),
+  costPerKwh: z.number().min(0).optional(),
+  waterFee: z.number().min(0).optional(),
+  trashFee: z.number().min(0).optional(),
 })
 
 type Schema = z.output<typeof schema>
@@ -60,11 +74,27 @@ watch(() => props.room, (newVal) => {
     state.name = newVal.name || ''
     state.price = Number(newVal.price)
     state.status = newVal.status
+    state.overrideSettings = !!newVal.settings
+    state.costPerKwh = Number(newVal.settings?.costPerKwh || newVal.property?.settings?.costPerKwh || globalSettings.value.costPerKwh || 0)
+    state.waterFee = Number(newVal.settings?.waterFee || newVal.property?.settings?.waterFee || globalSettings.value.waterFee || 0)
+    state.trashFee = Number(newVal.settings?.trashFee || newVal.property?.settings?.trashFee || globalSettings.value.trashFee || 0)
   } else {
     state.propertyId = props.propertyId
     state.name = ''
     state.price = 1000000
     state.status = 'available'
+    state.overrideSettings = false
+    state.costPerKwh = Number(inheritedSettings.value?.costPerKwh || 0)
+    state.waterFee = Number(inheritedSettings.value?.waterFee || 0)
+    state.trashFee = Number(inheritedSettings.value?.trashFee || 0)
+  }
+}, { immediate: true })
+
+watch(inheritedSettings, (settings) => {
+  if (!state.overrideSettings && settings) {
+    state.costPerKwh = Number(settings.costPerKwh || 0)
+    state.waterFee = Number(settings.waterFee || 0)
+    state.trashFee = Number(settings.trashFee || 0)
   }
 }, { immediate: true })
 
@@ -84,6 +114,13 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
       name: data.name,
       price: Number(data.price),
       propertyId: data.propertyId,
+      overrideSettings: data.overrideSettings,
+    }
+
+    if (data.overrideSettings) {
+      payload.costPerKwh = Number(data.costPerKwh)
+      payload.waterFee = Number(data.waterFee)
+      payload.trashFee = Number(data.trashFee)
     }
     
     // Only update status if room is not occupied
@@ -186,6 +223,46 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
             <p v-if="isOccupied" class="text-xs text-gray-500 mt-1">
               Status tidak dapat diubah saat kamar terisi.
             </p>
+          </div>
+
+          <div class="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="text-sm font-medium text-gray-900 dark:text-white">Konfigurasi Utilitas</h4>
+                <p class="text-xs text-gray-500">Urutan fallback: kamar, properti, lalu global.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Tarif Khusus</span>
+                <USwitch v-model="state.overrideSettings" />
+              </div>
+            </div>
+
+            <div v-if="!state.overrideSettings" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg text-sm text-gray-500">
+              Kamar ini mengikuti pengaturan turunan.
+              <div class="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="bg-white dark:bg-gray-800 p-1 rounded border">Listrik: {{ inheritedSettings.costPerKwh }}</div>
+                <div class="bg-white dark:bg-gray-800 p-1 rounded border">Air: {{ inheritedSettings.waterFee }}</div>
+                <div class="bg-white dark:bg-gray-800 p-1 rounded border">Sampah: {{ inheritedSettings.trashFee }}</div>
+              </div>
+            </div>
+
+            <div v-else class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <UFormField label="Listrik (/kWh)">
+                <UInput v-model="state.costPerKwh" type="number" step="100">
+                  <template #leading>Rp</template>
+                </UInput>
+              </UFormField>
+              <UFormField label="Biaya Air">
+                <UInput v-model="state.waterFee" type="number" step="1000">
+                  <template #leading>Rp</template>
+                </UInput>
+              </UFormField>
+              <UFormField label="Biaya Sampah">
+                <UInput v-model="state.trashFee" type="number" step="1000">
+                  <template #leading>Rp</template>
+                </UInput>
+              </UFormField>
+            </div>
           </div>
 
           <div class="flex justify-end gap-3 mt-6">

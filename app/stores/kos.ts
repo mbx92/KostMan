@@ -9,6 +9,14 @@ export interface PropertySettings {
     waterFee: number | string
 }
 
+export interface RoomSettings {
+    id?: string
+    roomId?: string
+    costPerKwh: number | string
+    trashFee: number | string
+    waterFee: number | string
+}
+
 export interface Property {
     id: string
     userId?: string
@@ -36,6 +44,7 @@ export interface Room {
     useTrashService?: boolean
     moveInDate?: string | null
     occupantCount?: number
+    settings?: RoomSettings | null
     property?: Property
     tenant?: Tenant | null
 }
@@ -402,7 +411,8 @@ export const useKosStore = defineStore('kos', () => {
                     price: Number(room.price)
                 }
             })
-            const roomWithPrice = { ...newRoom, price: Number(newRoom.price) }
+            const completeRoom = await fetchRoomById(newRoom.id)
+            const roomWithPrice = completeRoom || { ...newRoom, price: Number(newRoom.price) }
             rooms.value.push(roomWithPrice)
             return roomWithPrice
         } catch (err: any) {

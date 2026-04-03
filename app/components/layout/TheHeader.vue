@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getRoomStatusLabel } from '~/composables/useRoomStatus'
+
 interface Props {
   colorMode?: string
 }
@@ -13,10 +15,14 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const toast = useToast()
+const hasMounted = ref(false)
 
 // Fetch current user
 const { data: authData, refresh: refreshUser } = await useAuthFetch('/api/auth/me')
 const currentUser = computed(() => authData.value?.user)
+const currentUserName = computed(() => currentUser.value?.name || 'User')
+const currentUserInitial = computed(() => currentUser.value?.name?.charAt(0).toUpperCase() || '')
+const currentUserRole = computed(() => currentUser.value?.role || '')
 
 // Search
 const searchOpen = ref(false)
@@ -188,6 +194,8 @@ const userItems = [
 
 // Keyboard shortcut for search
 onMounted(() => {
+  hasMounted.value = true
+
   const handleKeydown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault()
@@ -333,22 +341,38 @@ onMounted(() => {
       <!-- User dropdown -->
       <UPopover :popper="{ placement: 'bottom-end' }">
         <UButton variant="ghost" color="neutral" class="gap-2" trailing-icon="i-heroicons-chevron-down">
-          <UAvatar
-            :alt="currentUser?.name"
-            size="xs"
-            class="bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200"
-          >
-            <template v-if="currentUser?.name">
-              {{ currentUser.name.charAt(0).toUpperCase() }}
+          <ClientOnly>
+            <div class="contents" v-if="hasMounted">
+              <UAvatar
+                :alt="currentUserName"
+                size="xs"
+                class="bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200"
+              >
+                <template v-if="currentUserInitial">
+                  {{ currentUserInitial }}
+                </template>
+                <template v-else>
+                  <UIcon name="i-heroicons-user" />
+                </template>
+              </UAvatar>
+              <span class="hidden lg:inline text-sm">{{ currentUserName }}</span>
+              <UBadge v-if="currentUserRole" color="primary" variant="subtle" size="xs" class="hidden xl:inline">
+                {{ currentUserRole }}
+              </UBadge>
+            </div>
+            <template #fallback>
+              <div class="contents">
+                <UAvatar
+                  alt="User"
+                  size="xs"
+                  class="bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200"
+                >
+                  <UIcon name="i-heroicons-user" />
+                </UAvatar>
+                <span class="hidden lg:inline text-sm">User</span>
+              </div>
             </template>
-            <template v-else>
-              <UIcon name="i-heroicons-user" />
-            </template>
-          </UAvatar>
-          <span class="hidden lg:inline text-sm">{{ currentUser?.name || 'User' }}</span>
-          <UBadge v-if="currentUser?.role" color="primary" variant="subtle" size="xs" class="hidden xl:inline">
-            {{ currentUser.role }}
-          </UBadge>
+          </ClientOnly>
         </UButton>
 
         <template #content>
@@ -449,7 +473,7 @@ onMounted(() => {
                     variant="subtle"
                     size="xs"
                   >
-                    {{ room.status === 'occupied' ? 'Terisi' : room.status === 'available' ? 'Tersedia' : 'Maintenance' }}
+                    {{ getRoomStatusLabel(room.status) }}
                   </UBadge>
                 </button>
               </div>

@@ -1,9 +1,9 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { meterReadings, rooms, propertySettings, rentBills } from '../../database/schema';
+import { meterReadings, rooms, rentBills } from '../../database/schema';
 import { meterReadingSchema } from '../../validations/meter-reading';
 import { eq, and } from 'drizzle-orm';
-import { createUtilityBill } from '../../services/utilityBillService';
+import { createUtilityBill, resolveRoomUtilitySettings } from '../../services/utilityBillService';
 import { autoGenerateRentBill } from '../../utils/rentBillService';
 
 export default defineEventHandler(async (event) => {
@@ -56,25 +56,18 @@ export default defineEventHandler(async (event) => {
                     return { meterReading, utilityBill };
                 }
 
-                const propSettings = await tx.select()
-                    .from(propertySettings)
-                    .where(eq(propertySettings.propertyId, roomData.propertyId))
-                    .limit(1);
+                const resolvedSettings = await resolveRoomUtilitySettings(validatedData.roomId, tx);
+                const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
 
-                if (propSettings.length > 0) {
-                    const settings = propSettings[0];
-                    const trashFee = roomData.useTrashService ? Number(settings.trashFee) : 0;
-
-                    utilityBill = await createUtilityBill({
-                        roomId: validatedData.roomId,
-                        period: validatedData.period,
-                        meterStart: validatedData.meterStart,
-                        meterEnd: validatedData.meterEnd,
-                        costPerKwh: Number(settings.costPerKwh),
-                        waterFee: Number(settings.waterFee),
-                        trashFee: trashFee,
-                    }, user, tx);
-                }
+                utilityBill = await createUtilityBill({
+                    roomId: validatedData.roomId,
+                    period: validatedData.period,
+                    meterStart: validatedData.meterStart,
+                    meterEnd: validatedData.meterEnd,
+                    costPerKwh: resolvedSettings.costPerKwh,
+                    waterFee: resolvedSettings.waterFee,
+                    trashFee,
+                }, user, tx);
             }
 
             // Auto-generate rent bill for this billing cycle (if not already exists)

@@ -16,32 +16,34 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return
     }
 
-    // On server: check cookie directly, if missing redirect immediately
+    // On server: auth cookie is HttpOnly, so rely on the request context populated
+    // by Nitro server middleware instead of trying to read the cookie in app code.
     if (import.meta.server) {
-        const token = useCookie('auth_token')
-        if (!token.value) {
+        const event = useRequestEvent()
+
+        if (!event?.context.user) {
             return navigateTo('/login')
         }
+
+        return
     }
 
-    // Verify session by calling API
-    // Use $fetch (not useFetch) to avoid caching/deduplication issues in middleware
+    // On client: verify the active session via an authenticated request.
     try {
-        const headers: Record<string, string> = {}
-        
-        // On server-side, forward cookie headers from the original browser request
-        if (import.meta.server) {
-            const reqHeaders = useRequestHeaders(['cookie'])
-            if (reqHeaders.cookie) {
-                headers['cookie'] = reqHeaders.cookie
-            }
-        }
-
         await $fetch('/api/auth/me', {
-            headers,
             credentials: 'include',
         })
     } catch (e: any) {
+        try {
+            await $fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+            })
+        } catch {
+            // Ignore cleanup failures and continue redirecting to login.
+        }
+
         return navigateTo('/login')
     }
 })
+

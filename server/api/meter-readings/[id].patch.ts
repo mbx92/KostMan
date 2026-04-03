@@ -1,9 +1,9 @@
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { meterReadings, rooms, propertySettings } from '../../database/schema';
+import { meterReadings, rooms } from '../../database/schema';
 import { meterReadingUpdateSchema } from '../../validations/meter-reading';
 import { eq } from 'drizzle-orm';
-import { findUtilityBillByRoomAndPeriod, updateUtilityBill } from '../../services/utilityBillService';
+import { findUtilityBillByRoomAndPeriod, resolveRoomUtilitySettings, updateUtilityBill } from '../../services/utilityBillService';
 import { autoGenerateRentBill } from '../../utils/rentBillService';
 
 export default defineEventHandler(async (event) => {
@@ -58,25 +58,18 @@ export default defineEventHandler(async (event) => {
                 if (room.length > 0) {
                     const roomData = room[0];
 
-                    const propSettings = await tx.select()
-                        .from(propertySettings)
-                        .where(eq(propertySettings.propertyId, roomData.propertyId))
-                        .limit(1);
+                    const resolvedSettings = await resolveRoomUtilitySettings(current.roomId, tx);
+                    const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
 
-                    if (propSettings.length > 0) {
-                        const settings = propSettings[0];
-                        const trashFee = roomData.useTrashService ? Number(settings.trashFee) : 0;
-
-                        utilityBill = await updateUtilityBill(existingBill.id, {
-                            roomId: current.roomId,
-                            period: current.period,
-                            meterStart: newStart,
-                            meterEnd: newEnd,
-                            costPerKwh: Number(settings.costPerKwh),
-                            waterFee: Number(settings.waterFee),
-                            trashFee: trashFee,
-                        }, user, tx);
-                    }
+                    utilityBill = await updateUtilityBill(existingBill.id, {
+                        roomId: current.roomId,
+                        period: current.period,
+                        meterStart: newStart,
+                        meterEnd: newEnd,
+                        costPerKwh: resolvedSettings.costPerKwh,
+                        waterFee: resolvedSettings.waterFee,
+                        trashFee,
+                    }, user, tx);
                 }
             }
 

@@ -3,7 +3,6 @@ definePageMeta({
   layout: false,
 });
 
-const router = useRouter();
 const toast = useToast();
 const isLoading = ref(false);
 const config = useRuntimeConfig();
@@ -15,6 +14,25 @@ const form = reactive({
 
 const errorMessage = ref("");
 const isDev = computed(() => config.public.NODE_ENV === 'development' || import.meta.dev);
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const ensureSessionReady = async () => {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await $fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+      return;
+    } catch {
+      if (attempt === 3) {
+        throw new Error('Session cookie was not available after login');
+      }
+
+      await wait(150 * (attempt + 1));
+    }
+  }
+};
 
 // Fill dev credentials
 const fillDevCredentials = () => {
@@ -39,6 +57,7 @@ const handleLogin = async () => {
   try {
     const response = await $fetch<{ token: string, user: any }>("/api/auth/login", {
       method: "POST",
+      credentials: 'include',
       body: {
         email: form.email,
         password: form.password,
@@ -52,10 +71,9 @@ const handleLogin = async () => {
       color: "success",
     });
 
-    // Redirect to homepage with full page reload for iOS compatibility
-    // Small delay to ensure cookie is set before navigation
-    await new Promise(resolve => setTimeout(resolve, 100));
-    window.location.href = "/";
+    // Safari can lag slightly before the HttpOnly session cookie becomes available.
+    await ensureSessionReady();
+    window.location.href = '/'
   } catch (error: any) {
     // Handle error
     const message = error.data?.statusMessage || error.message || "Login failed";
@@ -82,7 +100,7 @@ const handleLogin = async () => {
         class="absolute inset-0 w-full h-full object-cover opacity-80"
       />
       <div
-        class="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"
+        class="absolute inset-0 bg-linear-to-t from-gray-900 via-transparent to-transparent"
       />
 
       <div

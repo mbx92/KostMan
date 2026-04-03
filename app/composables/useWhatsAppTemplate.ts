@@ -188,12 +188,69 @@ export function useWhatsAppTemplate() {
   }
 
   /**
-   * Open WhatsApp with the message
+   * Build WhatsApp URL
    */
-  function openWhatsApp(phone: string, message: string) {
+  function buildWhatsAppUrl(phone: string, message: string): string {
     const formattedPhone = formatPhoneNumber(phone)
-    const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
-    window.open(waUrl, '_blank')
+    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+  }
+
+  function prepareWhatsAppTab() {
+    const pendingTab = window.open('about:blank', '_blank')
+
+    if (pendingTab) {
+      try {
+        pendingTab.opener = null
+      } catch {
+        // Ignore browser-specific opener restrictions.
+      }
+    }
+
+    return pendingTab
+  }
+
+  function closePreparedTab(targetWindow?: Window | null) {
+    if (targetWindow && !targetWindow.closed) {
+      targetWindow.close()
+    }
+  }
+
+  /**
+   * Open WhatsApp with the message.
+   * If a tab was prepared synchronously from a click handler, reuse it.
+   * Otherwise try opening a new tab.
+   */
+  function openWhatsApp(phone: string, message: string, targetWindow?: Window | null) {
+    const waUrl = buildWhatsAppUrl(phone, message)
+
+    if (targetWindow) {
+      try {
+        targetWindow.location.href = waUrl
+        targetWindow.focus()
+        return true
+      } catch {
+        try {
+          targetWindow.location.replace(waUrl)
+          targetWindow.focus()
+          return true
+        } catch {
+          // Fall through to opening a new tab only if no prepared tab can be used.
+        }
+      }
+    }
+
+    const newTab = window.open(waUrl, '_blank')
+
+    if (newTab) {
+      try {
+        newTab.opener = null
+      } catch {
+        // Ignore browser-specific opener restrictions.
+      }
+      return true
+    }
+
+    return false
   }
 
   return {
@@ -202,6 +259,9 @@ export function useWhatsAppTemplate() {
     buildLinkSection,
     getDefaultTemplate,
     formatPhoneNumber,
+    buildWhatsAppUrl,
+    prepareWhatsAppTab,
+    closePreparedTab,
     openWhatsApp,
     formatCurrency
   }

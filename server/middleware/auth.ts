@@ -1,10 +1,12 @@
 
 import jwt from 'jsonwebtoken';
 
-import { defineEventHandler, getCookie } from 'h3';
+import { defineEventHandler, getCookie, getRequestHeader } from 'h3';
 
 export default defineEventHandler((event) => {
-    const token = getCookie(event, 'auth_token');
+    // Try cookie first, then Authorization header as fallback
+    const token = getCookie(event, 'auth_token') || 
+                  getRequestHeader(event, 'authorization')?.replace('Bearer ', '');
 
     if (token) {
         try {

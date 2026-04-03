@@ -525,7 +525,7 @@ const genRoomOptions = computed(() => {
     } else if (r.status === "available") {
       label = `${r.name} (Kosong)`;
     } else if (r.status === "maintenance") {
-      label = `${r.name} (Maintenance)`;
+      label = `${r.name} (Perbaikan)`;
     }
 
     return {
@@ -1014,7 +1014,7 @@ const printCombined = (item: {
 
 // Send to WhatsApp
 const sendingWa = ref(false);
-const { buildMessage, getDefaultTemplate, openWhatsApp } =
+const { buildMessage, getDefaultTemplate, prepareWhatsAppTab, closePreparedTab, openWhatsApp } =
   useWhatsAppTemplate();
 
 const sendToWhatsApp = async (item: {
@@ -1051,6 +1051,8 @@ const sendToWhatsApp = async (item: {
     return;
   }
 
+  const pendingTab = prepareWhatsAppTab();
+
   // Generate public invoice link
   sendingWa.value = true;
   let invoiceUrl = "";
@@ -1068,6 +1070,7 @@ const sendToWhatsApp = async (item: {
     );
     invoiceUrl = linkResponse.publicUrl;
   } catch (e: any) {
+    closePreparedTab(pendingTab);
     toast.add({
       title: "Error",
       description: e?.data?.message || "Gagal generate link",
@@ -1119,8 +1122,14 @@ const sendToWhatsApp = async (item: {
 
   sendingWa.value = false;
 
-  // Open WhatsApp
-  openWhatsApp(tenant.contact, message);
+  const opened = openWhatsApp(tenant.contact, message, pendingTab);
+  if (!opened) {
+    toast.add({
+      title: "Popup Diblokir",
+      description: "Browser memblokir tab WhatsApp baru. Izinkan pop-up untuk situs ini lalu coba lagi.",
+      color: "warning",
+    });
+  }
 };
 
 // Helpers
@@ -1141,6 +1150,8 @@ const sendReminder = async (reminder: any) => {
     });
     return;
   }
+
+  const pendingTab = prepareWhatsAppTab();
 
   let phoneNumber = reminder.tenant.contact.replace(/\D/g, "");
   if (phoneNumber.startsWith("0")) {
@@ -1251,8 +1262,14 @@ const sendReminder = async (reminder: any) => {
 
   message += `Mohon segera melakukan pembayaran.\nTerima kasih.`;
 
-  const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-  window.open(waUrl, "_blank");
+  const opened = openWhatsApp(reminder.tenant.contact, message, pendingTab);
+  if (!opened) {
+    toast.add({
+      title: "Popup Diblokir",
+      description: "Browser memblokir tab WhatsApp baru. Izinkan pop-up untuk situs ini lalu coba lagi.",
+      color: "warning",
+    });
+  }
 };
 </script>
 

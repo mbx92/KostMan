@@ -84,6 +84,17 @@ export const propertySettings = pgTable("property_settings", {
   trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).notNull(),
 });
 
+export const roomSettings = pgTable("room_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id")
+    .references(() => rooms.id)
+    .notNull()
+    .unique(),
+  costPerKwh: decimal("cost_per_kwh", { precision: 10, scale: 2 }).notNull(),
+  waterFee: decimal("water_fee", { precision: 12, scale: 2 }).notNull(),
+  trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).notNull(),
+});
+
 export const tenantStatusEnum = pgEnum("tenant_status", ["active", "inactive"]);
 
 export const tenants = pgTable("tenants", {

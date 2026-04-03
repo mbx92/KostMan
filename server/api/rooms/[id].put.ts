@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rooms, properties, rentBills } from '../../database/schema';
+import { rooms, properties, rentBills, roomSettings } from '../../database/schema';
 import { roomSchema } from '../../validations/room';
 import { eq, and, ne } from 'drizzle-orm';
 
@@ -40,6 +40,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const { property, room } = currentRoomResult[0];
+    const { overrideSettings, costPerKwh, waterFee, trashFee, ...roomUpdates } = input;
 
     if (user.role !== Role.ADMIN) {
         if (property.userId !== user.id) {
@@ -63,21 +64,46 @@ export default defineEventHandler(async (event) => {
     }
 
     // 6. Update
-    const updatedRoom = await db.update(rooms).set({
-        ...input,
-        price: input.price ? input.price.toString() : undefined,
-        status: input.status as any,
-    }).where(eq(rooms.id, id)).returning();
+    const updatedRoom = await db.transaction(async (tx) => {
+        const updated = await tx.update(rooms).set({
+            ...roomUpdates,
+            price: roomUpdates.price !== undefined ? roomUpdates.price.toString() : undefined,
+            status: roomUpdates.status as any,
+        }).where(eq(rooms.id, id)).returning();
+
+        if (overrideSettings === true) {
+            const existingSettings = await tx.select().from(roomSettings).where(eq(roomSettings.roomId, id)).limit(1);
+
+            if (existingSettings.length > 0) {
+                await tx.update(roomSettings).set({
+                    costPerKwh: String(costPerKwh ?? 0),
+                    waterFee: String(waterFee ?? 0),
+                    trashFee: String(trashFee ?? 0),
+                }).where(eq(roomSettings.roomId, id));
+            } else {
+                await tx.insert(roomSettings).values({
+                    roomId: id,
+                    costPerKwh: String(costPerKwh ?? 0),
+                    waterFee: String(waterFee ?? 0),
+                    trashFee: String(trashFee ?? 0),
+                });
+            }
+        } else if (overrideSettings === false) {
+            await tx.delete(roomSettings).where(eq(roomSettings.roomId, id));
+        }
+
+        return updated;
+    });
 
     // 7. Auto-generate first rent bill if:
     //    - New moveInDate is being set (wasn't set before or changed)
     //    - tenantId is provided (either in input or existing)
-    const effectiveMoveInDate = input.moveInDate ?? room.moveInDate;
-    const effectiveTenantId = input.tenantId ?? room.tenantId;
-    const effectivePrice = input.price ?? Number(room.price);
+    const effectiveMoveInDate = roomUpdates.moveInDate ?? room.moveInDate;
+    const effectiveTenantId = roomUpdates.tenantId ?? room.tenantId;
+    const effectivePrice = roomUpdates.price ?? Number(room.price);
 
     // Only auto-generate if moveInDate is being newly set (wasn't set before)
-    const isNewMoveIn = input.moveInDate && !room.moveInDate && effectiveTenantId;
+    const isNewMoveIn = roomUpdates.moveInDate && !room.moveInDate && effectiveTenantId;
 
     if (isNewMoveIn && updatedRoom[0]) {
         try {
@@ -89,7 +115,7 @@ export default defineEventHandler(async (event) => {
 
             if (existingBills.length === 0) {
                 // No existing bills, create first one
-                const moveInDateStr = input.moveInDate!;
+                const moveInDateStr = roomUpdates.moveInDate!;
                 const startDate = new Date(moveInDateStr + 'T00:00:00');
                 const endDate = new Date(startDate);
                 endDate.setMonth(endDate.getMonth() + 1);

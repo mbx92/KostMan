@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { users, globalSettings, integrationSettings, properties, rooms, tenants, meterReadings, propertySettings, utilityBills, rentBills } from "./schema";
+import { users, globalSettings, integrationSettings, properties, rooms, tenants, meterReadings, propertySettings, roomSettings, utilityBills, rentBills } from "./schema";
 
 export const globalSettingsRelations = relations(globalSettings, ({one}) => ({
 	user: one(users, {
@@ -32,6 +32,7 @@ export const roomsRelations = relations(rooms, ({one, many}) => ({
 		references: [tenants.id]
 	}),
 	meterReadings: many(meterReadings),
+	roomSettings: many(roomSettings),
 	utilityBills: many(utilityBills),
 	rentBills: many(rentBills),
 }));
@@ -66,6 +67,13 @@ export const propertySettingsRelations = relations(propertySettings, ({one}) => 
 	property: one(properties, {
 		fields: [propertySettings.propertyId],
 		references: [properties.id]
+	}),
+}));
+
+export const roomSettingsRelations = relations(roomSettings, ({one}) => ({
+	room: one(rooms, {
+		fields: [roomSettings.roomId],
+		references: [rooms.id]
 	}),
 }));
 

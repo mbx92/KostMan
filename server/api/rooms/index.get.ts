@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rooms, properties, propertySettings, tenants } from '../../database/schema';
+import { rooms, properties, propertySettings, roomSettings, tenants } from '../../database/schema';
 import { eq, and, like, count, sql, asc } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -55,11 +55,13 @@ export default defineEventHandler(async (event) => {
         room: rooms,
         property: properties,
         settings: propertySettings,
+        roomSettings,
         tenant: tenants,
     })
         .from(rooms)
         .innerJoin(properties, eq(rooms.propertyId, properties.id))
         .leftJoin(propertySettings, eq(properties.id, propertySettings.propertyId))
+        .leftJoin(roomSettings, eq(rooms.id, roomSettings.roomId))
         .leftJoin(tenants, eq(rooms.tenantId, tenants.id))
         .orderBy(asc(properties.createdAt), asc(rooms.name));
 
@@ -97,6 +99,7 @@ export default defineEventHandler(async (event) => {
     return {
         data: results.map(row => ({
             ...row.room,
+            settings: row.roomSettings || null,
             tenantName: row.tenant?.name || null,
             property: {
                 ...row.property,

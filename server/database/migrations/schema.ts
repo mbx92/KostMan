@@ -144,6 +144,21 @@ export const propertySettings = pgTable("property_settings", {
 	unique("property_settings_property_id_unique").on(table.propertyId),
 ]);
 
+export const roomSettings = pgTable("room_settings", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	roomId: uuid("room_id").notNull(),
+	costPerKwh: numeric("cost_per_kwh", { precision: 10, scale:  2 }).notNull(),
+	waterFee: numeric("water_fee", { precision: 12, scale:  2 }).notNull(),
+	trashFee: numeric("trash_fee", { precision: 12, scale:  2 }).notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.roomId],
+			foreignColumns: [rooms.id],
+			name: "room_settings_room_id_rooms_id_fk"
+		}),
+	unique("room_settings_room_id_unique").on(table.roomId),
+]);
+
 export const utilityBills = pgTable("utility_bills", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	roomId: uuid("room_id").notNull(),

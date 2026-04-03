@@ -5,11 +5,14 @@ import { storeToRefs } from 'pinia';
 const kosStore = useKosStore();
 const { properties, reminders, remindersLoading, rentBills, utilityBills } = storeToRefs(kosStore);
 const toast = useToast();
+const hasMounted = ref(false);
 
 const { data: authData } = await useAuthFetch('/api/auth/me');
 const isStaff = computed(() => (authData.value as any)?.user?.role === 'staff');
 
 onMounted(async () => {
+    hasMounted.value = true;
+
     await Promise.all([
         kosStore.fetchProperties(),
         kosStore.fetchReminders(),
@@ -39,6 +42,8 @@ const { data: roomsData, refresh: refreshRooms, pending: isLoading } = await use
 });
 
 const paginatedRooms = computed(() => (roomsData.value as any)?.data || []);
+const showRefreshLoading = computed(() => hasMounted.value && (isLoading.value || remindersLoading.value));
+const showRoomsLoading = computed(() => hasMounted.value && isLoading.value && paginatedRooms.value.length === 0);
 
 // Collapsible sections per property
 const collapsedGroups = ref<Set<string>>(new Set())
@@ -260,7 +265,7 @@ const generateRentBill = async () => {
 
 // WhatsApp
 const sendingWa = ref<string | null>(null);
-const { buildMessage, getDefaultTemplate, openWhatsApp } = useWhatsAppTemplate();
+const { buildMessage, getDefaultTemplate, prepareWhatsAppTab, openWhatsApp } = useWhatsAppTemplate();
 
 const sendWhatsApp = async (room: any) => {
     const phone = room.tenant?.contact || room.tenantContact;
@@ -268,6 +273,8 @@ const sendWhatsApp = async (room: any) => {
         toast.add({ title: 'Error', description: 'Nomor kontak tidak tersedia', color: 'error' });
         return;
     }
+
+    const pendingTab = prepareWhatsAppTab();
 
     sendingWa.value = room.id;
     let invoiceUrl = '';
@@ -354,7 +361,10 @@ const sendWhatsApp = async (room: any) => {
 
     const message = buildMessage(template.message, billingData);
     sendingWa.value = null;
-    openWhatsApp(phone, message);
+    const opened = openWhatsApp(phone, message, pendingTab);
+    if (!opened) {
+        toast.add({ title: 'Popup Diblokir', description: 'Browser memblokir tab WhatsApp baru. Izinkan pop-up untuk situs ini lalu coba lagi.', color: 'warning' });
+    }
 };
 
 const refreshAll = async () => {
@@ -386,14 +396,14 @@ const refreshAll = async () => {
           :items="propertyItems"
           class="w-full sm:w-48"
         />
-        <UButton icon="i-heroicons-arrow-path" color="gray" variant="ghost" :loading="isLoading || remindersLoading" @click="refreshAll">
+                <UButton icon="i-heroicons-arrow-path" color="gray" variant="ghost" :loading="showRefreshLoading" @click="refreshAll">
             Refresh
         </UButton>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="isLoading && paginatedRooms.length === 0" class="py-12 flex justify-center">
+        <div v-if="showRoomsLoading" class="py-12 flex justify-center">
       <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin text-gray-400" />
     </div>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useKosStore, type MeterReading, type Room, type UtilityBill } from '~/stores/kos'
 import { usePdfReceipt } from '~/composables/usePdfReceipt'
+import { getRoomStatusLabel } from '~/composables/useRoomStatus'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
 
 const route = useRoute()
@@ -47,6 +48,7 @@ async function loadRoom() {
 }
 
 onMounted(async () => {
+  await store.fetchSettings()
   await store.fetchTenants({ all: true }) // Fetch tenants on mount
   await store.fetchProperties() // Fetch properties for settings
   await loadRoom()
@@ -67,6 +69,10 @@ const roomStatus = ref<'available' | 'occupied' | 'maintenance'>('available')
 const useTrashService = ref(true)
 const moveInDate = ref('')
 const occupantCount = ref(1)
+const overrideSettings = ref(false)
+const roomCostPerKwh = ref(0)
+const roomWaterFee = ref(0)
+const roomTrashFee = ref(0)
 const selectedTenantId = ref<string | null>(null)
 const isCreatingNewTenant = ref(false)
 const newTenantName = ref('')
@@ -109,6 +115,10 @@ watch(room, (r) => {
     useTrashService.value = r.useTrashService ?? true
     moveInDate.value = r.moveInDate || ''
     occupantCount.value = r.occupantCount || 1
+    overrideSettings.value = !!r.settings
+    roomCostPerKwh.value = Number(r.settings?.costPerKwh || r.property?.settings?.costPerKwh || settings.value.costPerKwh || 0)
+    roomWaterFee.value = Number(r.settings?.waterFee || r.property?.settings?.waterFee || settings.value.waterFee || 0)
+    roomTrashFee.value = Number(r.settings?.trashFee || r.property?.settings?.trashFee || settings.value.trashFee || 0)
     // Set tenantId directly from room data
     selectedTenantId.value = r.tenantId || null
   }
@@ -181,7 +191,11 @@ const updateRoomStatus = async () => {
       tenantName: roomStatus.value === 'occupied' ? tenantName : undefined,
       useTrashService: useTrashService.value,
       moveInDate: roomStatus.value === 'occupied' ? moveInDate.value : null,
-      occupantCount: roomStatus.value === 'occupied' ? occupantCount.value : 1
+      occupantCount: roomStatus.value === 'occupied' ? occupantCount.value : 1,
+      overrideSettings: overrideSettings.value,
+      costPerKwh: overrideSettings.value ? roomCostPerKwh.value : undefined,
+      waterFee: overrideSettings.value ? roomWaterFee.value : undefined,
+      trashFee: overrideSettings.value ? roomTrashFee.value : undefined,
     })
     
     // Reload room to get updated data
@@ -205,7 +219,7 @@ const removeTenant = async () => {
   
   const confirmed = await confirmDialog.value?.confirm({
     title: 'Checkout Penghuni?',
-    message: `Apakah Anda yakin ingin checkout ${selectedTenantName.value}? Kamar akan diubah ke status "Available".`,
+    message: `Apakah Anda yakin ingin checkout ${selectedTenantName.value}? Kamar akan diubah ke status "Tersedia".`,
     confirmText: 'Ya, Checkout',
     confirmColor: 'warning'
   })
@@ -352,8 +366,17 @@ const downloadReceipt = (bill: any) => {
 
 // Helpers
 const property = computed(() => properties.value.find(p => p.id === room.value?.propertyId))
-const effectiveSettings = computed(() => property.value?.settings || settings.value)
+const inheritedSettings = computed(() => property.value?.settings || settings.value)
+const effectiveSettings = computed(() => room.value?.settings || inheritedSettings.value)
 const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val)
+
+watch(inheritedSettings, (nextSettings) => {
+  if (!overrideSettings.value && nextSettings) {
+    roomCostPerKwh.value = Number(nextSettings.costPerKwh || 0)
+    roomWaterFee.value = Number(nextSettings.waterFee || 0)
+    roomTrashFee.value = Number(nextSettings.trashFee || 0)
+  }
+}, { immediate: true })
 
 const getStatusColor = (status: string) => {
   switch(status) {
@@ -389,8 +412,8 @@ const goBack = () => {
                 <div class="text-sm text-gray-500">Sewa Bulanan</div>
                 <div class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ formatCurrency(Number(room.price)) }}</div>
              </div>
-             <UBadge :color="getStatusColor(room.status)" size="lg" variant="solid" class="capitalize px-3 py-1.5">
-                {{ room.status }}
+             <UBadge :color="getStatusColor(room.status)" size="lg" variant="solid" class="px-3 py-1.5">
+               {{ getRoomStatusLabel(room.status) }}
              </UBadge>
         </div>
     </div>
@@ -636,6 +659,43 @@ const goBack = () => {
                             <USwitch v-model="useTrashService" />
                         </div>
                     </div>
+
+                      <div class="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                          <div>
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Tarif Utilitas Kamar</div>
+                            <div class="text-xs text-gray-500">Fallback: kamar, properti, lalu global.</div>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-500">Tarif Khusus</span>
+                            <USwitch v-model="overrideSettings" />
+                          </div>
+                        </div>
+
+                        <div v-if="!overrideSettings" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg text-sm text-gray-500">
+                          Menggunakan tarif turunan untuk kamar ini.
+                          <div class="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+                            <div class="bg-white dark:bg-gray-800 p-1 rounded border">Listrik: {{ inheritedSettings.costPerKwh }}</div>
+                            <div class="bg-white dark:bg-gray-800 p-1 rounded border">Air: {{ inheritedSettings.waterFee }}</div>
+                            <div class="bg-white dark:bg-gray-800 p-1 rounded border">Sampah: {{ inheritedSettings.trashFee }}</div>
+                          </div>
+                        </div>
+
+                        <div v-else class="grid grid-cols-1 gap-3">
+                          <div class="space-y-1">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Listrik (/kWh)</label>
+                            <UInput v-model.number="roomCostPerKwh" type="number" min="0" step="100" class="w-full" />
+                          </div>
+                          <div class="space-y-1">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Biaya Air</label>
+                            <UInput v-model.number="roomWaterFee" type="number" min="0" step="1000" class="w-full" />
+                          </div>
+                          <div class="space-y-1">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Biaya Sampah</label>
+                            <UInput v-model.number="roomTrashFee" type="number" min="0" step="1000" class="w-full" />
+                          </div>
+                        </div>
+                      </div>
 
                     <UButton @click="updateRoomStatus" block color="primary" class="mt-4" :loading="isSaving">
                         Simpan Perubahan

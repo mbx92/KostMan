@@ -10,6 +10,10 @@ export const roomSchema = z.object({
     useTrashService: z.boolean().optional(),
     moveInDate: z.string().date().nullish(), // Allow null and undefined
     occupantCount: z.number().int().min(1).max(10).optional().default(1),
+    overrideSettings: z.boolean().optional(),
+    costPerKwh: z.number().nonnegative('Cost per kWh must be non-negative').optional(),
+    waterFee: z.number().nonnegative('Water fee must be non-negative').optional(),
+    trashFee: z.number().nonnegative('Trash fee must be non-negative').optional(),
 });
 
 export type RoomInput = z.infer<typeof roomSchema>;

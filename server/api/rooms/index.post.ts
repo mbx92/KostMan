@@ -1,7 +1,7 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { rooms, properties, rentBills } from '../../database/schema';
+import { rooms, properties, rentBills, roomSettings } from '../../database/schema';
 import { roomSchema } from '../../validations/room';
 import { eq, and } from 'drizzle-orm';
 
@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const input = parseResult.data;
+    const { overrideSettings, costPerKwh, waterFee, trashFee } = input;
 
     // 3. Ownership Verification
     // Check if the property belongs to the user (if Owner)
@@ -49,15 +50,29 @@ export default defineEventHandler(async (event) => {
     }
 
     // 5. Insert
-    const newRoom = await db.insert(rooms).values({
-        propertyId: input.propertyId,
-        name: input.name,
-        price: input.price.toString(),
-        status: input.status as any ?? 'available',
-        tenantId: input.tenantId ?? null,
-        useTrashService: input.useTrashService ?? true,
-        moveInDate: input.moveInDate ? input.moveInDate : null, // Drizzle handles string date usually
-    }).returning();
+    const newRoom = await db.transaction(async (tx) => {
+        const insertedRoom = await tx.insert(rooms).values({
+            propertyId: input.propertyId,
+            name: input.name,
+            price: input.price.toString(),
+            status: input.status as any ?? 'available',
+            tenantId: input.tenantId ?? null,
+            useTrashService: input.useTrashService ?? true,
+            moveInDate: input.moveInDate ? input.moveInDate : null,
+            occupantCount: input.occupantCount ?? 1,
+        }).returning();
+
+        if (overrideSettings) {
+            await tx.insert(roomSettings).values({
+                roomId: insertedRoom[0].id,
+                costPerKwh: String(costPerKwh ?? 0),
+                waterFee: String(waterFee ?? 0),
+                trashFee: String(trashFee ?? 0),
+            });
+        }
+
+        return insertedRoom;
+    });
 
     // 6. Auto-generate first rent bill if moveInDate and tenantId are provided
     if (input.moveInDate && input.tenantId && newRoom[0]) {

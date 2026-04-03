@@ -73,12 +73,25 @@ const mockReadBody = vi.fn()
 const mockCreateError = vi.fn((err) => err)
 const mockSetCookie = vi.fn()
 const mockDeleteCookie = vi.fn()
+const mockGetRequestURL = vi.fn()
+const mockGetRequestHeader = vi.fn()
 const mockDefineEventHandler = (handler: any) => handler
+
+const createAdminEvent = () => ({
+    context: {
+        user: {
+            id: 99,
+            role: 'admin'
+        }
+    }
+})
 
 vi.stubGlobal('readBody', mockReadBody)
 vi.stubGlobal('createError', mockCreateError)
 vi.stubGlobal('setCookie', mockSetCookie)
 vi.stubGlobal('deleteCookie', mockDeleteCookie)
+vi.stubGlobal('getRequestURL', mockGetRequestURL)
+vi.stubGlobal('getRequestHeader', mockGetRequestHeader)
 vi.stubGlobal('defineEventHandler', mockDefineEventHandler)
 
 // Import handlers after mocking
@@ -92,6 +105,8 @@ describe('Auth API', () => {
         vi.clearAllMocks()
         mocks.mockRegisterSafeParse.mockImplementation((data) => ({ success: true, data }))
         mocks.mockLoginSafeParse.mockImplementation((data) => ({ success: true, data }))
+        mockGetRequestURL.mockReturnValue({ protocol: 'http:' })
+        mockGetRequestHeader.mockReturnValue(undefined)
     })
 
     describe('Register', () => {
@@ -105,7 +120,7 @@ describe('Auth API', () => {
             // Validation mock setup for success
             mocks.mockRegisterSafeParse.mockReturnValue({ success: true, data: userData })
 
-            const result = await RegisterHandler({} as any)
+            const result = await RegisterHandler(createAdminEvent() as any)
 
             expect(result).toMatchObject({
                 email: userData.email,
@@ -123,7 +138,7 @@ describe('Auth API', () => {
 
 
             try {
-                await RegisterHandler({} as any)
+                await RegisterHandler(createAdminEvent() as any)
             } catch (error: any) {
                 expect(error.statusCode).toBe(409)
                 expect(error.statusMessage).toBe('User already exists')
@@ -147,7 +162,43 @@ describe('Auth API', () => {
 
             expect(result).toHaveProperty('token', 'mock_token')
             expect(result.user).toHaveProperty('email', loginData.email)
-            expect(mockSetCookie).toHaveBeenCalled()
+            expect(mockSetCookie).toHaveBeenCalledWith(
+                expect.anything(),
+                'auth_token',
+                'mock_token',
+                expect.objectContaining({
+                    httpOnly: true,
+                    secure: false,
+                    sameSite: 'lax',
+                    path: '/',
+                    maxAge: 60 * 60 * 24 * 7,
+                })
+            )
+        })
+
+        it('should set a secure cookie when request is forwarded over https', async () => {
+            const loginData = { email: 'secure@example.com', password: 'password123' }
+            const userInDb = { id: 2, ...loginData, password: 'hashed_password', role: 'owner', name: 'Secure User' }
+
+            mockReadBody.mockResolvedValue(loginData)
+            mocks.mockLimit.mockResolvedValue([userInDb])
+            mocks.mockCompare.mockResolvedValue(true)
+            mocks.mockSign.mockReturnValue('secure_token')
+            mocks.mockLoginSafeParse.mockReturnValue({ success: true, data: loginData })
+            mockGetRequestHeader.mockImplementation((_: unknown, header: string) =>
+                header === 'x-forwarded-proto' ? 'https' : undefined
+            )
+
+            await LoginHandler({} as any)
+
+            expect(mockSetCookie).toHaveBeenCalledWith(
+                expect.anything(),
+                'auth_token',
+                'secure_token',
+                expect.objectContaining({
+                    secure: true,
+                })
+            )
         })
 
         it('should fail with invalid credentials', async () => {

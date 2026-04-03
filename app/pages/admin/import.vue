@@ -173,7 +173,7 @@
           <UCard>
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Occupied</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Terisi</p>
                 <p class="text-2xl font-bold">{{ previewData.occupiedCount }}</p>
               </div>
               <UIcon name="i-heroicons-check-circle" class="w-8 h-8 text-orange-500" />
@@ -241,7 +241,7 @@
                     :color="row.status === 'occupied' ? 'green' : 'gray'"
                     variant="soft"
                   >
-                    {{ row.status }}
+                    {{ getRoomStatusLabel(row.status) }}
                   </UBadge>
                 </template>
                 <template #price-data="{ row }">
@@ -618,6 +618,7 @@
 
 <script setup lang="ts">
 import * as XLSX from 'xlsx'
+import { getRoomStatusLabel } from '~/composables/useRoomStatus'
 
 definePageMeta({
   layout: 'default'
