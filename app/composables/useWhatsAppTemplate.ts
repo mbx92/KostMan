@@ -188,14 +188,46 @@ export function useWhatsAppTemplate() {
   }
 
   /**
-   * Build WhatsApp URL
+   * Detect iOS / iPadOS (Safari or in-app browsers)
+   */
+  function isIOS(): boolean {
+    if (typeof navigator === 'undefined') return false
+    const ua = navigator.userAgent || ''
+    // iPadOS 13+ reports as Macintosh but supports touch
+    const isIPad = /Macintosh/i.test(ua) && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1
+    return /iPhone|iPad|iPod/i.test(ua) || isIPad
+  }
+
+  /**
+   * Build WhatsApp URL (web — for desktop/Android)
    */
   function buildWhatsAppUrl(phone: string, message: string): string {
     const formattedPhone = formatPhoneNumber(phone)
     return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
   }
 
+  /**
+   * Build WhatsApp deep-link URL (for iOS/iPadOS).
+   * Uses the whatsapp:// URL scheme which opens the app DIRECTLY
+   * without going through the wa.me → api.whatsapp.com browser redirect.
+   */
+  function buildWhatsAppDeepLink(phone: string, message: string): string {
+    const formattedPhone = formatPhoneNumber(phone)
+    return `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`
+  }
+
+  /**
+   * Prepare a blank tab synchronously from a user-gesture context.
+   * On iOS this is skipped entirely because:
+   * - iOS Safari blocks about:blank popups
+   * - We use window.location.href instead (which reliably opens WhatsApp)
+   */
   function prepareWhatsAppTab() {
+    // On iOS, don't open a blank tab — we'll navigate the current page instead
+    if (isIOS()) {
+      return null
+    }
+
     const pendingTab = window.open('about:blank', '_blank')
 
     if (pendingTab) {
@@ -216,13 +248,60 @@ export function useWhatsAppTemplate() {
   }
 
   /**
+   * Open WhatsApp via a programmatic <a> tag click.
+   * This is the most reliable method on iOS because:
+   * 1. It mimics a real user tap on a link
+   * 2. Safari doesn't block it as a popup
+   * 3. The OS universal-link handler intercepts wa.me and opens WhatsApp directly
+   */
+  function openViaAnchorClick(url: string): boolean {
+    try {
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.target = '_blank'
+      anchor.rel = 'noopener noreferrer'
+      // Must be in the DOM briefly for some browsers to honour the click
+      anchor.style.display = 'none'
+      document.body.appendChild(anchor)
+      anchor.click()
+      // Clean up after a tick
+      setTimeout(() => document.body.removeChild(anchor), 100)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * Open WhatsApp with the message.
-   * If a tab was prepared synchronously from a click handler, reuse it.
-   * Otherwise try opening a new tab.
+   *
+   * Strategy per platform:
+   * - **iOS/iPadOS**: Use whatsapp://send deep-link to open the app directly,
+   *   bypassing the wa.me → api.whatsapp.com browser redirect entirely.
+   * - **Desktop/Android**: Use the pre-opened tab if available, otherwise
+   *   window.open, then anchor-click as a last resort.
    */
   function openWhatsApp(phone: string, message: string, targetWindow?: Window | null) {
     const waUrl = buildWhatsAppUrl(phone, message)
 
+    // --- iOS / iPadOS path ---
+    if (isIOS()) {
+      // Close any accidentally opened blank tab
+      closePreparedTab(targetWindow)
+
+      // Use whatsapp:// deep link — opens WhatsApp app directly
+      // without any browser redirect page
+      const deepLink = buildWhatsAppDeepLink(phone, message)
+      try {
+        window.location.href = deepLink
+        return true
+      } catch {
+        // Fallback: try wa.me via anchor click
+        return openViaAnchorClick(waUrl)
+      }
+    }
+
+    // --- Desktop / Android path ---
     if (targetWindow) {
       try {
         targetWindow.location.href = waUrl
@@ -234,13 +313,13 @@ export function useWhatsAppTemplate() {
           targetWindow.focus()
           return true
         } catch {
-          // Fall through to opening a new tab only if no prepared tab can be used.
+          // Fall through
         }
       }
     }
 
+    // Try window.open
     const newTab = window.open(waUrl, '_blank')
-
     if (newTab) {
       try {
         newTab.opener = null
@@ -250,7 +329,8 @@ export function useWhatsAppTemplate() {
       return true
     }
 
-    return false
+    // Last resort: anchor click
+    return openViaAnchorClick(waUrl)
   }
 
   return {
