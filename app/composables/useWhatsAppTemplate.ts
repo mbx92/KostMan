@@ -10,6 +10,8 @@ interface BillingData {
   propertyName: string
   roomName: string
   period: string
+  rentPeriod?: string
+  utilityPeriod?: string
   occupantCount?: number
   daysUntilDue?: number
   
@@ -43,14 +45,39 @@ export function useWhatsAppTemplate() {
       minimumFractionDigits: 0,
     }).format(Number(val))
 
+  const formatPeriod = (period?: string) => {
+    if (!period) return ''
+
+    const match = period.match(/^(\d{4})-(\d{2})$/)
+    if (!match) return period
+
+    const [, year, month] = match
+    const date = new Date(Number(year), Number(month) - 1, 1)
+
+    if (Number.isNaN(date.getTime())) return period
+
+    return new Intl.DateTimeFormat('id-ID', {
+      month: 'long',
+      year: 'numeric',
+    }).format(date)
+  }
+
+  const formatPeriodLabel = (period?: string) => {
+    if (!period) return ''
+    return formatPeriod(period)
+  }
+
   /**
    * Build billing detail section that gets auto-injected
    */
   function buildDetailSection(data: BillingData): string {
+    const formattedPeriod = formatPeriod(data.period)
+    const formattedRentPeriod = formatPeriodLabel(data.rentPeriod)
+    const formattedUtilityPeriod = formatPeriodLabel(data.utilityPeriod)
     let detail = `*TAGIHAN KOST*\n`
     detail += `${data.propertyName}\n`
     detail += `================================\n\n`
-    detail += `Periode: *${data.period}*\n`
+    detail += `Periode: *${formattedPeriod}*\n`
     detail += `Kamar: *${data.roomName}*\n`
     detail += `Penghuni: ${data.tenantName}\n`
     
@@ -63,6 +90,9 @@ export function useWhatsAppTemplate() {
     // Rent section
     if (data.rentAmount && Number(data.rentAmount) > 0) {
       detail += `\n*SEWA KAMAR*\n`
+      if (formattedRentPeriod) {
+        detail += `Periode Sewa: ${formattedRentPeriod}\n`
+      }
       if (data.monthsCovered && data.roomPrice) {
         detail += `${data.monthsCovered} bulan x ${formatCurrency(data.roomPrice)}\n`
       }
@@ -73,6 +103,9 @@ export function useWhatsAppTemplate() {
     // Utility section
     if (data.utilityTotal && Number(data.utilityTotal) > 0) {
       detail += `\n*UTILITAS*\n\n`
+      if (formattedUtilityPeriod) {
+        detail += `Periode Utilitas: ${formattedUtilityPeriod}\n\n`
+      }
       
       // Electricity
       if (data.meterStart !== undefined && data.meterEnd !== undefined) {
@@ -132,6 +165,9 @@ export function useWhatsAppTemplate() {
   function buildMessage(templateMessage: string, data: BillingData): string {
     const detailSection = buildDetailSection(data)
     const linkSection = buildLinkSection(data.invoiceUrl)
+    const formattedPeriod = formatPeriod(data.period)
+    const formattedRentPeriod = formatPeriodLabel(data.rentPeriod)
+    const formattedUtilityPeriod = formatPeriodLabel(data.utilityPeriod)
     
     // Replace template variables
     let message = templateMessage
@@ -139,7 +175,9 @@ export function useWhatsAppTemplate() {
       .replace(/{nama_properti}/g, data.propertyName)
       .replace(/{nama_kamar}/g, data.roomName)
       .replace(/{jumlah_tagihan}/g, formatCurrency(data.grandTotal))
-      .replace(/{periode}/g, data.period)
+      .replace(/{periode}/g, formattedPeriod)
+      .replace(/{periode_sewa}/g, formattedRentPeriod)
+      .replace(/{periode_utilitas}/g, formattedUtilityPeriod)
       .replace(/{status_tagihan}/g, data.isRentPaid && data.isUtilityPaid ? 'LUNAS' : 'BELUM LUNAS')
       .replace(/{detail_tagihan}/g, detailSection)
       .replace(/{link_pembayaran}/g, linkSection)

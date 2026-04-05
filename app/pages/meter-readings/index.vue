@@ -57,6 +57,12 @@ const currentPeriod = computed(() => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 })
 
+const getPreviousPeriod = (period: string) => {
+  const [year, month] = period.split('-').map(Number)
+  const previous = new Date(year, month - 2, 1)
+  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`
+}
+
 // --- Server Side Data Fetching ---
 
 // 1. Fetch Stats
@@ -210,11 +216,12 @@ async function fetchRoomBills(roomId: string, period: string) {
   isFetchingBills.value = true
   roomRentBills.value = []
   roomUtilityBills.value = []
+  const utilityBillPeriod = getPreviousPeriod(period)
   
   try {
     const [rentData, utilityData] = await Promise.all([
       $fetch<any[]>('/api/rent-bills', { query: { roomId } }), // Fetch all rent bills for room
-      $fetch<any[]>('/api/utility-bills', { query: { roomId, period } }) // Utility is strict to period
+      $fetch<any[]>('/api/utility-bills', { query: { roomId, period: utilityBillPeriod } }) // Utility bill follows previous usage period
     ])
     
     if (rentData && rentData.length > 0) {
@@ -266,9 +273,13 @@ async function submitMeterReading() {
     const rentGenerated = !!result.rentBill
     toast.add({
       title: 'Berhasil',
-      description: rentGenerated
-        ? `Meter listrik ${selectedRoom.value.name} dicatat. Tagihan sewa & utilitas bulan ini otomatis dibuat.`
-        : `Meter reading untuk ${selectedRoom.value.name} berhasil dicatat`,
+      description: result.utilityBill && rentGenerated
+        ? `Meter listrik ${selectedRoom.value.name} dicatat. Tagihan utilitas periode ${formatPeriodMonth(result.utilityBill.period)} dan tagihan sewa periode ${formatPeriodMonth(result.rentBill.period)} sudah disiapkan.`
+        : result.utilityBill
+          ? `Meter listrik ${selectedRoom.value.name} dicatat. Tagihan utilitas periode ${formatPeriodMonth(result.utilityBill.period)} berhasil diperbarui.`
+          : rentGenerated
+            ? `Meter listrik ${selectedRoom.value.name} dicatat. Tagihan sewa periode ${formatPeriodMonth(result.rentBill.period)} sudah disiapkan.`
+            : `Meter reading untuk ${selectedRoom.value.name} berhasil dicatat`,
       color: 'success'
     })
     
@@ -327,7 +338,7 @@ function formatDate(dateStr: string | null) {
         <div class="text-3xl font-bold text-green-600 dark:text-green-400">
           {{ statsData?.recorded || 0 }}
         </div>
-        <p class="text-sm text-gray-500">Periode {{ currentPeriod }}</p>
+        <p class="text-sm text-gray-500">Periode {{ formatPeriodMonth(currentPeriod) }}</p>
       </UCard>
       
       <UCard>
@@ -340,7 +351,7 @@ function formatDate(dateStr: string | null) {
         <div class="text-3xl font-bold text-orange-600 dark:text-orange-400">
           {{ statsData?.pending || 0 }}
         </div>
-        <p class="text-sm text-gray-500">Periode {{ currentPeriod }}</p>
+        <p class="text-sm text-gray-500">Periode {{ formatPeriodMonth(currentPeriod) }}</p>
       </UCard>
     </div>
 
@@ -466,14 +477,14 @@ function formatDate(dateStr: string | null) {
                     </span>
                     <span v-else class="text-gray-400 text-sm italic">Belum ada</span>
                     <div v-if="room.lastPeriod && room.currentPeriodStatus !== 'recorded'" class="text-xs text-gray-500 mt-0.5">
-                       Periode: {{ room.lastPeriod }}
+                       Periode: {{ formatPeriodMonth(room.lastPeriod) }}
                     </div>
                   </td>
                   <td class="py-3 px-5">
                     <div v-if="room.currentPeriodStatus === 'recorded'">
                       <div class="flex items-center gap-1 text-success-600 dark:text-success-400 font-medium text-sm">
                          <UIcon name="i-heroicons-check-circle" class="w-4 h-4" /> 
-                         Selesai ({{ currentPeriod }})
+                         Selesai ({{ formatPeriodMonth(currentPeriod) }})
                       </div>
                       <div class="text-xs text-gray-500 mt-0.5">{{ formatDate(room.lastRecordedAt) }}</div>
                     </div>

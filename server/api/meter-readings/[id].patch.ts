@@ -3,8 +3,14 @@ import { db } from '../../utils/drizzle';
 import { meterReadings, rooms } from '../../database/schema';
 import { meterReadingUpdateSchema } from '../../validations/meter-reading';
 import { eq } from 'drizzle-orm';
-import { findUtilityBillByRoomAndPeriod, resolveRoomUtilitySettings, updateUtilityBill } from '../../services/utilityBillService';
+import { createUtilityBill, findUtilityBillByRoomAndPeriod, resolveRoomUtilitySettings, updateUtilityBill } from '../../services/utilityBillService';
 import { autoGenerateRentBill } from '../../utils/rentBillService';
+
+function getPreviousPeriod(period: string) {
+    const [year, month] = period.split('-').map(Number);
+    const previous = new Date(year, month - 2, 1);
+    return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
@@ -44,36 +50,40 @@ export default defineEventHandler(async (event) => {
 
             const meterReading = meterResult[0];
 
-            // Sync associated utility bill
+            // Sync associated utility bill for the previous usage period
             let utilityBill = null;
-            const existingBill = await findUtilityBillByRoomAndPeriod(current.roomId, current.period, tx);
+            const utilityBillPeriod = getPreviousPeriod(current.period);
+            const existingBill = await findUtilityBillByRoomAndPeriod(current.roomId, utilityBillPeriod, tx);
 
-            if (existingBill) {
-                // Get room and property settings for recalculation
-                const room = await tx.select()
-                    .from(rooms)
-                    .where(eq(rooms.id, current.roomId))
-                    .limit(1);
+            // Get room and property settings for recalculation
+            const room = await tx.select()
+                .from(rooms)
+                .where(eq(rooms.id, current.roomId))
+                .limit(1);
 
-                if (room.length > 0) {
-                    const roomData = room[0];
+            if (room.length > 0) {
+                const roomData = room[0];
 
-                    const resolvedSettings = await resolveRoomUtilitySettings(current.roomId, tx);
-                    const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
+                const resolvedSettings = await resolveRoomUtilitySettings(current.roomId, tx);
+                const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
 
-                    utilityBill = await updateUtilityBill(existingBill.id, {
-                        roomId: current.roomId,
-                        period: current.period,
-                        meterStart: newStart,
-                        meterEnd: newEnd,
-                        costPerKwh: resolvedSettings.costPerKwh,
-                        waterFee: resolvedSettings.waterFee,
-                        trashFee,
-                    }, user, tx);
+                const billInput = {
+                    roomId: current.roomId,
+                    period: utilityBillPeriod,
+                    meterStart: newStart,
+                    meterEnd: newEnd,
+                    costPerKwh: resolvedSettings.costPerKwh,
+                    waterFee: resolvedSettings.waterFee,
+                    trashFee,
+                };
+
+                if (existingBill) {
+                    utilityBill = await updateUtilityBill(existingBill.id, billInput, user, tx);
+                } else if (roomData.tenantId) {
+                    utilityBill = await createUtilityBill(billInput, user, tx);
                 }
             }
 
-            // Auto-generate rent bill for this billing cycle (if not already exists)
             const rentBill = await autoGenerateRentBill(current.roomId, current.period, tx);
 
             return { meterReading, utilityBill, rentBill };

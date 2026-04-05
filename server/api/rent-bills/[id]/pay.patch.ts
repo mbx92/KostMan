@@ -6,9 +6,15 @@ import { eq } from 'drizzle-orm';
 export default defineEventHandler(async (event) => {
     requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
     const id = getRouterParam(event, 'id');
+    const body = await readBody<{ paymentMethod?: 'cash' | 'transfer' }>(event).catch(() => ({}));
+    const paymentMethod = body.paymentMethod ?? 'cash';
 
     if (!id) {
         throw createError({ statusCode: 400, statusMessage: 'Missing ID' });
+    }
+
+    if (!['cash', 'transfer'].includes(paymentMethod)) {
+        throw createError({ statusCode: 400, statusMessage: 'Invalid payment method' });
     }
 
     const existing = await db.select().from(rentBills).where(eq(rentBills.id, id)).limit(1);
@@ -23,7 +29,7 @@ export default defineEventHandler(async (event) => {
     const result = await db.update(rentBills).set({
         isPaid: true,
         paidAt: new Date(),
-        paymentMethod: 'cash',
+        paymentMethod,
     }).where(eq(rentBills.id, id)).returning();
 
     return result[0];

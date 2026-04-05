@@ -95,38 +95,45 @@ export default defineEventHandler(async (event) => {
         return updated;
     });
 
-    // 7. Auto-generate first rent bill if:
-    //    - New moveInDate is being set (wasn't set before or changed)
-    //    - tenantId is provided (either in input or existing)
+    // 7. Auto-generate first rent bill when:
+    //   - Room has a tenant (existing or newly assigned)
+    //   - Room has a moveInDate (existing or newly set/changed)
+    //   - No overlapping bill exists (checked below, prevents duplicates)
     const effectiveMoveInDate = roomUpdates.moveInDate ?? room.moveInDate;
     const effectiveTenantId = roomUpdates.tenantId ?? room.tenantId;
     const effectivePrice = roomUpdates.price ?? Number(room.price);
 
-    // Only auto-generate if moveInDate is being newly set (wasn't set before)
-    const isNewMoveIn = roomUpdates.moveInDate && !room.moveInDate && effectiveTenantId;
+    // Trigger: has tenant + has moveInDate (any of these changed or already existed)
+    const shouldAutoGenerateBill = !!effectiveTenantId && !!effectiveMoveInDate;
 
-    if (isNewMoveIn && updatedRoom[0]) {
+    if (shouldAutoGenerateBill && updatedRoom[0]) {
         try {
-            // Check if a rent bill already exists for this room starting from moveInDate
+            const moveInDateStr = effectiveMoveInDate!;
+            const startDate = new Date(moveInDateStr + 'T00:00:00');
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + 1);
+            endDate.setDate(endDate.getDate() - 1);
+
+            const periodStartDate = moveInDateStr;
+            const periodEndDate = endDate.toISOString().slice(0, 10);
+            const dueDate = periodEndDate;
+            const billingCycleDay = startDate.getDate();
+            const period = moveInDateStr.slice(0, 7);
+
+            // Check if a rent bill with overlapping dates already exists (avoid duplicates)
             const existingBills = await db.select()
                 .from(rentBills)
-                .where(eq(rentBills.roomId, id))
-                .limit(1);
+                .where(eq(rentBills.roomId, id));
 
-            if (existingBills.length === 0) {
-                // No existing bills, create first one
-                const moveInDateStr = roomUpdates.moveInDate!;
-                const startDate = new Date(moveInDateStr + 'T00:00:00');
-                const endDate = new Date(startDate);
-                endDate.setMonth(endDate.getMonth() + 1);
-                endDate.setDate(endDate.getDate() - 1);
+            const newStart = new Date(periodStartDate).getTime();
+            const newEnd = new Date(periodEndDate).getTime();
+            const hasOverlap = existingBills.some((b: any) => {
+                const s = new Date(b.periodStartDate).getTime();
+                const e = new Date(b.periodEndDate).getTime();
+                return newStart <= e && newEnd >= s;
+            });
 
-                const periodStartDate = moveInDateStr;
-                const periodEndDate = endDate.toISOString().slice(0, 10);
-                const dueDate = periodEndDate;
-                const billingCycleDay = startDate.getDate();
-                const period = moveInDateStr.slice(0, 7);
-
+            if (!hasOverlap) {
                 const roomPrice = Number(effectivePrice);
                 const totalAmount = roomPrice;
 
@@ -146,6 +153,8 @@ export default defineEventHandler(async (event) => {
                 });
 
                 console.log(`[Auto-Bill] Created first rent bill for room ${updatedRoom[0].name} (${periodStartDate} - ${periodEndDate})`);
+            } else {
+                console.log(`[Auto-Bill] Skipped: overlapping bill exists for room ${updatedRoom[0].name}`);
             }
         } catch (error) {
             console.error('[Auto-Bill] Failed to create first rent bill:', error);

@@ -77,6 +77,11 @@ export default defineEventHandler(async (event) => {
         .limit(limit)
         .offset(offset);
 
+    const normalizedExpenses = expensesList.map((expense) => ({
+        ...expense,
+        amount: Math.round(Number(expense.amount || 0)).toString(),
+    }));
+
     // Get total count and stats for pagination
     const [{ count, totalAmount, totalPaid, totalUnpaid }] = await db
         .select({
@@ -90,7 +95,7 @@ export default defineEventHandler(async (event) => {
 
     return {
         success: true,
-        expenses: expensesList,
+        expenses: normalizedExpenses,
         pagination: {
             page,
             limit,
@@ -98,9 +103,9 @@ export default defineEventHandler(async (event) => {
             totalPages: Math.ceil(Number(count) / limit),
         },
         stats: {
-            totalAmount: Number(totalAmount),
-            totalPaid: Number(totalPaid),
-            totalUnpaid: Number(totalUnpaid)
+            totalAmount: Math.round(Number(totalAmount)),
+            totalPaid: Math.round(Number(totalPaid)),
+            totalUnpaid: Math.round(Number(totalUnpaid))
         }
     };
 });

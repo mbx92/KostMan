@@ -7,6 +7,12 @@ import { eq } from 'drizzle-orm';
 import { createUtilityBill, findUtilityBillByRoomAndPeriod, resolveRoomUtilitySettings, updateUtilityBill } from '../../services/utilityBillService';
 import { autoGenerateRentBill } from '../../utils/rentBillService';
 
+function getPreviousPeriod(period: string) {
+    const [year, month] = period.split('-').map(Number);
+    const previous = new Date(year, month - 2, 1);
+    return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
@@ -36,7 +42,7 @@ export default defineEventHandler(async (event) => {
 
             const meterReading = meterResult[0];
 
-            // Auto-create or update associated utility bill
+            // Auto-create or update associated utility bill for the previous usage period
             const room = await tx.select()
                 .from(rooms)
                 .where(eq(rooms.id, validatedData.roomId))
@@ -54,10 +60,11 @@ export default defineEventHandler(async (event) => {
 
                 const resolvedSettings = await resolveRoomUtilitySettings(validatedData.roomId, tx);
                 const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
+                const utilityBillPeriod = getPreviousPeriod(validatedData.period);
 
                 const billInput = {
                     roomId: validatedData.roomId,
-                    period: validatedData.period,
+                    period: utilityBillPeriod,
                     meterStart: validatedData.meterStart,
                     meterEnd: validatedData.meterEnd,
                     costPerKwh: resolvedSettings.costPerKwh,
@@ -66,7 +73,7 @@ export default defineEventHandler(async (event) => {
                 };
 
                 // Check if a utility bill already exists for this room+period
-                const existingBill = await findUtilityBillByRoomAndPeriod(validatedData.roomId, validatedData.period, tx);
+                const existingBill = await findUtilityBillByRoomAndPeriod(validatedData.roomId, utilityBillPeriod, tx);
 
                 if (existingBill) {
                     utilityBill = await updateUtilityBill(existingBill.id, billInput, user, tx);
@@ -75,7 +82,6 @@ export default defineEventHandler(async (event) => {
                 }
             }
 
-            // Auto-generate rent bill for this billing cycle (if not already exists)
             const rentBill = await autoGenerateRentBill(validatedData.roomId, validatedData.period, tx);
 
             return { meterReading, utilityBill, rentBill };

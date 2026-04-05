@@ -4,6 +4,12 @@ import { meterReadings } from '../../database/schema';
 import { eq } from 'drizzle-orm';
 import { findUtilityBillByRoomAndPeriod, deleteUtilityBill } from '../../services/utilityBillService';
 
+function getPreviousPeriod(period: string) {
+    const [year, month] = period.split('-').map(Number);
+    const previous = new Date(year, month - 2, 1);
+    return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
     const id = getRouterParam(event, 'id');
@@ -27,7 +33,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Check if associated utility bill exists and is paid
-    const associatedBill = await findUtilityBillByRoomAndPeriod(reading.roomId, reading.period);
+    const associatedBill = await findUtilityBillByRoomAndPeriod(reading.roomId, getPreviousPeriod(reading.period));
 
     if (associatedBill && associatedBill.isPaid) {
         throw createError({

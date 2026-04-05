@@ -19,13 +19,7 @@ const remainingAmount = computed(() => props.totalAmount - props.paidAmount);
 
 const form = reactive({
   amount: remainingAmount.value,
-  paymentMethod: "cash" as
-    | "cash"
-    | "transfer"
-    | "credit_card"
-    | "debit_card"
-    | "e_wallet"
-    | "other",
+  paymentMethod: "cash" as "cash" | "transfer",
   paymentDate: new Date().toISOString().split("T")[0],
   notes: "",
 });
@@ -33,10 +27,6 @@ const form = reactive({
 const paymentMethodOptions = [
   { label: "Tunai", value: "cash" },
   { label: "Transfer Bank", value: "transfer" },
-  { label: "Kartu Kredit", value: "credit_card" },
-  { label: "Kartu Debit", value: "debit_card" },
-  { label: "E-Wallet", value: "e_wallet" },
-  { label: "Lainnya", value: "other" },
 ];
 
 const formatCurrency = (val: number) =>

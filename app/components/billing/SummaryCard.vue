@@ -59,6 +59,13 @@ const periodFormatted = computed(() => {
   const date = new Date(parseInt(year), parseInt(month) - 1);
   return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 });
+
+const utilityUsagePeriodFormatted = computed(() => {
+  if (!props.item.util?.period) return '';
+  const [year, month] = props.item.util.period.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+});
 </script>
 
 <template>
@@ -87,7 +94,10 @@ const periodFormatted = computed(() => {
           
           <!-- Property + Period -->
           <div class="text-sm text-gray-500 mt-0.5">
-            {{ propertyName }} • {{ periodFormatted }}
+            {{ propertyName }} • Tagihan {{ periodFormatted }}
+          </div>
+          <div v-if="utilityUsagePeriodFormatted" class="text-xs text-gray-400 mt-1">
+            Utilitas = pemakaian {{ utilityUsagePeriodFormatted }}
           </div>
           
           <!-- Status -->
@@ -126,7 +136,10 @@ const periodFormatted = computed(() => {
             </div>
           </div>
           <div class="flex justify-between items-center">
-            <span class="text-gray-500">Utilitas (Listrik/Air):</span>
+            <span class="text-gray-500">
+              Utilitas
+              <span v-if="utilityUsagePeriodFormatted">(Pemakaian {{ utilityUsagePeriodFormatted }})</span>:
+            </span>
             <div class="flex items-center gap-1">
               <span class="font-medium">{{ item.util ? formatCurrency(utilityAmount) : '-' }}</span>
               <UIcon 

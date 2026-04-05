@@ -15,6 +15,14 @@ const { generateUtilityReceipt, generateRentReceipt } = usePdfReceipt()
 
 // Confirm Dialog
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog> | null>(null)
+const markPaidModalOpen = ref(false)
+const selectedBillToMarkPaid = ref<any | null>(null)
+const selectedMarkPaidMethod = ref<'cash' | 'transfer'>('cash')
+const markPaidSubmitting = ref(false)
+const markPaidMethodOptions = [
+  { label: 'Tunai', value: 'cash' },
+  { label: 'Transfer Bank', value: 'transfer' }
+]
 
 // Fetch room from API
 const room = ref<Room | null>(null)
@@ -311,47 +319,6 @@ const deleteReading = async (id: string) => {
   }
 }
 
-// Bill actions
-// Bill actions
-const deleteBill = async (bill: any) => {
-  const isRent = bill.type === 'rent'
-  const title = isRent ? 'Hapus Rent Bill?' : 'Hapus Utility Bill?'
-  const message = `Data ${isRent ? 'rent' : 'utility'} bill ini akan dihapus permanen. Lanjutkan?`
-  
-  const confirmed = await confirmDialog.value?.confirm({
-    title,
-    message,
-    confirmText: 'Hapus',
-    confirmColor: 'error'
-  })
-  
-  if (confirmed) {
-    try {
-      if (isRent) {
-         await store.deleteRentBill(bill.id)
-      } else {
-         await store.deleteUtilityBill(bill.id)
-      }
-      toast.add({ title: 'Tagihan Dihapus', description: 'Tagihan telah dihapus.', color: 'success' })
-    } catch (e: any) {
-      toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Gagal menghapus tagihan', color: 'error' })
-    }
-  }
-}
-
-const markPaid = async (bill: any) => {
-  try {
-    if (bill.type === 'rent') {
-        await store.markRentBillAsPaid(bill.id)
-    } else {
-        await store.markUtilityBillAsPaid(bill.id)
-    }
-    toast.add({ title: 'Tagihan Lunas', description: 'Tagihan telah ditandai lunas.', color: 'success' })
-  } catch (e: any) {
-    toast.add({ title: 'Error', description: e?.data?.message || e?.message || 'Gagal menandai lunas', color: 'error' })
-  }
-}
-
 // Download receipt
 const downloadReceipt = (bill: any) => {
   if (!room.value || !property.value) return
@@ -522,14 +489,8 @@ const goBack = () => {
                                             </UBadge>
                                         </td>
                                         <td class="p-3 text-right flex justify-end gap-1">
-                                            <UTooltip text="Tandai Lunas" v-if="!bill.isPaid">
-                                                <UButton size="xs" color="success" variant="soft" icon="i-heroicons-check" @click="markPaid(bill)" />
-                                            </UTooltip>
                                             <UTooltip text="Cetak">
                                                 <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-printer" @click="downloadReceipt(bill)" />
-                                            </UTooltip>
-                                            <UTooltip text="Hapus">
-                                                <UButton size="xs" color="error" variant="ghost" icon="i-heroicons-trash" @click="deleteBill(bill)" />
                                             </UTooltip>
                                         </td>
                                     </tr>
@@ -708,6 +669,56 @@ const goBack = () => {
 
   <!-- Tenant Select Modal -->
   <TenantSelectModal v-model="isTenantModalOpen" @select="onTenantSelect" />
+
+  <UModal :open="markPaidModalOpen" @close="markPaidModalOpen = false">
+    <template #content>
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Tandai Lunas</h3>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-heroicons-x-mark"
+              @click="markPaidModalOpen = false"
+            />
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Pilih metode pembayaran untuk menandai tagihan ini sebagai lunas.
+          </p>
+
+          <UFormField label="Metode Pembayaran" required>
+            <USelect
+              v-model="selectedMarkPaidMethod"
+              :items="markPaidMethodOptions"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton color="neutral" variant="soft" @click="markPaidModalOpen = false">
+              Batal
+            </UButton>
+            <UButton
+              color="success"
+              :loading="markPaidSubmitting"
+              icon="i-heroicons-check"
+              @click="submitMarkPaid"
+            >
+              Tandai Lunas
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </template>
+  </UModal>
   
   <!-- Confirm Dialog -->
   <ConfirmDialog ref="confirmDialog" />

@@ -6,6 +6,12 @@ import { eq, and } from 'drizzle-orm';
 import { createUtilityBill, resolveRoomUtilitySettings } from '../../services/utilityBillService';
 import { autoGenerateRentBill } from '../../utils/rentBillService';
 
+function getPreviousPeriod(period: string) {
+    const [year, month] = period.split('-').map(Number);
+    const previous = new Date(year, month - 2, 1);
+    return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
@@ -40,7 +46,7 @@ export default defineEventHandler(async (event) => {
 
             const meterReading = meterResult[0];
 
-            // Auto-create utility bill from meter reading
+            // Auto-create utility bill for the previous usage period
             const room = await tx.select()
                 .from(rooms)
                 .where(eq(rooms.id, validatedData.roomId))
@@ -58,10 +64,11 @@ export default defineEventHandler(async (event) => {
 
                 const resolvedSettings = await resolveRoomUtilitySettings(validatedData.roomId, tx);
                 const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
+                const utilityBillPeriod = getPreviousPeriod(validatedData.period);
 
                 utilityBill = await createUtilityBill({
                     roomId: validatedData.roomId,
-                    period: validatedData.period,
+                    period: utilityBillPeriod,
                     meterStart: validatedData.meterStart,
                     meterEnd: validatedData.meterEnd,
                     costPerKwh: resolvedSettings.costPerKwh,
@@ -70,7 +77,6 @@ export default defineEventHandler(async (event) => {
                 }, user, tx);
             }
 
-            // Auto-generate rent bill for this billing cycle (if not already exists)
             const rentBill = await autoGenerateRentBill(validatedData.roomId, validatedData.period, tx);
 
             return { meterReading, utilityBill, rentBill };

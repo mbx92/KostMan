@@ -155,7 +155,8 @@ const formatCurrency = (val: number | string) =>
   new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
-    minimumFractionDigits: 0
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(Number(val))
 
 const formatDate = (dateStr: string) => {

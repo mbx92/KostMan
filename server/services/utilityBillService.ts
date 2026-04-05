@@ -230,7 +230,7 @@ export async function verifyBillOwnership(bill: { roomId: string }, user: Utilit
  * Mark a utility bill as paid.
  * Throws 400 if the bill is already paid.
  */
-export async function updateUtilityBillPaid(id: string, tx?: DbClient) {
+export async function updateUtilityBillPaid(id: string, paymentMethod: 'cash' | 'transfer' = 'cash', tx?: DbClient) {
     const client = tx || db;
     const bill = await getUtilityBillById(id, client);
 
@@ -241,7 +241,7 @@ export async function updateUtilityBillPaid(id: string, tx?: DbClient) {
     const result = await client.update(utilityBills).set({
         isPaid: true,
         paidAt: new Date(),
-        paymentMethod: 'cash',
+        paymentMethod,
     }).where(eq(utilityBills.id, id)).returning();
 
     return result[0];

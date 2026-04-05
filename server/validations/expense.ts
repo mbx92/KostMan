@@ -6,7 +6,7 @@ export const createExpenseSchema = z
         propertyId: z.string().uuid().optional().nullable(),
         category: z.string().min(1).max(50),
         description: z.string().min(3).max(500),
-        amount: z.number().positive(),
+        amount: z.number().positive().transform((val) => Math.round(val)),
         type: z.enum(["property", "global"]),
         expenseDate: z.string().transform((val) => {
             // If it's already in YYYY-MM-DD format, return as is
@@ -64,7 +64,7 @@ export const updateExpenseSchema = z.object({
     propertyId: z.string().uuid().optional().nullable(),
     category: z.string().min(1).max(50).optional(),
     description: z.string().min(3).max(500).optional(),
-    amount: z.number().positive().optional(),
+    amount: z.number().positive().transform((val) => Math.round(val)).optional(),
     type: z.enum(["property", "global"]).optional(),
     expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),

@@ -6,7 +6,7 @@ interface CreatePaymentInput {
   billId: string
   billType: 'rent' | 'utility'
   amount: number
-  paymentMethod: 'cash' | 'transfer' | 'credit_card' | 'debit_card' | 'e_wallet' | 'other'
+  paymentMethod: 'cash' | 'transfer'
   paymentDate: string
   notes?: string
 }
@@ -35,6 +35,13 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       message: 'Payment amount must be greater than 0',
+    })
+  }
+
+  if (!['cash', 'transfer'].includes(body.paymentMethod)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Payment method must be cash or transfer',
     })
   }
 

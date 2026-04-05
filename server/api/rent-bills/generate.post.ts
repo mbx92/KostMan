@@ -6,16 +6,16 @@ import { eq, and, or, lte, gte } from 'drizzle-orm';
 
 /**
  * Helper: Calculate period end date (start + monthsCovered, inclusive)
- * Note: End date is inclusive (last day tenant can stay)
- * For 3 months from Feb 18: Feb 18 + 3 months = May 18 (90 days inclusive)
- * Next period will start on May 19
+ * End date is the day before the next billing cycle starts.
+ * For 1 month from Mar 1 => Mar 31.
+ * For 3 months from Feb 18 => May 17.
  */
 function calculatePeriodEndDate(startDateStr: string, monthsCovered: number = 1): string {
     const [year, month, day] = startDateStr.split('-').map(Number);
     const startDate = new Date(year, month - 1, day);
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + monthsCovered);
-    // Don't subtract 1 day - end date is the last day tenant can stay
+    endDate.setDate(endDate.getDate() - 1);
     return endDate.toISOString().split('T')[0];
 }
 

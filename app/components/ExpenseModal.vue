@@ -67,7 +67,7 @@ const schema = z.object({
   propertyId: z.string().optional(),
   category: z.string().min(1, 'Kategori wajib diisi'),
   description: z.string().min(3, 'Deskripsi terlalu pendek'),
-  amount: z.number().positive('Jumlah harus positif'),
+  amount: z.number().int('Jumlah harus bilangan bulat').positive('Jumlah harus positif'),
   type: z.enum(['property', 'global']),
   expenseDate: z.string().min(1, 'Tanggal pengeluaran wajib diisi'),
   paidDate: z.string().optional(),
@@ -93,7 +93,7 @@ watch(() => props.expense, (newVal) => {
     state.propertyId = newVal.propertyId || ''
     state.category = newVal.category
     state.description = newVal.description
-    state.amount = parseFloat(newVal.amount)
+    state.amount = Math.round(Number(newVal.amount) || 0)
     state.type = newVal.type
     state.expenseDate = newVal.expenseDate
     state.paidDate = newVal.paidDate || ''
@@ -246,7 +246,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
 
             <div class="space-y-1">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah</label>
-              <UInput v-model="state.amount" type="number" step="0.01" placeholder="0.00" class="w-full">
+              <UInput v-model="state.amount" type="number" step="1" placeholder="0" class="w-full">
                 <template #leading>Rp</template>
               </UInput>
             </div>

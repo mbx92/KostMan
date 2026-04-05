@@ -11,7 +11,7 @@ type DbClient = NodePgDatabase<Record<string, never>>
  * Logic:
  *  1. Look up the room (moveInDate → billingCycleDay)
  *  2. Compute periodStartDate = YYYY-MM-{billingCycleDay} (clamped to month length)
- *  3. Compute periodEndDate   = periodStartDate + 1 month
+ *  3. Compute periodEndDate   = one day before the next billing cycle
  *  4. If any existing rent bill overlaps → skip (idempotent)
  *  5. Otherwise insert the rent bill (waterFee & trashFee handled by utility bills)
  *
@@ -51,10 +51,11 @@ export async function autoGenerateRentBill(
 
     const periodStartDate = `${yearStr}-${monthStr}-${String(cycleDay).padStart(2, '0')}`
 
-    // 3. periodEndDate = start + 1 month
+    // 3. periodEndDate = one day before next cycle
     const startObj = new Date(`${periodStartDate}T00:00:00`)
     const endObj = new Date(startObj)
     endObj.setMonth(endObj.getMonth() + 1)
+    endObj.setDate(endObj.getDate() - 1)
     const periodEndDate = endObj.toISOString().split('T')[0]
 
     // 4. Check overlap with existing rent bills

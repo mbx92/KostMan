@@ -34,6 +34,17 @@ const paymentBillId = ref<string | null>(null);
 const paymentBillType = ref<"rent" | "utility">("rent");
 const paymentBillData = ref<RentBill | UtilityBill | null>(null);
 
+// Mark Paid Modal State
+const markPaidModalOpen = ref(false);
+const markPaidBillId = ref<string | null>(null);
+const markPaidBillType = ref<"rent" | "utility">("rent");
+const markPaidPaymentMethod = ref<"cash" | "transfer">("cash");
+const markPaidSubmitting = ref(false);
+const markPaidMethodOptions = [
+  { label: "Tunai", value: "cash" },
+  { label: "Transfer Bank", value: "transfer" },
+];
+
 // Payment History State
 const paymentHistoryOpen = ref(false);
 const paymentHistoryBillId = ref<string | null>(null);
@@ -76,7 +87,7 @@ const viewMode = ref<"grid" | "list">("list");
 // Filters
 const selectedPropertyId = ref("all");
 const selectedRoomId = ref("all");
-const selectedStatus = ref<"all" | "paid" | "unpaid">("all");
+const selectedStatus = ref<"all" | "paid" | "unpaid">("unpaid");
 
 const propertyOptions = computed(() => [
   { label: "Semua Properti", value: "all" },
@@ -152,22 +163,74 @@ const combinedBills = computed(() => {
     { period: string; roomId: string; rent?: RentBill; util?: UtilityBill }
   >();
 
-  filteredRentBills.value.forEach((b) => {
-    const key = `${b.roomId}-${b.period}`;
-    if (!map.has(key)) map.set(key, { period: b.period, roomId: b.roomId });
+  const selectedBillingPeriod = selectedPeriod.value?.slice(0, 7);
+
+  rentBills.value.forEach((b) => {
+    if (selectedRoomId.value !== "all" && b.roomId !== selectedRoomId.value) return;
+    if (selectedPropertyId.value !== "all") {
+      const room = rooms.value.find((item) => item.id === b.roomId);
+      if (room?.propertyId !== selectedPropertyId.value) return;
+    }
+
+    const billingPeriod = getRentBillingPeriod(b);
+    if (selectedBillingPeriod && billingPeriod !== selectedBillingPeriod) return;
+
+    const key = `${b.roomId}-${billingPeriod}`;
+    if (!map.has(key)) map.set(key, { period: billingPeriod, roomId: b.roomId });
     map.get(key)!.rent = b;
   });
 
-  filteredUtilityBills.value.forEach((b) => {
-    const key = `${b.roomId}-${b.period}`;
-    if (!map.has(key)) map.set(key, { period: b.period, roomId: b.roomId });
+  utilityBills.value.forEach((b) => {
+    if (selectedRoomId.value !== "all" && b.roomId !== selectedRoomId.value) return;
+    if (selectedPropertyId.value !== "all") {
+      const room = rooms.value.find((item) => item.id === b.roomId);
+      if (room?.propertyId !== selectedPropertyId.value) return;
+    }
+
+    const billingPeriod = b.period;
+    if (selectedBillingPeriod && billingPeriod !== selectedBillingPeriod) return;
+
+    const key = `${b.roomId}-${billingPeriod}`;
+    if (!map.has(key)) map.set(key, { period: billingPeriod, roomId: b.roomId });
     map.get(key)!.util = b;
   });
 
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.period).getTime() - new Date(a.period).getTime(),
-  );
+  return Array.from(map.values())
+    .filter((item) => {
+      if (selectedStatus.value === "paid") {
+        return (item.rent ? item.rent.isPaid : true) &&
+          (item.util ? item.util.isPaid : true) &&
+          (!!item.rent || !!item.util);
+      }
+
+      if (selectedStatus.value === "unpaid") {
+        return item.rent?.isPaid === false || item.util?.isPaid === false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime());
 });
+
+const formatBillingPeriod = (period?: string | null) => {
+  if (!period) return "";
+
+  const match = period.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return period;
+
+  const [, year, month] = match;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+
+  if (Number.isNaN(date.getTime())) return period;
+
+  return new Intl.DateTimeFormat("id-ID", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+};
+
+const getRentBillingPeriod = (bill: RentBill) =>
+  bill.period || bill.periodStartDate.slice(0, 7);
 
 // Stats
 const totalUnpaidRent = computed(() =>
@@ -441,17 +504,53 @@ const summaryColumns: TableColumn<CombinedBillItem>[] = [
 const isGenerating = ref(false);
 const genPropertyId = ref("");
 const genRoomId = ref("");
-const genPeriodStartDate = ref(new Date().toISOString().slice(0, 10)); // YYYY-MM-DD
+
+const parseLocalDate = (dateStr?: string | null) => {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  const parsed = new Date(year, month - 1, day, 0, 0, 0, 0);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (dateStr?: string | null) => {
+  const date = parseLocalDate(dateStr);
+  if (!date) return dateStr || "";
+
+  return date.toLocaleDateString("id-ID", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+const getTodayLocalDate = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+};
+
+const genPeriodStartDate = ref(formatLocalDate(getTodayLocalDate())); // YYYY-MM-DD
 const genMonthsCovered = ref(1);
 
 // Calculate period end date (start + 1 month - 1 day)
 const genPeriodEndDate = computed(() => {
   if (!genPeriodStartDate.value) return "";
-  const start = new Date(genPeriodStartDate.value);
+  const start = parseLocalDate(genPeriodStartDate.value);
+  if (!start) return "";
+
   const end = new Date(start);
   end.setMonth(end.getMonth() + genMonthsCovered.value);
   end.setDate(end.getDate() - 1);
-  return end.toISOString().slice(0, 10);
+  return formatLocalDate(end);
 });
 
 // Due date = period end date
@@ -461,52 +560,41 @@ const genDueDate = computed(() => genPeriodEndDate.value);
 const setNextBillingCycle = () => {
   if (!genRoom.value?.moveInDate) return;
 
-  // Parse moveInDate correctly (avoid timezone issues)
-  // moveInDate is in format "YYYY-MM-DD"
-  const [year, month, day] = genRoom.value.moveInDate.split("-").map(Number);
-  const cycleDay = day; // Day of month from moveInDate (e.g., 18)
+  const [, , day] = genRoom.value.moveInDate.split("-").map(Number);
+  const cycleDay = day;
 
-  // Find next available start date
-  const today = new Date();
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth();
-  const todayDay = today.getDate();
+  const existingBills = rentBills.value
+    .filter((b) => b.roomId === genRoomId.value)
+    .sort((a, b) => b.periodEndDate.localeCompare(a.periodEndDate));
 
-  // Start with current month's cycle day
-  let nextStartYear = todayYear;
-  let nextStartMonth = todayMonth;
+  const latestBill = existingBills[0];
+  if (latestBill) {
+    const latestEndDate = parseLocalDate(latestBill.periodEndDate);
+    if (latestEndDate) {
+      const nextStartDate = new Date(latestEndDate);
+      nextStartDate.setDate(nextStartDate.getDate() + 1);
+      genPeriodStartDate.value = formatLocalDate(nextStartDate);
+      return;
+    }
+  }
 
-  // If cycle day has already passed this month, move to next month
-  if (todayDay > cycleDay) {
-    nextStartMonth++;
+  const today = getTodayLocalDate();
+  let nextStartYear = today.getFullYear();
+  let nextStartMonth = today.getMonth();
+
+  if (today.getDate() > cycleDay) {
+    nextStartMonth += 1;
     if (nextStartMonth > 11) {
       nextStartMonth = 0;
-      nextStartYear++;
+      nextStartYear += 1;
     }
   }
 
-  // Format as YYYY-MM-DD
-  let nextStartDate = `${nextStartYear}-${String(nextStartMonth + 1).padStart(2, "0")}-${String(cycleDay).padStart(2, "0")}`;
-
-  // Check if this period already has a bill, skip if overlapped
-  const existingBills = rentBills.value.filter(
-    (b) => b.roomId === genRoomId.value,
+  const maxDay = new Date(nextStartYear, nextStartMonth + 1, 0).getDate();
+  const nextStartDay = Math.min(cycleDay, maxDay);
+  genPeriodStartDate.value = formatLocalDate(
+    new Date(nextStartYear, nextStartMonth, nextStartDay, 0, 0, 0, 0),
   );
-
-  for (const bill of existingBills) {
-    const billStart = new Date(bill.periodStartDate + "T00:00:00");
-    const billEnd = new Date(bill.periodEndDate + "T00:00:00");
-    const checkDate = new Date(nextStartDate + "T00:00:00");
-
-    // If nextStart falls within existing bill period, move to after that bill
-    if (checkDate >= billStart && checkDate <= billEnd) {
-      const afterBillEnd = new Date(billEnd);
-      afterBillEnd.setDate(afterBillEnd.getDate() + 1);
-      nextStartDate = afterBillEnd.toISOString().slice(0, 10);
-    }
-  }
-
-  genPeriodStartDate.value = nextStartDate;
 };
 
 // Filtered room options for generate modal based on selected property
@@ -559,8 +647,10 @@ const existingRentBillRanges = computed(() => {
 
 // Helper to format date range
 const formatDateRange = (start: string, end: string) => {
-  const s = new Date(start);
-  const e = new Date(end);
+  const s = parseLocalDate(start);
+  const e = parseLocalDate(end);
+  if (!s || !e) return `${start} - ${end}`;
+
   const opts: Intl.DateTimeFormatOptions = {
     day: "numeric",
     month: "short",
@@ -573,10 +663,12 @@ const formatDateRange = (start: string, end: string) => {
 const isDateUnavailable = computed(() => {
   return (date: DateValue) => {
     const checkDate = new Date(date.year, date.month - 1, date.day);
+    checkDate.setHours(0, 0, 0, 0);
 
     // If room has moveInDate, don't allow dates before moveInDate
     if (genRoom.value?.moveInDate) {
-      const moveInDate = new Date(genRoom.value.moveInDate);
+      const moveInDate = parseLocalDate(genRoom.value.moveInDate);
+      if (!moveInDate) return false;
       if (checkDate < moveInDate) {
         return true;
       }
@@ -586,8 +678,10 @@ const isDateUnavailable = computed(() => {
     for (const bill of rentBills.value.filter(
       (b) => b.roomId === genRoomId.value,
     )) {
-      const start = new Date(bill.periodStartDate);
-      const end = new Date(bill.periodEndDate);
+      const start = parseLocalDate(bill.periodStartDate);
+      const end = parseLocalDate(bill.periodEndDate);
+      if (!start || !end) continue;
+
       if (checkDate >= start && checkDate <= end) {
         return true;
       }
@@ -622,14 +716,16 @@ const dateRangeConflict = computed(() => {
   if (!genPeriodStartDate.value || !genPeriodEndDate.value || !genRoomId.value)
     return null;
 
-  const newStart = new Date(genPeriodStartDate.value);
-  const newEnd = new Date(genPeriodEndDate.value);
+  const newStart = parseLocalDate(genPeriodStartDate.value);
+  const newEnd = parseLocalDate(genPeriodEndDate.value);
+  if (!newStart || !newEnd) return null;
 
   for (const bill of rentBills.value.filter(
     (b) => b.roomId === genRoomId.value,
   )) {
-    const existStart = new Date(bill.periodStartDate);
-    const existEnd = new Date(bill.periodEndDate);
+    const existStart = parseLocalDate(bill.periodStartDate);
+    const existEnd = parseLocalDate(bill.periodEndDate);
+    if (!existStart || !existEnd) continue;
 
     // Check overlap: ranges overlap if start1 <= end2 AND end1 >= start2
     if (newStart <= existEnd && newEnd >= existStart) {
@@ -689,21 +785,29 @@ const generateRentBill = async () => {
 };
 
 // Actions
-const markRentPaid = async (id: string) => {
-  try {
-    await store.markRentBillAsPaid(id);
-    toast.add({
-      title: "Lunas",
-      description: "Rent bill ditandai lunas.",
-      color: "success",
-    });
-  } catch (e: any) {
+const openMarkPaidModal = (billId: string, billType: "rent" | "utility") => {
+  const bill =
+    billType === "rent"
+      ? rentBills.value.find((item) => item.id === billId)
+      : utilityBills.value.find((item) => item.id === billId);
+
+  if (!bill) {
     toast.add({
       title: "Error",
-      description: e?.data?.message || e?.message,
+      description: "Tagihan tidak ditemukan",
       color: "error",
     });
+    return;
   }
+
+  markPaidBillId.value = billId;
+  markPaidBillType.value = billType;
+  markPaidPaymentMethod.value = "cash";
+  markPaidModalOpen.value = true;
+};
+
+const markRentPaid = (id: string) => {
+  openMarkPaidModal(id, "rent");
 };
 
 // Midtrans Payment
@@ -822,20 +926,44 @@ const deleteRent = async (id: string) => {
   }
 };
 
-const markUtilityPaid = async (id: string) => {
+const markUtilityPaid = (id: string) => {
+  openMarkPaidModal(id, "utility");
+};
+
+const submitMarkPaid = async () => {
+  if (!markPaidBillId.value) return;
+
+  markPaidSubmitting.value = true;
+
   try {
-    await store.markUtilityBillAsPaid(id);
+    if (markPaidBillType.value === "rent") {
+      await store.markRentBillAsPaid(
+        markPaidBillId.value,
+        markPaidPaymentMethod.value,
+      );
+    } else {
+      await store.markUtilityBillAsPaid(
+        markPaidBillId.value,
+        markPaidPaymentMethod.value,
+      );
+    }
+
     toast.add({
       title: "Lunas",
-      description: "Utility bill ditandai lunas.",
+      description: `Tagihan ditandai lunas dengan metode ${markPaidPaymentMethod.value === "cash" ? "Tunai" : "Transfer Bank"}.`,
       color: "success",
     });
+
+    markPaidModalOpen.value = false;
+    markPaidBillId.value = null;
   } catch (e: any) {
     toast.add({
       title: "Error",
       description: e?.data?.message || e?.message,
       color: "error",
     });
+  } finally {
+    markPaidSubmitting.value = false;
   }
 };
 
@@ -1058,14 +1186,32 @@ const sendToWhatsApp = async (item: {
   let invoiceUrl = "";
 
   try {
+    const requestBody =
+      item.rent && item.util
+        ? item.rent.period === item.util.period
+          ? { roomId: item.roomId, period: item.rent.period }
+          : { rentBillId: item.rent.id, utilBillId: item.util.id }
+        : item.rent
+          ? { billType: "rent" }
+          : item.util
+            ? { billType: "utility" }
+            : null;
+
+    if (!requestBody) {
+      throw new Error("Tagihan tidak ditemukan");
+    }
+
+    const endpoint = item.rent && item.util
+      ? `/api/bills/public-link/combined`
+      : item.rent
+        ? `/api/bills/public-link/${item.rent.id}`
+        : `/api/bills/public-link/${item.util!.id}`;
+
     const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
-      `/api/bills/public-link/combined`,
+      endpoint,
       {
         method: "POST",
-        body: {
-          roomId: item.roomId,
-          period: item.period,
-        },
+        body: requestBody,
       },
     );
     invoiceUrl = linkResponse.publicUrl;
@@ -1092,7 +1238,11 @@ const sendToWhatsApp = async (item: {
     tenantName: tenant.name,
     propertyName: propFallback.name,
     roomName: roomFallback.name,
-    period: item.period,
+    period: formatBillingPeriod(item.period),
+    rentPeriod: item.rent
+      ? formatDateRange(item.rent.periodStartDate, item.rent.periodEndDate)
+      : "",
+    utilityPeriod: item.util ? formatBillingPeriod(item.util.period) : "",
     occupantCount: roomFallback.occupantCount || 1,
 
     // Rent details
@@ -1659,7 +1809,7 @@ const sendReminder = async (reminder: any) => {
                   Number(row.original.paidAmount || 0) > 0 &&
                   !row.original.isPaid
                 "
-                size="2xs"
+                size="xs"
                 color="neutral"
                 variant="link"
                 icon="i-heroicons-clock"
@@ -1852,7 +2002,7 @@ const sendReminder = async (reminder: any) => {
         >
           <!-- Period Cell -->
           <template #period-cell="{ row }">
-            <span class="font-medium">{{ row.original.period }}</span>
+            <span class="font-medium">{{ formatBillingPeriod(row.original.period) }}</span>
           </template>
 
           <!-- Room Cell -->
@@ -1935,7 +2085,7 @@ const sendReminder = async (reminder: any) => {
                   Number(row.original.paidAmount || 0) > 0 &&
                   !row.original.isPaid
                 "
-                size="2xs"
+                size="xs"
                 color="neutral"
                 variant="link"
                 icon="i-heroicons-clock"
@@ -2126,7 +2276,7 @@ const sendReminder = async (reminder: any) => {
         >
           <!-- Period Cell -->
           <template #period-cell="{ row }">
-            <span class="font-medium">{{ row.original.period }}</span>
+            <span class="font-medium">{{ formatBillingPeriod(row.original.period) }}</span>
           </template>
 
           <!-- Room Cell -->
@@ -2162,7 +2312,10 @@ const sendReminder = async (reminder: any) => {
           <!-- Rent Cell -->
           <template #rent-cell="{ row }">
             <div v-if="row.original.rent">
-              {{ formatCurrency(row.original.rent.totalAmount) }}
+              <div>{{ formatCurrency(row.original.rent.totalAmount) }}</div>
+              <div class="text-xs text-gray-500">
+                Sewa {{ formatBillingPeriod(row.original.period) }}
+              </div>
               <UIcon
                 v-if="row.original.rent.isPaid"
                 name="i-heroicons-check-circle"
@@ -2180,7 +2333,10 @@ const sendReminder = async (reminder: any) => {
           <!-- Utility Cell -->
           <template #utility-cell="{ row }">
             <div v-if="row.original.util">
-              {{ formatCurrency(row.original.util.totalAmount) }}
+              <div>{{ formatCurrency(row.original.util.totalAmount) }}</div>
+              <div class="text-xs text-gray-500">
+                Pemakaian {{ formatBillingPeriod(row.original.util.period) }}
+              </div>
               <UIcon
                 v-if="row.original.util.isPaid"
                 name="i-heroicons-check-circle"
@@ -2387,13 +2543,7 @@ const sendReminder = async (reminder: any) => {
               <p class="text-xs text-blue-600 dark:text-blue-400">
                 <UIcon name="i-heroicons-calendar" class="w-3 h-3 inline" />
                 Tanggal masuk:
-                {{
-                  new Date(genRoom.moveInDate).toLocaleDateString("id-ID", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                }}
+                {{ formatDisplayDate(genRoom.moveInDate) }}
               </p>
             </div>
             <!-- Show date range preview -->
@@ -2414,13 +2564,7 @@ const sendReminder = async (reminder: any) => {
               </p>
               <p class="text-xs text-blue-600 dark:text-blue-300 mt-1">
                 Due Date:
-                {{
-                  new Date(genDueDate).toLocaleDateString("id-ID", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                }}
+                {{ formatDisplayDate(genDueDate) }}
               </p>
             </div>
             <!-- Show existing bills info -->
@@ -2544,6 +2688,61 @@ const sendReminder = async (reminder: any) => {
         @payment-added="handlePaymentAdded"
         @close="paymentModalOpen = false"
       />
+    </template>
+  </UModal>
+
+  <!-- Mark Paid Modal -->
+  <UModal :open="markPaidModalOpen" @close="markPaidModalOpen = false">
+    <template #content>
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Tandai Lunas</h3>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-heroicons-x-mark"
+              @click="markPaidModalOpen = false"
+            />
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Pilih metode pembayaran untuk menandai tagihan ini sebagai lunas.
+          </p>
+
+          <UFormField label="Metode Pembayaran" required>
+            <USelect
+              v-model="markPaidPaymentMethod"
+              :items="markPaidMethodOptions"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton
+              color="neutral"
+              variant="soft"
+              @click="markPaidModalOpen = false"
+            >
+              Batal
+            </UButton>
+            <UButton
+              color="success"
+              :loading="markPaidSubmitting"
+              icon="i-heroicons-check"
+              @click="submitMarkPaid"
+            >
+              Tandai Lunas
+            </UButton>
+          </div>
+        </template>
+      </UCard>
     </template>
   </UModal>
 

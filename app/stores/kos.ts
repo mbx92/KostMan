@@ -89,6 +89,7 @@ export interface RentBill {
     waterFee?: number | string
     trashFee?: number | string
     totalAmount: number | string
+    paidAmount?: number | string | null
     isPaid: boolean
     paidAt?: string | null
     generatedAt: string
@@ -110,6 +111,7 @@ export interface UtilityBill {
     trashFee: number | string
     additionalCost: number | string
     totalAmount: number | string
+    paidAmount?: number | string | null
     isPaid: boolean
     paidAt?: string | null
     generatedAt: string
@@ -530,12 +532,13 @@ export const useKosStore = defineStore('kos', () => {
         }
     }
 
-    async function markRentBillAsPaid(id: string) {
+    async function markRentBillAsPaid(id: string, paymentMethod: 'cash' | 'transfer' = 'cash') {
         rentBillsLoading.value = true
         rentBillsError.value = null
         try {
             const updatedBill = await $fetch<RentBill>(`/api/rent-bills/${id}/pay`, {
-                method: 'PATCH'
+                method: 'PATCH',
+                body: { paymentMethod }
             })
             const index = rentBills.value.findIndex(b => b.id === id)
             if (index !== -1) {
@@ -623,12 +626,13 @@ export const useKosStore = defineStore('kos', () => {
         }
     }
 
-    async function markUtilityBillAsPaid(id: string) {
+    async function markUtilityBillAsPaid(id: string, paymentMethod: 'cash' | 'transfer' = 'cash') {
         utilityBillsLoading.value = true
         utilityBillsError.value = null
         try {
             const updatedBill = await $fetch<UtilityBill>(`/api/utility-bills/${id}/pay`, {
-                method: 'PATCH'
+                method: 'PATCH',
+                body: { paymentMethod }
             })
             const index = utilityBills.value.findIndex(b => b.id === id)
             if (index !== -1) {

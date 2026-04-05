@@ -3,7 +3,7 @@ import { useKosStore } from '~/stores/kos';
 import { storeToRefs } from 'pinia';
 
 const kosStore = useKosStore();
-const { properties, reminders, remindersLoading, rentBills, utilityBills } = storeToRefs(kosStore);
+const { properties, reminders, remindersLoading, rentBills, utilityBills, rooms, tenants } = storeToRefs(kosStore);
 const toast = useToast();
 const hasMounted = ref(false);
 
@@ -17,7 +17,9 @@ onMounted(async () => {
         kosStore.fetchProperties(),
         kosStore.fetchReminders(),
         kosStore.fetchRentBills(),
-        kosStore.fetchUtilityBills()
+        kosStore.fetchUtilityBills(),
+        kosStore.fetchRooms({ all: true }),
+        kosStore.fetchTenants({ all: true }),
     ]);
 });
 
@@ -89,34 +91,100 @@ const groupedRooms = computed(() => {
     return result
 })
 
-// Build a per-room bill status using actual bill data from the store
-// Status: 'belum_lunas' | 'lunas' | 'belum_ada'
+const parseLocalDate = (value?: string | null) => {
+    if (!value) return null
+
+    const dateOnly = value.split('T')[0]
+    const [year, month, day] = dateOnly.split('-').map(Number)
+    if (!year || !month || !day) return null
+
+    const parsed = new Date(year, month - 1, day, 0, 0, 0, 0)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
+const getTodayLocalDate = () => {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    return date
+}
+
+const formatDisplayDate = (value?: string | null) => {
+    const parsed = parseLocalDate(value)
+    if (!parsed) return value || ''
+
+    return parsed.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    })
+}
+
+const today = new Date()
+today.setHours(0, 0, 0, 0)
+
+const getUtilityBillDueDate = (bill: any) => {
+    const generatedAt = parseLocalDate(bill.generatedAt)
+    if (!generatedAt) return null
+
+    const dueDate = new Date(generatedAt)
+    dueDate.setDate(dueDate.getDate() + 7)
+    dueDate.setHours(0, 0, 0, 0)
+    return dueDate
+}
+
+const isRentBillActive = (bill: any) => {
+    if (!bill.isPaid) return true
+
+    const dueDate = parseLocalDate(bill.dueDate) || parseLocalDate(bill.periodEndDate)
+    return !!dueDate && dueDate >= today
+}
+
+const isUtilityBillActive = (bill: any) => {
+    if (!bill.isPaid) return true
+
+    const dueDate = getUtilityBillDueDate(bill)
+    return !!dueDate && dueDate >= today
+}
+
+// Build a per-room bill status using active bill data only
+// Status: 'belum_lunas' | 'lunas' | 'tidak_ada_tagihan_aktif'
 const roomBillStatus = computed(() => {
-    const map: Record<string, { status: 'belum_lunas' | 'lunas' | 'belum_ada'; totalUnpaid: number; billCount: number; daysUntilDue: number | null; dueDate: string | null }> = {};
+    const map: Record<string, { status: 'belum_lunas' | 'lunas' | 'tidak_ada_tagihan_aktif'; totalUnpaid: number; billCount: number; daysUntilDue: number | null; dueDate: string | null }> = {};
     
     // Process rent bills
     for (const bill of rentBills.value) {
+        if (!isRentBillActive(bill)) continue
+
         const roomId = bill.roomId;
         if (!map[roomId]) {
             map[roomId] = { status: 'lunas', totalUnpaid: 0, billCount: 0, daysUntilDue: null, dueDate: null };
         }
-        map[roomId].billCount++;
         if (!bill.isPaid) {
             map[roomId].status = 'belum_lunas';
             map[roomId].totalUnpaid += Number(bill.totalAmount);
+            map[roomId].billCount++;
         }
     }
     
     // Process utility bills
     for (const bill of utilityBills.value) {
+        if (!isUtilityBillActive(bill)) continue
+
         const roomId = bill.roomId;
         if (!map[roomId]) {
             map[roomId] = { status: 'lunas', totalUnpaid: 0, billCount: 0, daysUntilDue: null, dueDate: null };
         }
-        map[roomId].billCount++;
         if (!bill.isPaid) {
             map[roomId].status = 'belum_lunas';
             map[roomId].totalUnpaid += Number(bill.totalAmount);
+            map[roomId].billCount++;
         }
     }
     
@@ -140,7 +208,7 @@ const roomBillStatus = computed(() => {
 });
 
 const getRoomStatus = (roomId: string) => {
-    return roomBillStatus.value[roomId] || { status: 'belum_ada' as const, totalUnpaid: 0, billCount: 0, daysUntilDue: null, dueDate: null };
+    return roomBillStatus.value[roomId] || { status: 'tidak_ada_tagihan_aktif' as const, totalUnpaid: 0, billCount: 0, daysUntilDue: null, dueDate: null };
 };
 
 // Detail Modal
@@ -149,7 +217,123 @@ const selectedRoom = ref<any>(null);
 const isFetchingBills = ref(false);
 const roomRentBills = ref<any[]>([]);
 const roomUtilityBills = ref<any[]>([]);
+
+// Generate Bill Modal State
+const showGenerateModal = ref(false);
 const isGenerating = ref(false);
+const genPeriodStartDate = ref(formatLocalDate(getTodayLocalDate()));
+const genMonthsCovered = ref(1);
+
+// Period end computed from start + months
+const genPeriodEndDate = computed(() => {
+    if (!genPeriodStartDate.value) return '';
+    const start = parseLocalDate(genPeriodStartDate.value);
+    if (!start) return '';
+
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + genMonthsCovered.value);
+    end.setDate(end.getDate() - 1);
+    return formatLocalDate(end);
+});
+
+const genDueDate = computed(() => genPeriodEndDate.value);
+
+// Format date range helper
+const formatDateRange = (start: string, end: string) => {
+    const s = parseLocalDate(start);
+    const e = parseLocalDate(end);
+    if (!s || !e) return `${start} - ${end}`;
+
+    const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+    return `${s.toLocaleDateString('id-ID', opts)} - ${e.toLocaleDateString('id-ID', opts)}`;
+};
+
+// Auto-set to next billing cycle from moveInDate (same logic as billing page)
+const setNextBillingCycle = () => {
+    if (!selectedRoom.value?.moveInDate) return;
+    const [, , dayStr] = selectedRoom.value.moveInDate.split('-');
+    const cycleDay = Number(dayStr);
+
+    const existing = rentBills.value
+        .filter(b => b.roomId === selectedRoom.value?.id)
+        .sort((a, b) => b.periodEndDate.localeCompare(a.periodEndDate));
+
+    const latestBill = existing[0];
+    if (latestBill) {
+        const latestEndDate = parseLocalDate(latestBill.periodEndDate);
+        if (latestEndDate) {
+            const nextStartDate = new Date(latestEndDate);
+            nextStartDate.setDate(nextStartDate.getDate() + 1);
+            genPeriodStartDate.value = formatLocalDate(nextStartDate);
+            return;
+        }
+    }
+
+    const today = getTodayLocalDate();
+    let nextYear = today.getFullYear();
+    let nextMonth = today.getMonth();
+    if (today.getDate() > cycleDay) {
+        nextMonth++;
+        if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+    }
+
+    const maxDay = new Date(nextYear, nextMonth + 1, 0).getDate();
+    const nextDay = Math.min(cycleDay, maxDay);
+    genPeriodStartDate.value = formatLocalDate(new Date(nextYear, nextMonth, nextDay, 0, 0, 0, 0));
+};
+
+// Existing bill ranges for the selected room
+const existingRentBillRanges = computed(() => {
+    if (!selectedRoom.value) return [];
+    return rentBills.value
+        .filter(b => b.roomId === selectedRoom.value.id)
+        .map(b => ({ start: b.periodStartDate, end: b.periodEndDate, formatted: formatDateRange(b.periodStartDate, b.periodEndDate) }));
+});
+
+// Conflict check
+const dateRangeConflict = computed(() => {
+    if (!genPeriodStartDate.value || !genPeriodEndDate.value || !selectedRoom.value) return null;
+    const ns = parseLocalDate(genPeriodStartDate.value);
+    const ne = parseLocalDate(genPeriodEndDate.value);
+    if (!ns || !ne) return null;
+
+    for (const bill of rentBills.value.filter(b => b.roomId === selectedRoom.value.id)) {
+        const bs = parseLocalDate(bill.periodStartDate);
+        const be = parseLocalDate(bill.periodEndDate);
+        if (!bs || !be) continue;
+
+        if (ns <= be && ne >= bs) return formatDateRange(bill.periodStartDate, bill.periodEndDate);
+    }
+    return null;
+});
+
+// Disabled dates (already billed or before moveIn)
+const isDateUnavailable = computed(() => {
+    return (date: any) => {
+        const check = new Date(date.year, date.month - 1, date.day);
+        check.setHours(0, 0, 0, 0);
+        if (selectedRoom.value?.moveInDate) {
+            const moveIn = parseLocalDate(selectedRoom.value.moveInDate);
+            if (!moveIn) return false;
+            if (check < moveIn) return true;
+        }
+        for (const bill of rentBills.value.filter(b => b.roomId === selectedRoom.value?.id)) {
+            const bs = parseLocalDate(bill.periodStartDate);
+            const be = parseLocalDate(bill.periodEndDate);
+            if (!bs || !be) continue;
+
+            if (check >= bs && check <= be) return true;
+        }
+        return false;
+    };
+});
+
+// Open generate modal for a specific room (from detail modal)
+const openGenerateModal = () => {
+    genMonthsCovered.value = 1;
+    setNextBillingCycle();
+    showGenerateModal.value = true;
+};
 
 // Format helpers
 const formatCurrency = (amount: number | string) => {
@@ -229,32 +413,26 @@ const allBillsPaid = computed(() => {
 const hasAnyBills = computed(() => roomRentBills.value.length > 0 || roomUtilityBills.value.length > 0);
 
 // Generate Rent Bill from modal
+// Submit generate bill from modal
 const generateRentBill = async () => {
     if (!selectedRoom.value) return;
+    if (dateRangeConflict.value) {
+        toast.add({ title: 'Konflik', description: `Periode ${dateRangeConflict.value} sudah memiliki tagihan.`, color: 'error' });
+        return;
+    }
     isGenerating.value = true;
-
-    const room = selectedRoom.value;
-    const now = new Date();
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const periodStartDate = room.moveInDate 
-        ? (() => {
-            const moveDay = new Date(room.moveInDate).getDate();
-            const y = nextMonth.getFullYear();
-            const m = nextMonth.getMonth();
-            return `${y}-${String(m + 1).padStart(2, '0')}-${String(moveDay).padStart(2, '0')}`;
-          })()
-        : `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
-
     try {
         await kosStore.generateRentBill({
-            roomId: room.id,
-            periodStartDate,
-            roomPrice: Number(room.price || 0),
+            roomId: selectedRoom.value.id,
+            periodStartDate: genPeriodStartDate.value,
+            monthsCovered: genMonthsCovered.value,
+            roomPrice: Number(selectedRoom.value.price || 0),
         });
         toast.add({ title: 'Berhasil', description: 'Tagihan sewa berhasil dibuat', color: 'success' });
-        // Re-fetch bills for this room 
-        await openDetails(room);
+        showGenerateModal.value = false;
+        await openDetails(selectedRoom.value);
         await kosStore.fetchReminders();
+        await kosStore.fetchRentBills();
     } catch (err: any) {
         const msg = err?.data?.message || err?.message || 'Gagal membuat tagihan sewa';
         toast.add({ title: 'Error', description: msg, color: 'error' });
@@ -342,6 +520,8 @@ const sendWhatsApp = async (room: any) => {
         propertyName: room.property?.name,
         roomName: room.name,
         period: rentBill?.period || utilBill?.period || 'N/A',
+        rentPeriod: rentBill ? formatDateRange(rentBill.periodStartDate, rentBill.periodEndDate) : '',
+        utilityPeriod: utilBill ? formatPeriodMonth(utilBill.period) : '',
         occupantCount: room.occupantCount || 1,
         daysUntilDue: 0,
         rentAmount: rentTotal,
@@ -449,11 +629,11 @@ const refreshAll = async () => {
                             'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400': getRoomStatus(room.id).status === 'belum_lunas' && getRoomStatus(room.id).daysUntilDue !== null && getRoomStatus(room.id).daysUntilDue! < 0,
                             'bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400': getRoomStatus(room.id).status === 'belum_lunas' && (getRoomStatus(room.id).daysUntilDue === null || getRoomStatus(room.id).daysUntilDue! >= 0),
                             'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400': getRoomStatus(room.id).status === 'lunas',
-                            'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400': getRoomStatus(room.id).status === 'belum_ada',
+                                                        'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400': getRoomStatus(room.id).status === 'tidak_ada_tagihan_aktif',
                           }"
                         >
                             <UIcon 
-                              :name="getRoomStatus(room.id).status === 'lunas' ? 'i-heroicons-check-circle' : (getRoomStatus(room.id).status === 'belum_ada' ? 'i-heroicons-document-plus' : (getRoomStatus(room.id).daysUntilDue !== null && getRoomStatus(room.id).daysUntilDue! < 0 ? 'i-heroicons-exclamation-triangle' : 'i-heroicons-clock'))" 
+                                                            :name="getRoomStatus(room.id).status === 'lunas' ? 'i-heroicons-check-circle' : (getRoomStatus(room.id).status === 'tidak_ada_tagihan_aktif' ? 'i-heroicons-document-plus' : (getRoomStatus(room.id).daysUntilDue !== null && getRoomStatus(room.id).daysUntilDue! < 0 ? 'i-heroicons-exclamation-triangle' : 'i-heroicons-clock'))" 
                               class="w-5 h-5" 
                             />
                         </div>
@@ -486,9 +666,9 @@ const refreshAll = async () => {
                                  <UBadge v-else-if="getRoomStatus(room.id).status === 'lunas'" color="success" variant="subtle" size="xs">
                                     Lunas
                                  </UBadge>
-                                 <!-- Belum Ada Tagihan Badge -->
+                                            <!-- No Active Bill Badge -->
                                  <UBadge v-else color="neutral" variant="subtle" size="xs">
-                                    Belum Ada Tagihan
+                                                Tidak Ada Tagihan Aktif
                                  </UBadge>
                             </div>
                         </div>
@@ -550,7 +730,19 @@ const refreshAll = async () => {
                 <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="flex justify-between items-center px-4 py-2 bg-gray-100 dark:bg-gray-800">
                         <span class="text-xs font-bold uppercase text-gray-500 tracking-wide">Tagihan Sewa</span>
-                        <span v-if="roomRentBills.length > 0" class="text-xs text-gray-500">{{ formatPeriodMonth(roomRentBills[0].bill?.period) }}</span>
+                        <div class="flex items-center gap-2">
+                            <span v-if="roomRentBills.length > 0" class="text-xs text-gray-500">{{ formatPeriodMonth(roomRentBills[0].bill?.period) }}</span>
+                            <UButton 
+                                v-if="!isStaff"
+                                size="xs" 
+                                color="primary" 
+                                variant="soft"
+                                icon="i-heroicons-plus"
+                                @click="openGenerateModal"
+                            >
+                                Buat Tagihan Baru
+                            </UButton>
+                        </div>
                     </div>
                     
                     <template v-if="roomRentBills.length > 0">
@@ -587,19 +779,8 @@ const refreshAll = async () => {
                         </div>
                     </template>
                     <template v-else>
-                        <div class="p-4 flex items-center justify-between">
+                        <div class="p-4">
                             <span class="text-sm text-gray-500">Belum ada tagihan sewa</span>
-                            <UButton 
-                                v-if="!isStaff"
-                                size="xs" 
-                                color="primary" 
-                                variant="soft"
-                                icon="i-heroicons-plus"
-                                :loading="isGenerating"
-                                @click="generateRentBill"
-                            >
-                                Buat Tagihan
-                            </UButton>
                         </div>
                     </template>
                 </div>
@@ -697,6 +878,129 @@ const refreshAll = async () => {
             :loading="sendingWa === selectedRoom?.id"
             @click="sendWhatsApp(selectedRoom); close()" 
         />
+      </template>
+    </UModal>
+
+    <!-- Generate Bill Modal -->
+    <UModal :open="showGenerateModal" @close="showGenerateModal = false">
+      <template #content>
+        <UCard class="max-h-[90dvh] overflow-y-auto">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-semibold text-lg">Buat Tagihan Sewa</h3>
+                <p class="text-sm text-gray-500 mt-0.5" v-if="selectedRoom">
+                  {{ selectedRoom.tenantName || 'Penghuni' }} • {{ selectedRoom.name }}
+                </p>
+              </div>
+              <UButton variant="ghost" color="neutral" icon="i-heroicons-x-mark" @click="showGenerateModal = false" />
+            </div>
+          </template>
+
+          <div class="space-y-4 p-1">
+            <!-- Period Start -->
+            <UFormField label="Tanggal Mulai Periode" required>
+              <div class="flex gap-2 items-center">
+                <DatePicker
+                  v-model="genPeriodStartDate"
+                  granularity="day"
+                  class="flex-1"
+                  :is-date-unavailable="isDateUnavailable"
+                />
+                <UButton
+                  v-if="selectedRoom?.moveInDate"
+                  variant="soft"
+                  color="primary"
+                  size="sm"
+                  icon="i-heroicons-arrow-path"
+                  @click="setNextBillingCycle"
+                >
+                  Auto
+                </UButton>
+              </div>
+
+              <!-- MoveIn info -->
+              <div v-if="selectedRoom?.moveInDate" class="mt-2">
+                <p class="text-xs text-blue-600 dark:text-blue-400">
+                  <UIcon name="i-heroicons-calendar" class="w-3 h-3 inline" />
+                  Tanggal masuk:
+                                    {{ formatDisplayDate(selectedRoom.moveInDate) }}
+                </p>
+              </div>
+
+              <!-- Period preview -->
+              <div v-if="genPeriodStartDate && genPeriodEndDate" class="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                <p class="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                  <UIcon name="i-heroicons-calendar-days" class="w-4 h-4" />
+                  Periode: <strong>{{ formatDateRange(genPeriodStartDate, genPeriodEndDate) }}</strong>
+                </p>
+                <p class="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                                    Due Date: {{ formatDisplayDate(genDueDate) }}
+                </p>
+              </div>
+
+              <!-- Existing bills info -->
+              <div v-if="existingRentBillRanges.length > 0" class="mt-2">
+                <p class="text-xs text-gray-500">
+                  Periode terisi:
+                  <span class="font-mono font-semibold">{{ existingRentBillRanges.map(r => r.formatted).join('; ') }}</span>
+                </p>
+              </div>
+
+              <!-- Conflict warning -->
+              <div v-if="dateRangeConflict" class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                <p class="text-xs text-red-700 dark:text-red-400 flex items-center gap-1">
+                  <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4" />
+                  Konflik: Periode {{ dateRangeConflict }} sudah memiliki tagihan!
+                </p>
+              </div>
+            </UFormField>
+
+            <!-- Months Covered -->
+            <UFormField label="Jumlah Bulan">
+              <UInput type="number" v-model.number="genMonthsCovered" min="1" max="12" />
+            </UFormField>
+
+            <!-- Summary Card -->
+            <div v-if="selectedRoom" class="bg-primary-50 dark:bg-primary-900/20 p-4 rounded-lg border border-primary-200 dark:border-primary-800">
+              <div class="flex items-center gap-2 mb-3">
+                <UIcon name="i-heroicons-calculator" class="w-5 h-5 text-primary-500" />
+                <span class="font-semibold text-primary-700 dark:text-primary-300">Ringkasan Tagihan</span>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600 dark:text-gray-400">Harga per Bulan:</span>
+                  <span class="font-medium">{{ formatCurrency(selectedRoom.price) }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600 dark:text-gray-400">Durasi:</span>
+                  <span class="font-medium">{{ genMonthsCovered }} Bulan</span>
+                </div>
+                <div class="border-t border-primary-200 dark:border-primary-700 pt-2 mt-2">
+                  <div class="flex justify-between text-lg font-bold">
+                    <span>Total:</span>
+                    <span class="text-primary-600 dark:text-primary-400">{{ formatCurrency(Number(selectedRoom.price) * genMonthsCovered) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <UButton variant="outline" color="neutral" @click="showGenerateModal = false">Batal</UButton>
+              <UButton
+                @click="generateRentBill"
+                color="primary"
+                :disabled="!!dateRangeConflict"
+                :loading="isGenerating"
+                icon="i-heroicons-document-plus"
+              >
+                Buat Tagihan
+              </UButton>
+            </div>
+          </template>
+        </UCard>
       </template>
     </UModal>
   </div>
