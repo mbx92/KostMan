@@ -8,6 +8,15 @@ import { existsSync } from 'node:fs'
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
+const resolvePublicDir = () => {
+  const runtimePublicDir = join(process.cwd(), '.output', 'public')
+  if (existsSync(runtimePublicDir)) {
+    return runtimePublicDir
+  }
+
+  return join(process.cwd(), 'public')
+}
+
 /**
  * POST /api/bills/upload-proof/[token]
  * Upload payment proof for a bill (no auth required - public endpoint)
@@ -137,8 +146,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid token format' })
   }
 
-  // Save file to public/bills/proofs/
-  const proofsDir = join(process.cwd(), 'public', 'bills', 'proofs')
+  // In production Nuxt serves static assets from .output/public, while local dev uses public.
+  const proofsDir = join(resolvePublicDir(), 'bills', 'proofs')
   if (!existsSync(proofsDir)) {
     await mkdir(proofsDir, { recursive: true })
   }
