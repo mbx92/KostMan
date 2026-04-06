@@ -4,18 +4,10 @@ import { eq, and } from 'drizzle-orm'
 import { writeFile, mkdir } from 'node:fs/promises'
 import { join, extname } from 'node:path'
 import { existsSync } from 'node:fs'
+import { resolveWritableProofsDir } from '../../../utils/payment-proof-storage'
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-
-const resolvePublicDir = () => {
-  const runtimePublicDir = join(process.cwd(), '.output', 'public')
-  if (existsSync(runtimePublicDir)) {
-    return runtimePublicDir
-  }
-
-  return join(process.cwd(), 'public')
-}
 
 /**
  * POST /api/bills/upload-proof/[token]
@@ -146,8 +138,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid token format' })
   }
 
-  // In production Nuxt serves static assets from .output/public, while local dev uses public.
-  const proofsDir = join(resolvePublicDir(), 'bills', 'proofs')
+  const proofsDir = resolveWritableProofsDir()
   if (!existsSync(proofsDir)) {
     await mkdir(proofsDir, { recursive: true })
   }
