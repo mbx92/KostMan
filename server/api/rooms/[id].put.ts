@@ -4,6 +4,7 @@ import { db } from '../../utils/drizzle';
 import { rooms, properties, rentBills, roomSettings } from '../../database/schema';
 import { roomSchema } from '../../validations/room';
 import { eq, and, ne } from 'drizzle-orm';
+import { syncUnpaidUtilityBillsForRoom } from '../../services/utilityBillService';
 
 export default defineEventHandler(async (event) => {
     // 1. Get Room ID
@@ -41,6 +42,16 @@ export default defineEventHandler(async (event) => {
 
     const { property, room } = currentRoomResult[0];
     const { overrideSettings, costPerKwh, waterFee, trashFee, ...roomUpdates } = input;
+    const effectiveTenantId = roomUpdates.tenantId !== undefined ? roomUpdates.tenantId : room.tenantId;
+    const sameTenantContinues = !!room.tenantId && effectiveTenantId === room.tenantId;
+    const shouldSyncUtilityBills = sameTenantContinues && (
+        input.occupantCount !== undefined ||
+        input.useTrashService !== undefined ||
+        overrideSettings !== undefined ||
+        costPerKwh !== undefined ||
+        waterFee !== undefined ||
+        trashFee !== undefined
+    );
 
     if (user.role !== Role.ADMIN) {
         if (property.userId !== user.id) {
@@ -92,6 +103,10 @@ export default defineEventHandler(async (event) => {
             await tx.delete(roomSettings).where(eq(roomSettings.roomId, id));
         }
 
+        if (shouldSyncUtilityBills) {
+            await syncUnpaidUtilityBillsForRoom(id, user, tx);
+        }
+
         return updated;
     });
 
@@ -99,8 +114,7 @@ export default defineEventHandler(async (event) => {
     //   - Room has a tenant (existing or newly assigned)
     //   - Room has a moveInDate (existing or newly set/changed)
     //   - No overlapping bill exists (checked below, prevents duplicates)
-    const effectiveMoveInDate = roomUpdates.moveInDate ?? room.moveInDate;
-    const effectiveTenantId = roomUpdates.tenantId ?? room.tenantId;
+    const effectiveMoveInDate = roomUpdates.moveInDate !== undefined ? roomUpdates.moveInDate : room.moveInDate;
     const effectivePrice = roomUpdates.price ?? Number(room.price);
 
     // Trigger: has tenant + has moveInDate (any of these changed or already existed)

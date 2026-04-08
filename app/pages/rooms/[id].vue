@@ -208,7 +208,8 @@ const updateRoomStatus = async () => {
     
     // Reload room to get updated data
     await loadRoom()
-    
+    await store.fetchUtilityBills({ roomId: roomId.value })
+
     toast.add({ title: 'Kamar Diperbarui', description: 'Pengaturan kamar telah disimpan.', color: 'success' })
   } catch (err: any) {
     toast.add({

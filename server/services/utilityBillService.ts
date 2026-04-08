@@ -318,3 +318,55 @@ export async function updateUtilityBill(id: string, input: UtilityBillInput, use
 
     return result[0];
 }
+
+/**
+ * Recalculate all unpaid utility bills for a room using the latest room settings.
+ * This keeps water/trash/electricity totals in sync when occupant count or utility
+ * configuration changes after bills have been generated.
+ */
+export async function syncUnpaidUtilityBillsForRoom(roomId: string, user: UtilityBillUser, tx?: DbClient) {
+    const client = tx || db;
+    const roomData = await verifyRoomExists(roomId, client);
+
+    await verifyRoomOwnership(roomData, user, client);
+
+    if (!roomData.tenantId) {
+        return [];
+    }
+
+    const resolvedSettings = await resolveRoomUtilitySettings(roomId, client);
+    const trashFee = roomData.useTrashService ? resolvedSettings.trashFee : 0;
+    const unpaidBills = await client.select()
+        .from(utilityBills)
+        .where(and(
+            eq(utilityBills.roomId, roomId),
+            eq(utilityBills.isPaid, false),
+        ));
+
+    const updatedBills = [];
+
+    for (const bill of unpaidBills) {
+        const { usageCost, adjustedWaterFee, totalAmount } = calculateUtilityBillCosts({
+            roomId,
+            period: bill.period,
+            meterStart: bill.meterStart,
+            meterEnd: bill.meterEnd,
+            costPerKwh: resolvedSettings.costPerKwh,
+            waterFee: resolvedSettings.waterFee,
+            trashFee,
+            additionalCost: Number(bill.additionalCost || 0),
+        }, roomData.occupantCount || 1);
+
+        const result = await client.update(utilityBills).set({
+            costPerKwh: resolvedSettings.costPerKwh.toString(),
+            usageCost: usageCost.toString(),
+            waterFee: adjustedWaterFee.toString(),
+            trashFee: trashFee.toString(),
+            totalAmount: totalAmount.toString(),
+        }).where(eq(utilityBills.id, bill.id)).returning();
+
+        updatedBills.push(result[0]);
+    }
+
+    return updatedBills;
+}
