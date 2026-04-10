@@ -4,7 +4,7 @@ import { tenants } from '../../database/schema';
 import { tenantSchema } from '../../validations/tenant';
 
 export default defineEventHandler(async (event) => {
-    requireRole(event, [Role.ADMIN, Role.OWNER]);
+    requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
 
     const body = await readBody(event);
     const validatedData = tenantSchema.parse(body);

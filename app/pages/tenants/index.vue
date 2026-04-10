@@ -155,7 +155,7 @@ const confirmDelete = async () => {
   deleteLoading.value = true
   try {
     await store.deleteTenant(deleteTenant.value.id)
-    toast.add({ title: 'Penghuni Dihapus', color: 'success' })
+    toast.add({ title: 'Penghuni Dinonaktifkan', color: 'success' })
     isDeleteModalOpen.value = false
     loadTenants()
   } catch (err: any) {
@@ -439,20 +439,20 @@ const onModalClose = () => {
                 <UIcon name="i-heroicons-trash" class="w-6 h-6 text-error-500" />
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Hapus Penghuni</h3>
-                <p class="text-sm text-gray-500">Konfirmasi penghapusan data</p>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Nonaktifkan Penghuni</h3>
+                <p class="text-sm text-gray-500">Konfirmasi perubahan status penghuni</p>
               </div>
             </div>
           </template>
           
           <div class="space-y-4">
             <p class="text-gray-600 dark:text-gray-300">
-              Apakah Anda yakin ingin menghapus <strong>{{ deleteTenant?.name }}</strong>?
+              Apakah Anda yakin ingin menonaktifkan <strong>{{ deleteTenant?.name }}</strong>?
             </p>
             <div class="p-3 bg-error-50 dark:bg-error-900/20 rounded-lg border border-error-200 dark:border-error-800">
               <p class="text-sm text-error-600 dark:text-error-400">
                 <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4 inline mr-1" />
-                Tindakan ini tidak dapat dibatalkan. Semua data penghuni akan dihapus permanen.
+                Penghuni akan disembunyikan dari daftar aktif dan statusnya diubah menjadi tidak aktif.
               </p>
             </div>
           </div>
@@ -464,7 +464,7 @@ const onModalClose = () => {
               </UButton>
               <UButton color="error" @click="confirmDelete" :loading="deleteLoading">
                 <UIcon name="i-heroicons-trash" class="w-4 h-4 mr-1" />
-                Hapus
+                Nonaktifkan
               </UButton>
             </div>
           </template>

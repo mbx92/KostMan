@@ -3,6 +3,7 @@
  * 
  * Restricts staff role to only access allowed pages:
  * - Dashboard (/)
+ * - Tenants (/tenants)
  * - Meter Readings (/meter-readings)
  * - Reminders (/reminders)
  * - Account (/account, /my-profile)
@@ -30,7 +31,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     // Check if user is staff
     if (user.role === 'staff') {
       // Allowed paths for staff
-      const allowedPaths = ['/', '/meter-readings', '/reminders', '/account', '/my-profile']
+      const allowedPaths = ['/', '/tenants', '/meter-readings', '/reminders', '/account', '/my-profile']
 
       // Check if current path is allowed
       const isAllowed = allowedPaths.some(path =>

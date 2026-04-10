@@ -386,6 +386,45 @@ docker logs traefik -f
 
 ---
 
+### Coolify Tidak Bisa Akses GitHub
+
+**Masalah**: Deployment gagal sebelum build dimulai, dengan error seperti:
+
+```bash
+fatal: unable to access 'https://github.com/mbx92/KostMan/': Could not resolve host: github.com
+```
+
+**Penyebab**: Container helper Coolify tidak bisa melakukan DNS resolve ke `github.com`. Ini biasanya masalah DNS / outbound network di host Docker, bukan masalah pada aplikasi KostMan.
+
+**Solusi**:
+1. Verifikasi DNS dari host server:
+   ```bash
+   getent hosts github.com
+   nslookup github.com
+   curl -I https://github.com
+   ```
+2. Verifikasi DNS dari network Docker / Coolify:
+   ```bash
+   docker run --rm --network coolify alpine:3.20 sh -c "apk add --no-cache bind-tools curl >/dev/null && nslookup github.com && curl -I https://github.com"
+   ```
+3. Jika host bisa resolve tapi container tidak, set DNS Docker secara eksplisit di `/etc/docker/daemon.json`:
+   ```json
+   {
+     "dns": ["1.1.1.1", "8.8.8.8"]
+   }
+   ```
+4. Restart Docker dan container Coolify:
+   ```bash
+   sudo systemctl restart docker
+   docker ps --format '{{.Names}}' | grep coolify
+   docker restart coolify
+   ```
+5. Jika masih gagal, cek firewall / outbound policy server. Pastikan traffic keluar ke DNS (`53/tcp`, `53/udp`) dan HTTPS (`443/tcp`) tidak diblokir.
+
+**Catatan**: Error ini terjadi sebelum `Dockerfile` project dijalankan, jadi perubahan aplikasi tidak akan memperbaikinya sampai konektivitas server ke GitHub normal.
+
+---
+
 ### Aplikasi Tidak Bisa Koneksi ke Database
 
 **Masalah**: `DATABASE_URL` salah atau container tidak bisa saling komunikasi.

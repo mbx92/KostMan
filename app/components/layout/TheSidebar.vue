@@ -141,6 +141,11 @@ const staffNavigation: NavItem[] = [
     icon: 'i-heroicons-building-office-2',
     children: [
       {
+        label: 'Penghuni',
+        icon: 'i-heroicons-users',
+        to: '/tenants'
+      },
+      {
         label: 'Catat Meter',
         icon: 'i-heroicons-bolt',
         to: '/meter-readings'

@@ -4,7 +4,7 @@ import { tenants } from '../../database/schema';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
-    requireRole(event, [Role.ADMIN, Role.OWNER]);
+    requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF]);
     const id = getRouterParam(event, 'id');
 
     if (!id) {

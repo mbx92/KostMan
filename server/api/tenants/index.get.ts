@@ -17,9 +17,11 @@ export default defineEventHandler(async (event) => {
     // Build where conditions
     const conditions = [];
 
-    // Status filter
+    // Default tenant listing to active only; inactive tenants remain accessible via explicit filter.
     if (status && (status === 'active' || status === 'inactive')) {
         conditions.push(eq(tenants.status, status));
+    } else {
+        conditions.push(eq(tenants.status, 'active'));
     }
 
     // Search filter (name, contact, idCardNumber)
