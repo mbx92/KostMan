@@ -10,6 +10,7 @@ interface BillingData {
   propertyName: string
   roomName: string
   period: string
+  customPeriodLabel?: string
   rentPeriod?: string
   utilityPeriod?: string
   occupantCount?: number
@@ -35,6 +36,7 @@ interface BillingData {
   
   // Invoice link (auto-generated)
   invoiceUrl?: string
+  customDetailSection?: string
 }
 
 export function useWhatsAppTemplate() {
@@ -71,6 +73,10 @@ export function useWhatsAppTemplate() {
    * Build billing detail section that gets auto-injected
    */
   function buildDetailSection(data: BillingData): string {
+    if (data.customDetailSection) {
+      return data.customDetailSection
+    }
+
     const formattedPeriod = formatPeriod(data.period)
     const formattedRentPeriod = formatPeriodLabel(data.rentPeriod)
     const formattedUtilityPeriod = formatPeriodLabel(data.utilityPeriod)
@@ -165,7 +171,7 @@ export function useWhatsAppTemplate() {
   function buildMessage(templateMessage: string, data: BillingData): string {
     const detailSection = buildDetailSection(data)
     const linkSection = buildLinkSection(data.invoiceUrl)
-    const formattedPeriod = formatPeriod(data.period)
+    const formattedPeriod = data.customPeriodLabel || formatPeriod(data.period)
     const formattedRentPeriod = formatPeriodLabel(data.rentPeriod)
     const formattedUtilityPeriod = formatPeriodLabel(data.utilityPeriod)
     

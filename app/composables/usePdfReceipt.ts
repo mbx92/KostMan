@@ -7,7 +7,43 @@ export const usePdfReceipt = () => {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(val))
     }
 
-    const _createDoc = (property: Property, room: Room, tenant: Tenant | null, title: string, billNo: string, date: Date | string, isPaid: boolean) => {
+    const formatPeriod = (period?: string | null) => {
+        if (!period) return '-'
+
+        const match = period.match(/^(\d{4})-(\d{2})$/)
+        if (!match) return period
+
+        const [, year, month] = match
+        const date = new Date(Number(year), Number(month) - 1, 1)
+
+        if (Number.isNaN(date.getTime())) return period
+
+        return new Intl.DateTimeFormat('id-ID', {
+            month: 'long',
+            year: 'numeric'
+        }).format(date)
+    }
+
+    const formatDateRange = (start?: string | null, end?: string | null) => {
+        if (!start || !end) return '-'
+
+        const startDate = new Date(start)
+        const endDate = new Date(end)
+
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+            return `${start} - ${end}`
+        }
+
+        const opts: Intl.DateTimeFormatOptions = {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        }
+
+        return `${startDate.toLocaleDateString('id-ID', opts)} - ${endDate.toLocaleDateString('id-ID', opts)}`
+    }
+
+    const _createDoc = (property: Property, room: Room, tenant: Tenant | null, title: string, billNo: string, date: Date | string, isPaid: boolean, periodLabel?: string) => {
         const doc = new jsPDF()
         
         // --- Header ---
@@ -33,10 +69,13 @@ export const usePdfReceipt = () => {
         doc.setTextColor(100)
         doc.text(`No: ${billNo.slice(0, 8).toUpperCase()}`, pageWidth - 14, 21, { align: 'right' })
         doc.text(`Date: ${new Date(date).toLocaleDateString('id-ID')}`, pageWidth - 14, 26, { align: 'right' })
+        if (periodLabel) {
+            doc.text(`Periode: ${periodLabel}`, pageWidth - 14, 31, { align: 'right' })
+        }
         
         const status = isPaid ? 'PAID' : 'UNPAID'
         doc.setTextColor(isPaid ? 'green' : 'red')
-        doc.text(status, pageWidth - 14, 31, { align: 'right' })
+        doc.text(status, pageWidth - 14, periodLabel ? 36 : 31, { align: 'right' })
 
         return doc
     }
@@ -62,7 +101,8 @@ export const usePdfReceipt = () => {
             throw new Error('Data tidak lengkap untuk membuat receipt')
         }
         
-        const doc = _createDoc(property, room, tenant, bill.isPaid ? 'RENT RECEIPT' : 'RENT INVOICE', bill.id, bill.generatedAt, bill.isPaid)
+        const rentPeriodLabel = formatDateRange(bill.periodStartDate, bill.periodEndDate)
+        const doc = _createDoc(property, room, tenant, bill.isPaid ? 'RENT RECEIPT' : 'RENT INVOICE', bill.id, bill.generatedAt, bill.isPaid, rentPeriodLabel)
 
         const tableBody = [
             ['Description', 'Detail', 'Amount'],
@@ -70,7 +110,7 @@ export const usePdfReceipt = () => {
         ]
 
         autoTable(doc, {
-            startY: 40,
+            startY: 45,
             head: [['Item', 'Description', 'Total']],
             body: tableBody,
             foot: [['TOTAL', '', formatCurrency(bill.totalAmount)]],
@@ -89,7 +129,8 @@ export const usePdfReceipt = () => {
             throw new Error('Data tidak lengkap untuk membuat receipt')
         }
         
-        const doc = _createDoc(property, room, tenant, bill.isPaid ? 'UTILITY RECEIPT' : 'UTILITY INVOICE', bill.id, bill.generatedAt, bill.isPaid)
+        const utilityPeriodLabel = formatPeriod(bill.period)
+        const doc = _createDoc(property, room, tenant, bill.isPaid ? 'UTILITY RECEIPT' : 'UTILITY INVOICE', bill.id, bill.generatedAt, bill.isPaid, utilityPeriodLabel)
 
         const tableBody = [
             ['Electricity', `${bill.meterStart} -> ${bill.meterEnd} (${bill.meterEnd - bill.meterStart} kWh @ ${bill.costPerKwh})`, formatCurrency(bill.usageCost)],
@@ -104,7 +145,7 @@ export const usePdfReceipt = () => {
         }
 
         autoTable(doc, {
-            startY: 40,
+            startY: 45,
             head: [['Item', 'Description', 'Amount']],
             body: tableBody,
             foot: [['TOTAL', '', formatCurrency(bill.totalAmount)]],
@@ -136,14 +177,18 @@ export const usePdfReceipt = () => {
         // Simplified title logic
         let title = isFullyPaid ? 'PAYMENT RECEIPT' : 'INVOICE'
 
-        const doc = _createDoc(property, room, tenant, title, mainBill.id, mainBill.generatedAt, isFullyPaid)
+        const combinedPeriodLabel = rentBill
+            ? formatDateRange(rentBill.periodStartDate, rentBill.periodEndDate)
+            : formatPeriod(utilBill?.period)
+
+        const doc = _createDoc(property, room, tenant, title, mainBill.id, mainBill.generatedAt, isFullyPaid, combinedPeriodLabel)
 
         // Override status for better clarity
         if (hasUnpaid) {
             const pageWidth = doc.internal.pageSize.width
             doc.setFontSize(10)
             doc.setTextColor(220, 53, 69) // Red
-            doc.text('UNPAID', pageWidth - 14, 31, { align: 'right' })
+            doc.text('UNPAID', pageWidth - 14, 36, { align: 'right' })
         }
 
         const tableBody: any[] = []
@@ -172,7 +217,7 @@ export const usePdfReceipt = () => {
         const grandTotal = totalRent + totalUtil
 
         autoTable(doc, {
-            startY: 40,
+            startY: 45,
             head: [['Item', 'Description', 'Amount']],
             body: tableBody,
             foot: [['GRAND TOTAL', '', formatCurrency(grandTotal)]],

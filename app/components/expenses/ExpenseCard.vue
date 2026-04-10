@@ -4,6 +4,7 @@ interface Props {
   formatCurrency: (value: number | string) => string
   formatDate: (date: string) => string
   getCategoryColor: (category: string) => string
+  showActions?: boolean
 }
 
 const props = defineProps<Props>()
@@ -100,7 +101,7 @@ const statusLabel = computed(() => {
       </div>
 
       <!-- Actions -->
-      <div class="p-3 flex flex-wrap gap-2 border-t border-gray-100 dark:border-gray-800">
+      <div v-if="showActions !== false" class="p-3 flex flex-wrap gap-2 border-t border-gray-100 dark:border-gray-800">
          <UButton
            size="sm"
            color="neutral"

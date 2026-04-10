@@ -18,7 +18,7 @@ const appConfig = useAppConfig()
 const route = useRoute()
 
 // Fetch current user
-const { data: authData } = await useAuthFetch('/api/auth/me')
+const { data: authData } = await useAuthFetch<{ user?: { role?: string } }>('/api/auth/me')
 const currentUser = computed(() => authData.value?.user)
 
 interface NavItem {
@@ -69,6 +69,11 @@ const defaultNavigation: NavItem[] = [
         label: 'Kelola Tagihan',
         icon: 'i-heroicons-calculator',
         to: '/billing'
+      },
+      {
+        label: 'Reopen Tagihan',
+        icon: 'i-heroicons-arrow-uturn-left',
+        to: '/billing/reopen'
       },
       {
         label: 'Konfirmasi Pembayaran',
@@ -160,6 +165,11 @@ const staffNavigation: NavItem[] = [
         label: 'Pengingat',
         icon: 'i-heroicons-bell-alert',
         to: '/reminders'
+      },
+      {
+        label: 'Pengeluaran',
+        icon: 'i-heroicons-receipt-percent',
+        to: '/expenses'
       }
     ]
   },
@@ -226,6 +236,11 @@ const isExpanded = (label: string) => expandedItems.value.has(label)
 
 const isActive = (to: string | undefined) => {
   if (!to) return false
+
+  if (to === '/billing') {
+    return route.path === '/billing'
+  }
+
   return route.path === to || route.path.startsWith(to + '/')
 }
 

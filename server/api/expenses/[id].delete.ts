@@ -11,6 +11,13 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    if (user.role === 'staff') {
+        throw createError({
+            statusCode: 403,
+            message: 'Staff tidak diizinkan menghapus pengeluaran',
+        });
+    }
+
     const id = getRouterParam(event, "id");
     if (!id) {
         throw createError({

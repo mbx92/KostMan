@@ -3,6 +3,8 @@ import ConfirmDialog from "~/components/ConfirmDialog.vue";
 
 const toast = useToast()
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
+const { data: authData } = await useAuthFetch('/api/auth/me')
+const isStaff = computed(() => authData.value?.user?.role === 'staff')
 
 // Modals
 const expenseModalOpen = ref(false)
@@ -184,10 +186,13 @@ const onExpenseSaved = async () => {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Pengeluaran</h1>
-        <p class="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-1">Pantau dan kelola pengeluaran bisnis Anda</p>
+        <p class="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-1">
+          {{ isStaff ? 'Input pengeluaran dan pantau daftar pengeluaran yang sudah tercatat' : 'Pantau dan kelola pengeluaran bisnis Anda' }}
+        </p>
       </div>
       <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <UButton
+          v-if="!isStaff"
           label="Kelola Kategori"
           icon="i-heroicons-tag"
           color="neutral"
@@ -310,17 +315,17 @@ const onExpenseSaved = async () => {
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Properti</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jumlah</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
+              <th v-if="!isStaff" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             <tr v-if="expensesLoading">
-              <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+              <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
                 <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto" />
               </td>
             </tr>
             <tr v-else-if="filteredExpenses.length === 0">
-              <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+              <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
                 Tidak ada pengeluaran ditemukan
               </td>
             </tr>
@@ -355,7 +360,7 @@ const onExpenseSaved = async () => {
                   Belum Dibayar
                 </span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <td v-if="!isStaff" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end gap-2">
                   <UButton 
                     icon="i-heroicons-pencil" 
@@ -405,6 +410,7 @@ const onExpenseSaved = async () => {
         :format-currency="formatCurrency"
         :format-date="formatDate"
         :get-category-color="getCategoryColor"
+        :show-actions="!isStaff"
         @edit="openEditExpense"
         @mark-paid="markAsPaid"
         @delete="deleteExpense"

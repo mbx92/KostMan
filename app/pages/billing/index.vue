@@ -442,6 +442,59 @@ interface CombinedBillItem {
   util?: UtilityBill;
 }
 
+const summaryDetailsOpen = ref(false);
+const selectedSummaryItem = ref<CombinedBillItem | null>(null);
+
+const selectedSummaryRoom = computed(() => {
+  const item = selectedSummaryItem.value;
+  if (!item) return null;
+
+  return (
+    item.rent?.room ||
+    item.util?.room ||
+    rooms.value.find((room) => room.id === item.roomId) ||
+    null
+  );
+});
+
+const selectedSummaryProperty = computed(() => {
+  const item = selectedSummaryItem.value;
+  const room = selectedSummaryRoom.value;
+  if (!item) return null;
+
+  return (
+    item.rent?.property ||
+    item.util?.property ||
+    properties.value.find((property) => property.id === room?.propertyId) ||
+    null
+  );
+});
+
+const selectedSummaryTenant = computed(() => {
+  const item = selectedSummaryItem.value;
+  const room = selectedSummaryRoom.value;
+  if (!item) return null;
+
+  return (
+    item.rent?.tenant ||
+    item.util?.tenant ||
+    tenants.value.find((tenant) => tenant.id === room?.tenantId) ||
+    null
+  );
+});
+
+const selectedSummaryTotal = computed(() => {
+  if (!selectedSummaryItem.value) return 0;
+
+  return Number(selectedSummaryItem.value.rent?.totalAmount || 0) +
+    Number(selectedSummaryItem.value.util?.totalAmount || 0);
+});
+
+const openSummaryDetailsModal = (item: CombinedBillItem) => {
+  selectedSummaryItem.value = item;
+  summaryDetailsOpen.value = true;
+};
+
 const summaryColumns: TableColumn<CombinedBillItem>[] = [
   {
     accessorKey: "period",
@@ -1167,7 +1220,7 @@ const sendToWhatsApp = async (item: {
       description: "Data kamar tidak ditemukan",
       color: "error",
     });
-    return;
+    return false;
   }
 
   if (!tenant || !tenant.contact) {
@@ -1176,7 +1229,7 @@ const sendToWhatsApp = async (item: {
       description: "Nomor kontak penghuni tidak tersedia",
       color: "error",
     });
-    return;
+    return false;
   }
 
   const pendingTab = prepareWhatsAppTab();
@@ -1222,63 +1275,83 @@ const sendToWhatsApp = async (item: {
       description: e?.data?.message || "Gagal generate link",
       color: "error",
     });
-    sendingWa.value = false;
-    return;
+    return false;
   }
 
-  // Get template from database
-  const template = await getDefaultTemplate("billing");
+  try {
+    // Get template from database
+    const template = await getDefaultTemplate("billing");
 
-  // Build billing data for template
-  const totalRent = item.rent ? Number(item.rent.totalAmount) : 0;
-  const totalUtil = item.util ? Number(item.util.totalAmount) : 0;
-  const grandTotal = totalRent + totalUtil;
+    // Build billing data for template
+    const totalRent = item.rent ? Number(item.rent.totalAmount) : 0;
+    const totalUtil = item.util ? Number(item.util.totalAmount) : 0;
+    const grandTotal = totalRent + totalUtil;
 
-  const billingData = {
-    tenantName: tenant.name,
-    propertyName: propFallback.name,
-    roomName: roomFallback.name,
-    period: formatBillingPeriod(item.period),
-    rentPeriod: item.rent
-      ? formatDateRange(item.rent.periodStartDate, item.rent.periodEndDate)
-      : "",
-    utilityPeriod: item.util ? formatBillingPeriod(item.util.period) : "",
-    occupantCount: roomFallback.occupantCount || 1,
+    const billingData = {
+      tenantName: tenant.name,
+      propertyName: propFallback.name,
+      roomName: roomFallback.name,
+      period: formatBillingPeriod(item.period),
+      rentPeriod: item.rent
+        ? formatDateRange(item.rent.periodStartDate, item.rent.periodEndDate)
+        : "",
+      utilityPeriod: item.util ? formatBillingPeriod(item.util.period) : "",
+      occupantCount: roomFallback.occupantCount || 1,
 
-    // Rent details
-    rentAmount: totalRent,
-    monthsCovered: item.rent?.monthsCovered || 1,
-    roomPrice: item.rent?.roomPrice || 0,
-    isRentPaid: item.rent?.isPaid || false,
+      // Rent details
+      rentAmount: totalRent,
+      monthsCovered: item.rent?.monthsCovered || 1,
+      roomPrice: item.rent?.roomPrice || 0,
+      isRentPaid: item.rent?.isPaid || false,
 
-    // Utility details
-    meterStart: item.util?.meterStart,
-    meterEnd: item.util?.meterEnd,
-    usageCost: item.util?.usageCost || 0,
-    waterFee: item.util?.waterFee || 0,
-    trashFee: item.util?.trashFee || 0,
-    utilityTotal: totalUtil,
-    isUtilityPaid: item.util?.isPaid || false,
+      // Utility details
+      meterStart: item.util?.meterStart,
+      meterEnd: item.util?.meterEnd,
+      usageCost: item.util?.usageCost || 0,
+      waterFee: item.util?.waterFee || 0,
+      trashFee: item.util?.trashFee || 0,
+      utilityTotal: totalUtil,
+      isUtilityPaid: item.util?.isPaid || false,
 
-    // Grand total
-    grandTotal: grandTotal,
+      // Grand total
+      grandTotal: grandTotal,
 
-    // Invoice link
-    invoiceUrl: invoiceUrl,
-  };
+      // Invoice link
+      invoiceUrl: invoiceUrl,
+    };
 
-  // Build message using template
-  const message = buildMessage(template.message, billingData);
+    // Build message using template
+    const message = buildMessage(template.message, billingData);
 
-  sendingWa.value = false;
+    const opened = openWhatsApp(tenant.contact, message, pendingTab);
+    if (!opened) {
+      toast.add({
+        title: "Popup Diblokir",
+        description: "Browser memblokir tab WhatsApp baru. Izinkan pop-up untuk situs ini lalu coba lagi.",
+        color: "warning",
+      });
+    }
 
-  const opened = openWhatsApp(tenant.contact, message, pendingTab);
-  if (!opened) {
+    return true;
+  } catch (e: any) {
+    closePreparedTab(pendingTab);
     toast.add({
-      title: "Popup Diblokir",
-      description: "Browser memblokir tab WhatsApp baru. Izinkan pop-up untuk situs ini lalu coba lagi.",
-      color: "warning",
+      title: "Error",
+      description: e?.data?.message || e?.message || "Gagal menyiapkan pesan WhatsApp",
+      color: "error",
     });
+    return false;
+  } finally {
+    sendingWa.value = false;
+  }
+};
+
+const sendSelectedSummaryToWhatsApp = async () => {
+  if (!selectedSummaryItem.value) return;
+
+  const success = await sendToWhatsApp(selectedSummaryItem.value);
+  if (success) {
+    summaryDetailsOpen.value = false;
   }
 };
 
@@ -1443,6 +1516,14 @@ const sendReminder = async (reminder: any) => {
           Kelola tagihan sewa dan utilitas.
         </p>
       </div>
+      <UButton
+        to="/billing/reopen"
+        color="warning"
+        variant="soft"
+        icon="i-heroicons-arrow-uturn-left"
+      >
+        Reopen Tagihan
+      </UButton>
       <UButton
         @click="isGenerating = !isGenerating"
         color="primary"
@@ -2197,7 +2278,7 @@ const sendReminder = async (reminder: any) => {
           :key="`${item.roomId}-${item.period}`"
           :item="item"
           :format-currency="formatCurrency"
-          @send-whats-app="sendToWhatsApp"
+          @send-whats-app="openSummaryDetailsModal"
           @print="printCombined"
         />
 
@@ -2420,7 +2501,7 @@ const sendReminder = async (reminder: any) => {
                   size="xs"
                   class="bg-[#25D366] hover:bg-[#128C7E] text-white"
                   icon="i-simple-icons-whatsapp"
-                  @click="sendToWhatsApp(row.original)"
+                  @click="openSummaryDetailsModal(row.original)"
               /></UTooltip>
               <UTooltip text="Cetak Laporan">
                 <UButton
@@ -2467,6 +2548,185 @@ const sendReminder = async (reminder: any) => {
       </div>
     </UCard>
   </div>
+
+  <UModal
+    v-model:open="summaryDetailsOpen"
+    title="Detail Tagihan"
+    :description="selectedSummaryRoom ? `${selectedSummaryTenant?.name || selectedSummaryRoom.tenantName || 'Penghuni'} • ${selectedSummaryRoom.name}` : ''"
+    :ui="{ footer: 'justify-end' }"
+  >
+    <template #body>
+      <div v-if="selectedSummaryItem" class="space-y-4">
+        <div class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/50">
+          <UAvatar
+            :alt="selectedSummaryTenant?.name || selectedSummaryRoom?.tenantName || 'P'"
+            size="md"
+            class="shrink-0 bg-primary-100 text-primary-600 ring-2 ring-white dark:ring-gray-900"
+          />
+          <div class="min-w-0">
+            <div class="font-semibold text-gray-900 dark:text-white">
+              {{ selectedSummaryTenant?.name || selectedSummaryRoom?.tenantName || 'Penghuni' }}
+            </div>
+            <div class="flex flex-wrap items-center gap-1 text-sm text-gray-500">
+              <UIcon name="i-heroicons-building-office-2" class="h-3.5 w-3.5 shrink-0" />
+              <span>{{ selectedSummaryProperty?.name || 'Properti' }}</span>
+              <span class="text-gray-300 dark:text-gray-600">•</span>
+              <UIcon name="i-heroicons-home" class="h-3.5 w-3.5 shrink-0" />
+              <span>{{ selectedSummaryRoom?.name || '-' }}</span>
+              <span class="text-gray-300 dark:text-gray-600">•</span>
+              <UIcon name="i-heroicons-users" class="h-3.5 w-3.5 shrink-0" />
+              <span>{{ selectedSummaryRoom?.occupantCount || 1 }} orang</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+          <div class="flex items-center justify-between bg-gray-100 px-4 py-2 dark:bg-gray-800">
+            <span class="text-xs font-bold uppercase tracking-wide text-gray-500">Tagihan Sewa</span>
+            <span v-if="selectedSummaryItem.rent" class="text-xs text-gray-500">
+              {{ formatDateRange(selectedSummaryItem.rent.periodStartDate, selectedSummaryItem.rent.periodEndDate) }}
+            </span>
+          </div>
+
+          <template v-if="selectedSummaryItem.rent">
+            <div class="space-y-2 p-4 text-sm">
+              <div class="flex justify-between text-gray-700 dark:text-gray-300">
+                <span>
+                  Sewa Kamar
+                  <span v-if="selectedSummaryItem.rent.monthsCovered > 1" class="text-gray-500">
+                    ({{ selectedSummaryItem.rent.monthsCovered }} bulan)
+                  </span>
+                </span>
+                <span class="font-medium">{{ formatCurrency(selectedSummaryItem.rent.roomPrice || selectedSummaryItem.rent.totalAmount) }}</span>
+              </div>
+              <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold dark:border-gray-700">
+                <span class="text-gray-900 dark:text-white">Total Sewa</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-900 dark:text-white">{{ formatCurrency(selectedSummaryItem.rent.totalAmount) }}</span>
+                  <UBadge
+                    :color="selectedSummaryItem.rent.isPaid ? 'success' : (selectedSummaryItem.rent.paidAmount && Number(selectedSummaryItem.rent.paidAmount) > 0 ? 'warning' : 'error')"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    {{ selectedSummaryItem.rent.isPaid ? 'Lunas' : (selectedSummaryItem.rent.paidAmount && Number(selectedSummaryItem.rent.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                  </UBadge>
+                </div>
+              </div>
+              <div
+                v-if="!selectedSummaryItem.rent.isPaid && Number(selectedSummaryItem.rent.paidAmount) > 0"
+                class="space-y-0.5 text-xs text-gray-500"
+              >
+                <div class="flex justify-between text-green-600 dark:text-green-400">
+                  <span>Sudah dibayar</span>
+                  <span>{{ formatCurrency(selectedSummaryItem.rent.paidAmount) }}</span>
+                </div>
+                <div class="flex justify-between font-medium text-red-600 dark:text-red-400">
+                  <span>Sisa</span>
+                  <span>{{ formatCurrency(Number(selectedSummaryItem.rent.totalAmount) - Number(selectedSummaryItem.rent.paidAmount || 0)) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="p-4">
+              <span class="text-sm text-gray-500">Tidak ada tagihan sewa pada periode ini.</span>
+            </div>
+          </template>
+        </div>
+
+        <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+          <div class="flex items-center justify-between bg-gray-100 px-4 py-2 dark:bg-gray-800">
+            <span class="text-xs font-bold uppercase tracking-wide text-gray-500">Tagihan Utilitas</span>
+            <span v-if="selectedSummaryItem.util" class="text-xs text-gray-500">
+              {{ formatBillingPeriod(selectedSummaryItem.util.period) }}
+            </span>
+          </div>
+
+          <template v-if="selectedSummaryItem.util">
+            <div class="space-y-2 p-4 text-sm">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="text-gray-700 dark:text-gray-300">Listrik</div>
+                  <div class="mt-0.5 font-mono text-xs text-gray-400">
+                    {{ selectedSummaryItem.util.meterStart }} → {{ selectedSummaryItem.util.meterEnd }}
+                    = {{ (selectedSummaryItem.util.meterEnd || 0) - (selectedSummaryItem.util.meterStart || 0) }} kWh
+                    × {{ formatCurrency(selectedSummaryItem.util.costPerKwh || 0) }}
+                  </div>
+                </div>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(selectedSummaryItem.util.usageCost || 0) }}</span>
+              </div>
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="text-gray-700 dark:text-gray-300">Air</div>
+                  <div class="mt-0.5 text-xs text-gray-400">
+                    {{ selectedSummaryRoom?.occupantCount || 1 }} orang × {{ formatCurrency(Number(selectedSummaryItem.util.waterFee || 0) / (selectedSummaryRoom?.occupantCount || 1)) }}/orang
+                  </div>
+                </div>
+                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(selectedSummaryItem.util.waterFee || 0) }}</span>
+              </div>
+              <div v-if="Number(selectedSummaryItem.util.trashFee) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                <span>Sampah</span>
+                <span>{{ formatCurrency(selectedSummaryItem.util.trashFee) }}</span>
+              </div>
+              <div v-if="Number(selectedSummaryItem.util.additionalCost) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                <span>Biaya Lain</span>
+                <span>{{ formatCurrency(selectedSummaryItem.util.additionalCost) }}</span>
+              </div>
+              <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold dark:border-gray-700">
+                <span class="text-gray-900 dark:text-white">Total Utilitas</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-900 dark:text-white">{{ formatCurrency(selectedSummaryItem.util.totalAmount) }}</span>
+                  <UBadge
+                    :color="selectedSummaryItem.util.isPaid ? 'success' : (selectedSummaryItem.util.paidAmount && Number(selectedSummaryItem.util.paidAmount) > 0 ? 'warning' : 'error')"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    {{ selectedSummaryItem.util.isPaid ? 'Lunas' : (selectedSummaryItem.util.paidAmount && Number(selectedSummaryItem.util.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                  </UBadge>
+                </div>
+              </div>
+              <div
+                v-if="!selectedSummaryItem.util.isPaid && Number(selectedSummaryItem.util.paidAmount) > 0"
+                class="space-y-0.5 text-xs"
+              >
+                <div class="flex justify-between text-green-600 dark:text-green-400">
+                  <span>Sudah dibayar</span>
+                  <span>{{ formatCurrency(selectedSummaryItem.util.paidAmount) }}</span>
+                </div>
+                <div class="flex justify-between font-medium text-red-600 dark:text-red-400">
+                  <span>Sisa</span>
+                  <span>{{ formatCurrency(Number(selectedSummaryItem.util.totalAmount) - Number(selectedSummaryItem.util.paidAmount || 0)) }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="p-4">
+              <span class="text-sm text-gray-500">Tidak ada tagihan utilitas pada periode ini.</span>
+            </div>
+          </template>
+        </div>
+
+        <div class="flex items-center justify-between border-t border-gray-200 pt-2 text-base font-bold dark:border-gray-700">
+          <span class="text-gray-900 dark:text-white">Total Tagihan</span>
+          <span class="text-lg text-primary-600 dark:text-primary-400">{{ formatCurrency(selectedSummaryTotal) }}</span>
+        </div>
+      </div>
+    </template>
+
+    <template #footer>
+      <UButton label="Tutup" size="lg" color="neutral" variant="outline" @click="summaryDetailsOpen = false" />
+      <UButton
+        label="Kirim WhatsApp"
+        size="lg"
+        icon="i-simple-icons-whatsapp"
+        class="bg-[#25D366] hover:bg-[#128C7E] text-white"
+        :loading="sendingWa"
+        :disabled="!selectedSummaryTenant?.contact"
+        @click="sendSelectedSummaryToWhatsApp"
+      />
+    </template>
+  </UModal>
 
   <!-- Generate Rent Bill Modal -->
   <UModal :open="isGenerating" @close="isGenerating = false">

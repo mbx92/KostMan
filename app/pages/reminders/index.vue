@@ -217,6 +217,17 @@ const selectedRoom = ref<any>(null);
 const isFetchingBills = ref(false);
 const roomRentBills = ref<any[]>([]);
 const roomUtilityBills = ref<any[]>([]);
+const showPreviousRentBills = ref(false);
+const showPreviousUtilityBills = ref(false);
+const selectedRentBillIds = ref<string[]>([]);
+const selectedUtilityBillIds = ref<string[]>([]);
+const currentRentBillEntry = computed(() => roomRentBills.value[0] || null);
+const previousRentBillEntries = computed(() => roomRentBills.value.slice(1));
+const currentUtilityBillEntry = computed(() => roomUtilityBills.value[0] || null);
+const previousUtilityBillEntries = computed(() => roomUtilityBills.value.slice(1));
+const selectedRentBillEntries = computed(() => roomRentBills.value.filter(entry => selectedRentBillIds.value.includes(entry.bill?.id)));
+const selectedUtilityBillEntries = computed(() => roomUtilityBills.value.filter(entry => selectedUtilityBillIds.value.includes(entry.bill?.id)));
+const hasSelectedBillsForWhatsApp = computed(() => selectedRentBillEntries.value.length > 0 || selectedUtilityBillEntries.value.length > 0);
 
 // Generate Bill Modal State
 const showGenerateModal = ref(false);
@@ -361,6 +372,10 @@ const openDetails = async (room: any) => {
     showDetails.value = true;
     roomRentBills.value = [];
     roomUtilityBills.value = [];
+    showPreviousRentBills.value = false;
+    showPreviousUtilityBills.value = false;
+    selectedRentBillIds.value = [];
+    selectedUtilityBillIds.value = [];
     isFetchingBills.value = true;
 
     const roomId = room.id;
@@ -372,13 +387,13 @@ const openDetails = async (room: any) => {
         ]);
 
         if (rentData && rentData.length > 0) {
-            // Sort rent bills descending by period, pick the latest one
+            // Sort rent bills descending by period and keep all periods
             rentData.sort((a, b) => {
                 const pA = a.bill?.period || ''
                 const pB = b.bill?.period || ''
                 return pB.localeCompare(pA)
             })
-            roomRentBills.value = [rentData[0]]
+            roomRentBills.value = rentData
         } else {
             roomRentBills.value = []
         }
@@ -390,10 +405,8 @@ const openDetails = async (room: any) => {
             const pB = b.bill?.period || ''
             return pB.localeCompare(pA)
         });
-        // Keep only the latest one
-        if (roomUtilityBills.value.length > 0) {
-            roomUtilityBills.value = [roomUtilityBills.value[0]];
-        }
+
+        initializeSelectedBills();
     } catch (e) {
         console.error('Failed to fetch room bills', e)
     } finally {
@@ -411,6 +424,138 @@ const allBillsPaid = computed(() => {
 });
 
 const hasAnyBills = computed(() => roomRentBills.value.length > 0 || roomUtilityBills.value.length > 0);
+
+const getRemainingBillAmount = (bill: any) => Number(bill?.totalAmount || 0) - Number(bill?.paidAmount || 0);
+
+const formatSelectedPeriods = (periods: string[]) => {
+    if (periods.length === 0) return '';
+    return periods.join(', ');
+}
+
+const buildPerPeriodReminderDetail = (room: any, rentBills: any[], utilityBills: any[]) => {
+    const grouped = new Map<string, {
+        label: string;
+        sortKey: string;
+        rentBills: any[];
+        utilityBills: any[];
+    }>();
+
+    for (const bill of rentBills) {
+        const key = bill.period || bill.periodStartDate || bill.id;
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                label: formatDateRange(bill.periodStartDate, bill.periodEndDate),
+                sortKey: bill.period || bill.periodStartDate || '',
+                rentBills: [],
+                utilityBills: [],
+            });
+        }
+        grouped.get(key)!.rentBills.push(bill);
+    }
+
+    for (const bill of utilityBills) {
+        const key = bill.period || bill.id;
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                label: formatPeriodMonth(bill.period),
+                sortKey: bill.period || '',
+                rentBills: [],
+                utilityBills: [],
+            });
+        }
+        grouped.get(key)!.utilityBills.push(bill);
+    }
+
+    const sections = Array.from(grouped.values())
+        .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+        .map((group) => {
+            const lines = [`*Periode: ${group.label || '-'}*`];
+
+            if (group.rentBills.length > 0) {
+                const rentTotal = group.rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+                const monthCount = group.rentBills.reduce((sum, bill) => sum + Number(bill.monthsCovered || 1), 0);
+                const roomPrice = group.rentBills[0]?.roomPrice;
+
+                lines.push(`Sewa: ${formatCurrency(rentTotal)}`);
+                if (roomPrice) {
+                    lines.push(`  ${monthCount} bulan x ${formatCurrency(roomPrice)}`);
+                }
+            }
+
+            if (group.utilityBills.length > 0) {
+                const utilityTotal = group.utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+                const usageCost = group.utilityBills.reduce((sum, bill) => sum + Number(bill.usageCost || 0), 0);
+                const waterFee = group.utilityBills.reduce((sum, bill) => sum + Number(bill.waterFee || 0), 0);
+                const trashFee = group.utilityBills.reduce((sum, bill) => sum + Number(bill.trashFee || 0), 0);
+
+                lines.push(`Utilitas: ${formatCurrency(utilityTotal)}`);
+                if (usageCost > 0) lines.push(`  Listrik: ${formatCurrency(usageCost)}`);
+                if (waterFee > 0) lines.push(`  Air: ${formatCurrency(waterFee)}`);
+                if (trashFee > 0) lines.push(`  Sampah: ${formatCurrency(trashFee)}`);
+            }
+
+            const periodTotal = group.rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0) +
+                group.utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+            lines.push(`Total Periode: ${formatCurrency(periodTotal)}`);
+
+            return lines.join('\n');
+        });
+
+    const overallTotal = rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0) +
+        utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+
+    let detail = `*TAGIHAN KOST*\n`;
+    detail += `${room.property?.name}\n`;
+    detail += `================================\n\n`;
+    detail += `Kamar: *${room.name}*\n`;
+    detail += `Penghuni: ${room.tenantName || room.tenant?.name}\n`;
+
+    if ((room.occupantCount || 1) > 1) {
+        detail += `Jumlah Penghuni: ${room.occupantCount} orang\n`;
+    }
+
+    detail += `\n================================\n\n`;
+    detail += sections.join(`\n\n--------------------------------\n\n`);
+    detail += `\n\n================================\n`;
+    detail += `*TOTAL TAGIHAN: ${formatCurrency(overallTotal)}*\n`;
+    detail += `Status: *BELUM LUNAS*\n`;
+    detail += `================================`;
+
+    return detail;
+}
+
+const initializeSelectedBills = () => {
+    selectedRentBillIds.value = roomRentBills.value
+        .filter(entry => !entry.bill?.isPaid)
+        .slice(0, 1)
+        .map(entry => entry.bill.id);
+    selectedUtilityBillIds.value = roomUtilityBills.value
+        .filter(entry => !entry.bill?.isPaid)
+        .slice(0, 1)
+        .map(entry => entry.bill.id);
+}
+
+const toggleBillSelection = (type: 'rent' | 'utility', entry: any) => {
+    if (!entry?.bill || entry.bill.isPaid) return;
+
+    if (type === 'rent') {
+        selectedRentBillIds.value = selectedRentBillIds.value.includes(entry.bill.id)
+            ? selectedRentBillIds.value.filter(id => id !== entry.bill.id)
+            : [...selectedRentBillIds.value, entry.bill.id];
+        return;
+    }
+
+    selectedUtilityBillIds.value = selectedUtilityBillIds.value.includes(entry.bill.id)
+        ? selectedUtilityBillIds.value.filter(id => id !== entry.bill.id)
+        : [...selectedUtilityBillIds.value, entry.bill.id];
+}
+
+const isBillSelected = (type: 'rent' | 'utility', entry: any) => {
+    if (!entry?.bill) return false;
+    return type === 'rent'
+        ? selectedRentBillIds.value.includes(entry.bill.id)
+        : selectedUtilityBillIds.value.includes(entry.bill.id);
+}
 
 // Generate Rent Bill from modal
 // Submit generate bill from modal
@@ -449,48 +594,53 @@ const sendWhatsApp = async (room: any) => {
     const phone = room.tenant?.contact || room.tenantContact;
     if (!phone) {
         toast.add({ title: 'Error', description: 'Nomor kontak tidak tersedia', color: 'error' });
-        return;
+        return false;
     }
 
     const pendingTab = prepareWhatsAppTab();
 
     sendingWa.value = room.id;
     let invoiceUrl = '';
+    const selectedRents = selectedRentBillEntries.value;
+    const selectedUtils = selectedUtilityBillEntries.value;
 
-    // Collect unpaid bills
-    const unpaidRent = roomRentBills.value.filter(r => !r.bill?.isPaid);
-    const unpaidUtil = roomUtilityBills.value.filter(u => !u.bill?.isPaid);
+    if (selectedRents.length === 0 && selectedUtils.length === 0) {
+        toast.add({ title: 'Pilih Tagihan', description: 'Pilih minimal satu tagihan yang ingin dikirim ke WhatsApp.', color: 'warning' });
+        sendingWa.value = null;
+        return false;
+    }
 
     try {
-        // Use combined link when both types exist for the same period
-        const rentPeriod = unpaidRent[0]?.bill?.period;
-        const utilPeriod = unpaidUtil[0]?.bill?.period;
+        const selectedRent = selectedRents[0] || null;
+        const selectedUtil = selectedUtils[0] || null;
+        const rentPeriod = selectedRent?.bill?.period;
+        const utilPeriod = selectedUtil?.bill?.period;
 
-        if (unpaidRent.length > 0 && unpaidUtil.length > 0 && rentPeriod === utilPeriod) {
+        if (selectedRents.length === 1 && selectedUtils.length === 1 && rentPeriod === utilPeriod) {
             // Combined link (same period)
             const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
                 `/api/bills/public-link/combined`,
                 { method: 'POST', body: { roomId: room.id, period: rentPeriod } }
             );
             invoiceUrl = linkResponse.publicUrl;
-        } else if (unpaidRent.length > 0 && unpaidUtil.length > 0) {
+        } else if (selectedRents.length === 1 && selectedUtils.length === 1) {
             // Different periods - use dual bill ID format
             const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
                 `/api/bills/public-link/combined`,
-                { method: 'POST', body: { rentBillId: unpaidRent[0].bill.id, utilBillId: unpaidUtil[0].bill.id } }
+                { method: 'POST', body: { rentBillId: selectedRent.bill.id, utilBillId: selectedUtil.bill.id } }
             );
             invoiceUrl = linkResponse.publicUrl;
-        } else if (unpaidRent.length > 0) {
+        } else if (selectedRents.length === 1 && selectedUtils.length === 0) {
             // Only rent
             const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
-                `/api/bills/public-link/${unpaidRent[0].bill.id}`,
+                `/api/bills/public-link/${selectedRent.bill.id}`,
                 { method: 'POST', body: { billType: 'rent' } }
             );
             invoiceUrl = linkResponse.publicUrl;
-        } else if (unpaidUtil.length > 0) {
+        } else if (selectedUtils.length === 1 && selectedRents.length === 0) {
             // Only utility
             const linkResponse = await $fetch<{ token: string; publicUrl: string }>(
-                `/api/bills/public-link/${unpaidUtil[0].bill.id}`,
+                `/api/bills/public-link/${selectedUtil.bill.id}`,
                 { method: 'POST', body: { billType: 'utility' } }
             );
             invoiceUrl = linkResponse.publicUrl;
@@ -500,17 +650,19 @@ const sendWhatsApp = async (room: any) => {
         toast.add({ title: 'Warning', description: 'Gagal generate link invoice', color: 'warning' });
     }
 
-    let rentTotal = 0;
-    let utilityTotal = 0;
-    let rentBill: any = null;
-    let utilBill: any = null;
-
-    for (const r of roomRentBills.value) {
-        if (!r.bill?.isPaid) { rentTotal += Number(r.bill.totalAmount); rentBill = r.bill; }
-    }
-    for (const u of roomUtilityBills.value) {
-        if (!u.bill?.isPaid) { utilityTotal += Number(u.bill.totalAmount); utilBill = u.bill; }
-    }
+    const rentBills = selectedRents.map(entry => entry.bill).filter(Boolean);
+    const utilityBills = selectedUtils.map(entry => entry.bill).filter(Boolean);
+    const firstRentBill = rentBills[0] || null;
+    const firstUtilityBill = utilityBills[0] || null;
+    const rentTotal = rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+    const utilityTotal = utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+    const totalMonthsCovered = rentBills.reduce((sum, bill) => sum + Number(bill.monthsCovered || 1), 0);
+    const hasSingleUtilitySelection = utilityBills.length === 1;
+    const combinedPeriods = [
+        ...rentBills.map((bill: any) => formatDateRange(bill.periodStartDate, bill.periodEndDate)),
+        ...utilityBills.map((bill: any) => formatPeriodMonth(bill.period))
+    ];
+    const customDetailSection = buildPerPeriodReminderDetail(room, rentBills, utilityBills);
 
     const templateType = 'reminder_due_soon';
     const template = await getDefaultTemplate(templateType);
@@ -519,24 +671,26 @@ const sendWhatsApp = async (room: any) => {
         tenantName: room.tenantName || room.tenant?.name,
         propertyName: room.property?.name,
         roomName: room.name,
-        period: rentBill?.period || utilBill?.period || 'N/A',
-        rentPeriod: rentBill ? formatDateRange(rentBill.periodStartDate, rentBill.periodEndDate) : '',
-        utilityPeriod: utilBill ? formatPeriodMonth(utilBill.period) : '',
+        period: formatSelectedPeriods(combinedPeriods) || 'N/A',
+        customPeriodLabel: formatSelectedPeriods(combinedPeriods) || 'N/A',
+        rentPeriod: formatSelectedPeriods(rentBills.map((bill: any) => formatDateRange(bill.periodStartDate, bill.periodEndDate))),
+        utilityPeriod: formatSelectedPeriods(utilityBills.map((bill: any) => formatPeriodMonth(bill.period))),
         occupantCount: room.occupantCount || 1,
         daysUntilDue: 0,
         rentAmount: rentTotal,
-        monthsCovered: rentBill?.monthsCovered || 1,
-        roomPrice: rentBill?.roomPrice || 0,
-        isRentPaid: false,
-        meterStart: utilBill?.meterStart,
-        meterEnd: utilBill?.meterEnd,
-        usageCost: utilBill?.usageCost || 0,
-        waterFee: utilBill?.waterFee || 0,
-        trashFee: utilBill?.trashFee || 0,
+        monthsCovered: rentBills.length > 0 ? totalMonthsCovered : undefined,
+        roomPrice: rentBills.length === 1 ? firstRentBill?.roomPrice || 0 : undefined,
+        isRentPaid: rentBills.length > 0 ? rentBills.every((bill: any) => bill.isPaid) : true,
+        meterStart: hasSingleUtilitySelection ? firstUtilityBill?.meterStart : undefined,
+        meterEnd: hasSingleUtilitySelection ? firstUtilityBill?.meterEnd : undefined,
+        usageCost: utilityBills.reduce((sum, bill: any) => sum + Number(bill.usageCost || 0), 0),
+        waterFee: utilityBills.reduce((sum, bill: any) => sum + Number(bill.waterFee || 0), 0),
+        trashFee: utilityBills.reduce((sum, bill: any) => sum + Number(bill.trashFee || 0), 0),
         utilityTotal: utilityTotal,
-        isUtilityPaid: false,
+        isUtilityPaid: utilityBills.length > 0 ? utilityBills.every((bill: any) => bill.isPaid) : true,
         grandTotal: rentTotal + utilityTotal,
-        invoiceUrl: invoiceUrl || undefined
+        invoiceUrl: invoiceUrl || undefined,
+        customDetailSection,
     };
 
     const message = buildMessage(template.message, billingData);
@@ -545,7 +699,16 @@ const sendWhatsApp = async (room: any) => {
     if (!opened) {
         toast.add({ title: 'Popup Diblokir', description: 'Browser memblokir tab WhatsApp baru. Izinkan pop-up untuk situs ini lalu coba lagi.', color: 'warning' });
     }
+    return true;
 };
+
+const sendSelectedBillsToWhatsApp = async (close: () => void) => {
+    if (!selectedRoom.value) return;
+    const success = await sendWhatsApp(selectedRoom.value);
+    if (success) {
+        close();
+    }
+}
 
 const refreshAll = async () => {
     await Promise.all([
@@ -731,7 +894,7 @@ const refreshAll = async () => {
                     <div class="flex justify-between items-center px-4 py-2 bg-gray-100 dark:bg-gray-800">
                         <span class="text-xs font-bold uppercase text-gray-500 tracking-wide">Tagihan Sewa</span>
                         <div class="flex items-center gap-2">
-                            <span v-if="roomRentBills.length > 0" class="text-xs text-gray-500">{{ formatPeriodMonth(roomRentBills[0].bill?.period) }}</span>
+                            <span v-if="currentRentBillEntry" class="text-xs text-gray-500">{{ formatPeriodMonth(currentRentBillEntry.bill?.period) }}</span>
                             <UButton 
                                 v-if="!isStaff"
                                 size="xs" 
@@ -745,35 +908,103 @@ const refreshAll = async () => {
                         </div>
                     </div>
                     
-                    <template v-if="roomRentBills.length > 0">
+                    <template v-if="currentRentBillEntry">
                         <div class="p-4 space-y-2 text-sm">
                             <!-- Room Price -->
                             <div class="flex justify-between text-gray-700 dark:text-gray-300">
                                 <span>Sewa Kamar
-                                    <span v-if="roomRentBills[0].bill?.monthsCovered > 1" class="text-gray-500">
-                                        ({{ roomRentBills[0].bill.monthsCovered }} bulan)
+                                    <span v-if="currentRentBillEntry.bill?.monthsCovered > 1" class="text-gray-500">
+                                        ({{ currentRentBillEntry.bill.monthsCovered }} bulan)
                                     </span>
                                 </span>
-                                <span class="font-medium">{{ formatCurrency(roomRentBills[0].bill?.roomPrice || 0) }}</span>
+                                <span class="font-medium">{{ formatCurrency(currentRentBillEntry.bill?.roomPrice || 0) }}</span>
                             </div>
                             <div class="border-t border-gray-100 dark:border-gray-700 pt-2 flex justify-between items-center font-semibold">
                                 <span class="text-gray-900 dark:text-white">Total Sewa</span>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-gray-900 dark:text-white">{{ formatCurrency(roomRentBills[0].bill.totalAmount) }}</span>
-                                    <UBadge :color="roomRentBills[0].bill.isPaid ? 'success' : (roomRentBills[0].bill.paidAmount && Number(roomRentBills[0].bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
-                                        {{ roomRentBills[0].bill.isPaid ? 'Lunas' : (roomRentBills[0].bill.paidAmount && Number(roomRentBills[0].bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                                    <span class="text-gray-900 dark:text-white">{{ formatCurrency(currentRentBillEntry.bill.totalAmount) }}</span>
+                                    <UBadge :color="currentRentBillEntry.bill.isPaid ? 'success' : (currentRentBillEntry.bill.paidAmount && Number(currentRentBillEntry.bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
+                                        {{ currentRentBillEntry.bill.isPaid ? 'Lunas' : (currentRentBillEntry.bill.paidAmount && Number(currentRentBillEntry.bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
                                     </UBadge>
                                 </div>
                             </div>
+                            <div v-if="!currentRentBillEntry.bill.isPaid" class="flex justify-end">
+                                <UButton
+                                    size="xs"
+                                    :color="isBillSelected('rent', currentRentBillEntry) ? 'primary' : 'neutral'"
+                                    :variant="isBillSelected('rent', currentRentBillEntry) ? 'solid' : 'outline'"
+                                    icon="i-heroicons-check-circle"
+                                    @click="toggleBillSelection('rent', currentRentBillEntry)"
+                                >
+                                    {{ isBillSelected('rent', currentRentBillEntry) ? 'Terpilih untuk WA' : 'Pilih untuk WA' }}
+                                </UButton>
+                            </div>
                             <!-- Partial paid info -->
-                            <div v-if="!roomRentBills[0].bill.isPaid && Number(roomRentBills[0].bill.paidAmount) > 0" class="text-xs text-gray-500 space-y-0.5">
+                            <div v-if="!currentRentBillEntry.bill.isPaid && Number(currentRentBillEntry.bill.paidAmount) > 0" class="text-xs text-gray-500 space-y-0.5">
                                 <div class="flex justify-between text-green-600 dark:text-green-400">
                                     <span>Sudah dibayar</span>
-                                    <span>{{ formatCurrency(roomRentBills[0].bill.paidAmount) }}</span>
+                                    <span>{{ formatCurrency(currentRentBillEntry.bill.paidAmount) }}</span>
                                 </div>
                                 <div class="flex justify-between text-red-600 dark:text-red-400 font-medium">
                                     <span>Sisa</span>
-                                    <span>{{ formatCurrency(Number(roomRentBills[0].bill.totalAmount) - Number(roomRentBills[0].bill.paidAmount)) }}</span>
+                                    <span>{{ formatCurrency(getRemainingBillAmount(currentRentBillEntry.bill)) }}</span>
+                                </div>
+                            </div>
+
+                            <div v-if="previousRentBillEntries.length > 0" class="pt-3 border-t border-gray-100 dark:border-gray-700">
+                                <button
+                                    type="button"
+                                    class="flex w-full items-center justify-between text-sm font-medium text-primary-600 dark:text-primary-400"
+                                    @click="showPreviousRentBills = !showPreviousRentBills"
+                                >
+                                    <span>Tagihan periode sebelumnya ({{ previousRentBillEntries.length }})</span>
+                                    <UIcon :name="showPreviousRentBills ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'" class="w-4 h-4" />
+                                </button>
+
+                                <div v-if="showPreviousRentBills" class="mt-3 space-y-3">
+                                    <div
+                                        v-for="entry in previousRentBillEntries"
+                                        :key="entry.bill.id"
+                                        class="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+                                    >
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div class="font-medium text-gray-900 dark:text-white">{{ formatDateRange(entry.bill.periodStartDate, entry.bill.periodEndDate) }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    Sewa kamar
+                                                    <span v-if="entry.bill.monthsCovered > 1">({{ entry.bill.monthsCovered }} bulan)</span>
+                                                </div>
+                                            </div>
+                                            <UBadge :color="entry.bill.isPaid ? 'success' : (entry.bill.paidAmount && Number(entry.bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
+                                                {{ entry.bill.isPaid ? 'Lunas' : (entry.bill.paidAmount && Number(entry.bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                                            </UBadge>
+                                        </div>
+                                        <div class="mt-3 space-y-1 text-sm">
+                                            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                                                <span>Total</span>
+                                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(entry.bill.totalAmount) }}</span>
+                                            </div>
+                                            <div v-if="Number(entry.bill.paidAmount) > 0" class="flex justify-between text-green-600 dark:text-green-400 text-xs">
+                                                <span>Sudah dibayar</span>
+                                                <span>{{ formatCurrency(entry.bill.paidAmount) }}</span>
+                                            </div>
+                                            <div v-if="!entry.bill.isPaid" class="flex justify-between text-red-600 dark:text-red-400 text-xs font-medium">
+                                                <span>Sisa</span>
+                                                <span>{{ formatCurrency(getRemainingBillAmount(entry.bill)) }}</span>
+                                            </div>
+                                        </div>
+                                        <div v-if="!entry.bill.isPaid" class="mt-3 flex justify-end">
+                                            <UButton
+                                                size="xs"
+                                                :color="isBillSelected('rent', entry) ? 'primary' : 'neutral'"
+                                                :variant="isBillSelected('rent', entry) ? 'solid' : 'outline'"
+                                                icon="i-heroicons-check-circle"
+                                                @click="toggleBillSelection('rent', entry)"
+                                            >
+                                                {{ isBillSelected('rent', entry) ? 'Terpilih untuk WA' : 'Pilih untuk WA' }}
+                                            </UButton>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -789,61 +1020,129 @@ const refreshAll = async () => {
                 <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="flex justify-between items-center px-4 py-2 bg-gray-100 dark:bg-gray-800">
                         <span class="text-xs font-bold uppercase text-gray-500 tracking-wide">Tagihan Utilitas</span>
-                        <span v-if="roomUtilityBills.length > 0" class="text-xs text-gray-500">{{ formatPeriodMonth(roomUtilityBills[0].bill?.period) }}</span>
+                        <span v-if="currentUtilityBillEntry" class="text-xs text-gray-500">{{ formatPeriodMonth(currentUtilityBillEntry.bill?.period) }}</span>
                     </div>
                     
-                    <template v-if="roomUtilityBills.length > 0">
+                    <template v-if="currentUtilityBillEntry">
                         <div class="p-4 space-y-2 text-sm">
                             <!-- Meter reading -->
                             <div class="flex justify-between items-start">
                                 <div>
                                     <div class="text-gray-700 dark:text-gray-300">Listrik</div>
                                     <div class="text-xs text-gray-400 font-mono mt-0.5">
-                                        {{ roomUtilityBills[0].bill?.meterStart }} → {{ roomUtilityBills[0].bill?.meterEnd }}
-                                        = {{ (roomUtilityBills[0].bill?.meterEnd || 0) - (roomUtilityBills[0].bill?.meterStart || 0) }} kWh
-                                        × {{ formatCurrency(roomUtilityBills[0].bill?.costPerKwh || 0) }}
+                                        {{ currentUtilityBillEntry.bill?.meterStart }} → {{ currentUtilityBillEntry.bill?.meterEnd }}
+                                        = {{ (currentUtilityBillEntry.bill?.meterEnd || 0) - (currentUtilityBillEntry.bill?.meterStart || 0) }} kWh
+                                        × {{ formatCurrency(currentUtilityBillEntry.bill?.costPerKwh || 0) }}
                                     </div>
                                 </div>
-                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill?.usageCost || 0) }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(currentUtilityBillEntry.bill?.usageCost || 0) }}</span>
                             </div>
                             <!-- Water fee -->
                             <div class="flex justify-between items-start">
                                 <div>
                                     <div class="text-gray-700 dark:text-gray-300">Air</div>
                                     <div class="text-xs text-gray-400 mt-0.5">
-                                        {{ selectedRoom.occupantCount || 1 }} orang × {{ formatCurrency(Number(roomUtilityBills[0].bill?.waterFee || 0) / (selectedRoom.occupantCount || 1)) }}/orang
+                                        {{ selectedRoom.occupantCount || 1 }} orang × {{ formatCurrency(Number(currentUtilityBillEntry.bill?.waterFee || 0) / (selectedRoom.occupantCount || 1)) }}/orang
                                     </div>
                                 </div>
-                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill?.waterFee || 0) }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(currentUtilityBillEntry.bill?.waterFee || 0) }}</span>
                             </div>
                             <!-- Trash fee -->
-                            <div v-if="Number(roomUtilityBills[0].bill?.trashFee) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                            <div v-if="Number(currentUtilityBillEntry.bill?.trashFee) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
                                 <span>Sampah</span>
-                                <span>{{ formatCurrency(roomUtilityBills[0].bill.trashFee) }}</span>
+                                <span>{{ formatCurrency(currentUtilityBillEntry.bill.trashFee) }}</span>
                             </div>
                             <!-- Additional cost -->
-                            <div v-if="Number(roomUtilityBills[0].bill?.additionalCost) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                            <div v-if="Number(currentUtilityBillEntry.bill?.additionalCost) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
                                 <span>Biaya Lain</span>
-                                <span>{{ formatCurrency(roomUtilityBills[0].bill.additionalCost) }}</span>
+                                <span>{{ formatCurrency(currentUtilityBillEntry.bill.additionalCost) }}</span>
                             </div>
                             <div class="border-t border-gray-100 dark:border-gray-700 pt-2 flex justify-between items-center font-semibold">
                                 <span class="text-gray-900 dark:text-white">Total Utilitas</span>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-gray-900 dark:text-white">{{ formatCurrency(roomUtilityBills[0].bill.totalAmount) }}</span>
-                                    <UBadge :color="roomUtilityBills[0].bill.isPaid ? 'success' : (roomUtilityBills[0].bill.paidAmount && Number(roomUtilityBills[0].bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
-                                        {{ roomUtilityBills[0].bill.isPaid ? 'Lunas' : (roomUtilityBills[0].bill.paidAmount && Number(roomUtilityBills[0].bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                                    <span class="text-gray-900 dark:text-white">{{ formatCurrency(currentUtilityBillEntry.bill.totalAmount) }}</span>
+                                    <UBadge :color="currentUtilityBillEntry.bill.isPaid ? 'success' : (currentUtilityBillEntry.bill.paidAmount && Number(currentUtilityBillEntry.bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
+                                        {{ currentUtilityBillEntry.bill.isPaid ? 'Lunas' : (currentUtilityBillEntry.bill.paidAmount && Number(currentUtilityBillEntry.bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
                                     </UBadge>
                                 </div>
                             </div>
+                            <div v-if="!currentUtilityBillEntry.bill.isPaid" class="flex justify-end">
+                                <UButton
+                                    size="xs"
+                                    :color="isBillSelected('utility', currentUtilityBillEntry) ? 'primary' : 'neutral'"
+                                    :variant="isBillSelected('utility', currentUtilityBillEntry) ? 'solid' : 'outline'"
+                                    icon="i-heroicons-check-circle"
+                                    @click="toggleBillSelection('utility', currentUtilityBillEntry)"
+                                >
+                                    {{ isBillSelected('utility', currentUtilityBillEntry) ? 'Terpilih untuk WA' : 'Pilih untuk WA' }}
+                                </UButton>
+                            </div>
                             <!-- Partial paid info -->
-                            <div v-if="!roomUtilityBills[0].bill.isPaid && Number(roomUtilityBills[0].bill.paidAmount) > 0" class="text-xs space-y-0.5">
+                            <div v-if="!currentUtilityBillEntry.bill.isPaid && Number(currentUtilityBillEntry.bill.paidAmount) > 0" class="text-xs space-y-0.5">
                                 <div class="flex justify-between text-green-600 dark:text-green-400">
                                     <span>Sudah dibayar</span>
-                                    <span>{{ formatCurrency(roomUtilityBills[0].bill.paidAmount) }}</span>
+                                    <span>{{ formatCurrency(currentUtilityBillEntry.bill.paidAmount) }}</span>
                                 </div>
                                 <div class="flex justify-between text-red-600 dark:text-red-400 font-medium">
                                     <span>Sisa</span>
-                                    <span>{{ formatCurrency(Number(roomUtilityBills[0].bill.totalAmount) - Number(roomUtilityBills[0].bill.paidAmount)) }}</span>
+                                    <span>{{ formatCurrency(getRemainingBillAmount(currentUtilityBillEntry.bill)) }}</span>
+                                </div>
+                            </div>
+
+                            <div v-if="previousUtilityBillEntries.length > 0" class="pt-3 border-t border-gray-100 dark:border-gray-700">
+                                <button
+                                    type="button"
+                                    class="flex w-full items-center justify-between text-sm font-medium text-primary-600 dark:text-primary-400"
+                                    @click="showPreviousUtilityBills = !showPreviousUtilityBills"
+                                >
+                                    <span>Tagihan periode sebelumnya ({{ previousUtilityBillEntries.length }})</span>
+                                    <UIcon :name="showPreviousUtilityBills ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'" class="w-4 h-4" />
+                                </button>
+
+                                <div v-if="showPreviousUtilityBills" class="mt-3 space-y-3">
+                                    <div
+                                        v-for="entry in previousUtilityBillEntries"
+                                        :key="entry.bill.id"
+                                        class="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+                                    >
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div class="font-medium text-gray-900 dark:text-white">{{ formatPeriodMonth(entry.bill?.period) }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    {{ entry.bill?.meterStart }} → {{ entry.bill?.meterEnd }}
+                                                    ({{ (entry.bill?.meterEnd || 0) - (entry.bill?.meterStart || 0) }} kWh)
+                                                </div>
+                                            </div>
+                                            <UBadge :color="entry.bill.isPaid ? 'success' : (entry.bill.paidAmount && Number(entry.bill.paidAmount) > 0 ? 'warning' : 'error')" variant="subtle" size="xs">
+                                                {{ entry.bill.isPaid ? 'Lunas' : (entry.bill.paidAmount && Number(entry.bill.paidAmount) > 0 ? 'Sebagian' : 'Belum Lunas') }}
+                                            </UBadge>
+                                        </div>
+                                        <div class="mt-3 space-y-1 text-sm">
+                                            <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                                                <span>Total</span>
+                                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(entry.bill.totalAmount) }}</span>
+                                            </div>
+                                            <div v-if="Number(entry.bill.paidAmount) > 0" class="flex justify-between text-green-600 dark:text-green-400 text-xs">
+                                                <span>Sudah dibayar</span>
+                                                <span>{{ formatCurrency(entry.bill.paidAmount) }}</span>
+                                            </div>
+                                            <div v-if="!entry.bill.isPaid" class="flex justify-between text-red-600 dark:text-red-400 text-xs font-medium">
+                                                <span>Sisa</span>
+                                                <span>{{ formatCurrency(getRemainingBillAmount(entry.bill)) }}</span>
+                                            </div>
+                                        </div>
+                                        <div v-if="!entry.bill.isPaid" class="mt-3 flex justify-end">
+                                            <UButton
+                                                size="xs"
+                                                :color="isBillSelected('utility', entry) ? 'primary' : 'neutral'"
+                                                :variant="isBillSelected('utility', entry) ? 'solid' : 'outline'"
+                                                icon="i-heroicons-check-circle"
+                                                @click="toggleBillSelection('utility', entry)"
+                                            >
+                                                {{ isBillSelected('utility', entry) ? 'Terpilih untuk WA' : 'Pilih untuk WA' }}
+                                            </UButton>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -859,8 +1158,8 @@ const refreshAll = async () => {
                 <div v-if="hasAnyBills" class="flex justify-between items-center font-bold text-base pt-2 border-t border-gray-200 dark:border-gray-700">
                     <span class="text-gray-900 dark:text-white">Total Belum Lunas</span>
                     <span class="text-lg text-primary-600 dark:text-primary-400">{{ formatCurrency(
-                        (roomRentBills.length > 0 && !roomRentBills[0].bill.isPaid ? Number(roomRentBills[0].bill.totalAmount) - Number(roomRentBills[0].bill.paidAmount || 0) : 0) +
-                        (roomUtilityBills.length > 0 && !roomUtilityBills[0].bill.isPaid ? Number(roomUtilityBills[0].bill.totalAmount) - Number(roomUtilityBills[0].bill.paidAmount || 0) : 0)
+                        roomRentBills.reduce((sum, entry) => sum + (entry.bill?.isPaid ? 0 : getRemainingBillAmount(entry.bill)), 0) +
+                        roomUtilityBills.reduce((sum, entry) => sum + (entry.bill?.isPaid ? 0 : getRemainingBillAmount(entry.bill)), 0)
                     ) }}</span>
                 </div>
             </template>
@@ -874,9 +1173,9 @@ const refreshAll = async () => {
             size="lg" 
             icon="i-simple-icons-whatsapp" 
             class="bg-[#25D366] hover:bg-[#128C7E] text-white"
-            :disabled="allBillsPaid || isFetchingBills"
+                        :disabled="!hasSelectedBillsForWhatsApp || isFetchingBills"
             :loading="sendingWa === selectedRoom?.id"
-            @click="sendWhatsApp(selectedRoom); close()" 
+                        @click="sendSelectedBillsToWhatsApp(close)" 
         />
       </template>
     </UModal>

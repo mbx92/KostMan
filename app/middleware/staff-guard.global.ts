@@ -6,6 +6,7 @@
  * - Tenants (/tenants)
  * - Meter Readings (/meter-readings)
  * - Reminders (/reminders)
+ * - Expenses (/expenses)
  * - Account (/account, /my-profile)
  * - Login (/login)
  * 
@@ -30,8 +31,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
     // Check if user is staff
     if (user.role === 'staff') {
+      if (to.path === '/expenses/categories' || to.path.startsWith('/expenses/categories/')) {
+        return navigateTo('/expenses')
+      }
+
       // Allowed paths for staff
-      const allowedPaths = ['/', '/tenants', '/meter-readings', '/reminders', '/account', '/my-profile']
+      const allowedPaths = ['/', '/tenants', '/meter-readings', '/reminders', '/expenses', '/account', '/my-profile']
 
       // Check if current path is allowed
       const isAllowed = allowedPaths.some(path =>

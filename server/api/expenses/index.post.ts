@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
         // Admin can create expenses for any property
         // Owner can only create expenses for their own properties
-        const whereConditions = user.role === 'admin'
+        const whereConditions = ['admin', 'staff'].includes(user.role)
             ? eq(properties.id, validatedData.propertyId)
             : and(
                 eq(properties.id, validatedData.propertyId),

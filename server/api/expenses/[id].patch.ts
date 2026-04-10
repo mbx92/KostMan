@@ -12,6 +12,13 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    if (user.role === 'staff') {
+        throw createError({
+            statusCode: 403,
+            message: 'Staff hanya dapat menambah pengeluaran baru',
+        });
+    }
+
     const id = getRouterParam(event, "id");
     if (!id) {
         throw createError({

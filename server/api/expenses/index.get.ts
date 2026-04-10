@@ -16,7 +16,9 @@ export default defineEventHandler(async (event) => {
     const validatedQuery = expenseQuerySchema.parse(query);
 
     // Build where conditions
-    const conditions = [eq(expenses.userId, user.id)];
+    const conditions = user.role === 'admin' || user.role === 'staff'
+        ? []
+        : [eq(expenses.userId, user.id)];
 
     if (validatedQuery.propertyId) {
         if (validatedQuery.propertyId === "global") {
