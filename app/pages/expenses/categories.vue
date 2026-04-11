@@ -11,7 +11,13 @@ const selectedCategory = ref<any>(null)
 // Fetch categories
 const { data: categoriesData, pending: categoriesLoading, refresh: refreshCategories } = await useAuthFetch('/api/expenses/categories')
 
-const defaultCategories = computed(() => categoriesData.value?.categories?.default || [])
+const defaultCategories = computed(() => [
+  { name: 'Maintenance', description: 'Kategori untuk perawatan', color: '#FF5733' },
+  { name: 'Token', description: 'Kategori untuk token listrik', color: '#33FF57' },
+  { name: 'Salary', description: 'Kategori untuk gaji', color: '#3357FF' },
+  { name: 'Others', description: 'Kategori untuk lainnya', color: '#F3FF33' }
+])
+
 const customCategories = computed(() => categoriesData.value?.categories?.custom || [])
 
 // Actions

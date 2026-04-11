@@ -54,12 +54,12 @@ const propertyOptions = computed(() => {
   }))
 })
 
-const categoryOptions = computed(() => {
-  return props.categories.map(c => ({
-    label: c.name,
-    value: c.name
-  }))
-})
+const categoryOptions = [
+  { label: 'Maintenance', value: 'Maintenance' },
+  { label: 'Token', value: 'Token' },
+  { label: 'Salary', value: 'Salary' },
+  { label: 'Others', value: 'Others' }
+]
 
 
 // Validation Schema
