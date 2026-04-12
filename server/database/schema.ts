@@ -224,6 +224,9 @@ export const globalSettings = pgTable("global_settings", {
   ),
   waterFee: decimal("water_fee", { precision: 12, scale: 2 }).default("50000"),
   trashFee: decimal("trash_fee", { precision: 12, scale: 2 }).default("25000"),
+  whatsappDetailFields: text("whatsapp_detail_fields").default(
+    '["property_name","room_name","tenant_name","occupant_count","rent_section","utility_section","grand_total","payment_status"]',
+  ),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -353,6 +356,13 @@ export const whatsappTemplates = pgTable("whatsapp_templates", {
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
+});
+
+export const publicInvoiceLinks = pgTable("public_invoice_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 16 }).notNull().unique(),
+  token: text("token").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 // Backup Type Enum
 export const backupTypeEnum = pgEnum("backup_type", ["manual", "scheduled"]);

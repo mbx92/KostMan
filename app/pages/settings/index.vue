@@ -3,6 +3,12 @@ import { z } from 'zod'
 import type { FormSubmitEvent } from '#ui/types'
 import { useKosStore } from '~/stores/kos'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
+import {
+  DEFAULT_WHATSAPP_DETAIL_FIELDS,
+  WHATSAPP_DETAIL_FIELD_OPTIONS,
+  normalizeWhatsAppDetailFields,
+} from '~/composables/useWhatsAppTemplate'
+import { getDefaultWhatsAppTemplate } from '#shared/whatsapp-template-defaults'
 
 const store = useKosStore()
 const { settings, integrations, settingsLoading, integrationsLoading } = storeToRefs(store)
@@ -14,7 +20,8 @@ const state = reactive({
   appName: '',
   costPerKwh: 0,
   waterFee: 0,
-  trashFee: 0
+  trashFee: 0,
+  whatsappDetailFields: [...DEFAULT_WHATSAPP_DETAIL_FIELDS]
 })
 
 // --- WhatsApp Template State ---
@@ -41,7 +48,8 @@ const schema = z.object({
   appName: z.string().min(1, 'App Name is required'),
   costPerKwh: z.number().min(0),
   waterFee: z.number().min(0),
-  trashFee: z.number().min(0)
+  trashFee: z.number().min(0),
+  whatsappDetailFields: z.array(z.string()).min(1, 'Pilih minimal satu item detail tagihan')
 })
 
 type Schema = z.output<typeof schema>
@@ -125,6 +133,26 @@ function formatFileSize(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
 }
 
+function toggleWhatsappDetailField(field: string, enabled: boolean) {
+  if (enabled) {
+    if (!state.whatsappDetailFields.includes(field)) {
+      state.whatsappDetailFields = [...state.whatsappDetailFields, field]
+    }
+    return
+  }
+
+  if (state.whatsappDetailFields.length === 1) {
+    toast.add({
+      title: 'Minimal Satu Item',
+      description: 'Detail tagihan harus menampilkan minimal satu item.',
+      color: 'warning',
+    })
+    return
+  }
+
+  state.whatsappDetailFields = state.whatsappDetailFields.filter(item => item !== field)
+}
+
 // --- WhatsApp Template Functions ---
 async function loadWhatsAppTemplates() {
   try {
@@ -153,14 +181,7 @@ function openTemplateForm(template?: any) {
 }
 
 function getDefaultTemplate() {
-  return `Halo {nama_penyewa},
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Mohon segera melakukan pembayaran.
-Terima kasih.`
+  return getDefaultWhatsAppTemplate('general').message
 }
 
 async function saveTemplate() {
@@ -292,6 +313,7 @@ onMounted(async () => {
     state.costPerKwh = Number(settings.value.costPerKwh)
     state.waterFee = Number(settings.value.waterFee)
     state.trashFee = Number(settings.value.trashFee)
+    state.whatsappDetailFields = normalizeWhatsAppDetailFields(settings.value.whatsappDetailFields)
   }
 
   // Sync integration state
@@ -453,6 +475,15 @@ onMounted(async () => {
           <p class="text-sm text-gray-500">Kelola template pesan untuk reminder pembayaran via WhatsApp.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
+          <UButton
+            color="primary"
+            variant="soft"
+            :loading="settingsLoading"
+            @click="onSubmitGlobal({ data: state } as any)"
+            class="w-full sm:w-auto justify-center"
+          >
+            Simpan Detail Tagihan
+          </UButton>
           <UButton 
             icon="i-heroicons-arrow-down-tray" 
             color="gray" 
@@ -473,6 +504,38 @@ onMounted(async () => {
           </UButton>
         </div>
       </div>
+
+      <UCard>
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Item untuk variabel {detail_tagihan}</h3>
+            <p class="text-sm text-gray-500 mt-1">Pilih bagian mana saja yang otomatis dimasukkan saat template memakai variabel {detail_tagihan}.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="option in WHATSAPP_DETAIL_FIELD_OPTIONS"
+              :key="option.value"
+              class="rounded-xl border border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-900"
+            >
+              <div class="flex items-start gap-3">
+                <UCheckbox
+                  :model-value="state.whatsappDetailFields.includes(option.value)"
+                  @update:model-value="toggleWhatsappDetailField(option.value, $event)"
+                />
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ option.label }}</p>
+                  <p class="text-xs text-gray-500 mt-1">{{ option.description }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-xs text-gray-500 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+            Variabel {detail_tagihan} akan mengikuti checklist di atas pada pesan billing dan reminder WhatsApp.
+          </div>
+        </div>
+      </UCard>
 
       <UCard v-if="whatsappTemplates.length === 0">
         <div class="text-center py-8">
@@ -517,7 +580,7 @@ onMounted(async () => {
                 </p>
               </div>
               <!-- Action buttons - horizontal on mobile -->
-              <div class="flex gap-2 flex-shrink-0">
+              <div class="flex gap-2 shrink-0">
                 <UButton 
                   icon="i-heroicons-pencil" 
                   size="sm" 
@@ -538,7 +601,7 @@ onMounted(async () => {
             </div>
             
             <!-- Message Preview -->
-            <div class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto">
+            <div class="text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto">
               {{ template.message }}
             </div>
           </div>
@@ -548,7 +611,7 @@ onMounted(async () => {
       <!-- Info Card -->
       <UCard class="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
         <div class="flex flex-col sm:flex-row gap-3">
-          <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
           <div class="text-sm text-blue-700 dark:text-blue-300 space-y-2">
             <p><strong>Variabel yang Tersedia:</strong></p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs">
@@ -559,6 +622,7 @@ onMounted(async () => {
               <div><code>{tanggal_jatuh_tempo}</code> - Tgl jatuh tempo</div>
               <div><code>{status_tagihan}</code> - Status tagihan</div>
               <div><code>{periode}</code> - Periode billing</div>
+              <div><code>{detail_tagihan}</code> - Rincian otomatis sesuai checklist di atas</div>
             </div>
             <p class="pt-2">Gunakan variabel di atas dalam template untuk data yang dinamis.</p>
           </div>

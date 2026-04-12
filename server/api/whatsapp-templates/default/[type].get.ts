@@ -2,6 +2,7 @@ import { requireRole, Role } from '../../../utils/permissions'
 import { db } from '../../../utils/drizzle'
 import { whatsappTemplates } from '../../../database/schema'
 import { eq, and } from 'drizzle-orm'
+import { getDefaultWhatsAppTemplate } from '../../../../shared/whatsapp-template-defaults'
 
 export default defineEventHandler(async (event) => {
   const user = await requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF])
@@ -37,63 +38,13 @@ export default defineEventHandler(async (event) => {
 
   // If still no template, return default built-in template
   if (!template) {
-    const defaultTemplates: Record<string, { name: string; message: string }> = {
-      billing: {
-        name: 'Default Billing',
-        message: `Halo {nama_penyewa},
-
-Berikut tagihan kost Anda:
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Mohon segera melakukan pembayaran.
-Terima kasih.`
-      },
-      reminder_overdue: {
-        name: 'Default Overdue Reminder',
-        message: `Halo {nama_penyewa},
-
-⚠️ Tagihan Anda sudah LEWAT JATUH TEMPO.
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Mohon segera melakukan pembayaran.
-Terima kasih.`
-      },
-      reminder_due_soon: {
-        name: 'Default Due Soon Reminder',
-        message: `Halo {nama_penyewa},
-
-🔔 Pengingat: Tagihan Anda akan segera jatuh tempo.
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Silakan lakukan pembayaran sebelum jatuh tempo.
-Terima kasih.`
-      },
-      general: {
-        name: 'Default General',
-        message: `Halo {nama_penyewa},
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Terima kasih.`
-      }
-    }
+    const defaultTemplate = getDefaultWhatsAppTemplate(templateType)
 
     return {
       template: {
         id: null,
-        name: defaultTemplates[templateType]?.name || 'Default Template',
-        message: defaultTemplates[templateType]?.message || '{detail_tagihan}\n\n{link_pembayaran}',
+        name: defaultTemplate?.name || 'Template Default',
+        message: defaultTemplate?.message || '{detail_tagihan}\n\n{link_pembayaran}',
         templateType,
         isDefault: true,
         isBuiltIn: true

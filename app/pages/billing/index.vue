@@ -1444,46 +1444,44 @@ const sendReminder = async (reminder: any) => {
     console.error("Failed to generate invoice link:", e);
   }
 
-  let message = `*PENGINGAT TAGIHAN KOST*\n`;
-  message += `================================\n\n`;
-  message += `Halo *${reminder.tenant.name}*,\n\n`;
+  const templateType = reminder.reminderType === "overdue"
+    ? "reminder_overdue"
+    : reminder.reminderType === "due_soon"
+      ? "reminder_due_soon"
+      : "general";
 
-  // Different message based on reminder type
-  if (reminder.reminderType === "overdue") {
-    message += `Tagihan Anda sudah *LEWAT JATUH TEMPO*\n`;
-    message += `(${Math.abs(reminder.daysUntilDue)} hari yang lalu)\n\n`;
-  } else if (reminder.reminderType === "due_soon") {
-    message += `Tagihan akan jatuh tempo dalam:\n`;
-    message += `*${reminder.daysUntilDue} hari* (${reminder.dueDay})\n\n`;
-  } else {
-    message += `Anda memiliki tagihan yang belum dibayar.\n\n`;
-  }
+  const template = await getDefaultTemplate(templateType);
+  const firstRentBill = reminder.unpaidRentBills?.[0];
+  const firstUtilityBill = reminder.unpaidUtilityBills?.[0];
 
-  message += `Kos: ${reminder.property?.name || "Kost"}\n`;
-  message += `Kamar: ${reminder.room.name}\n`;
-  message += `\n================================\n\n`;
-  message += `*RINCIAN TAGIHAN:*\n\n`;
+  const billingData = {
+    tenantName: reminder.tenant.name,
+    propertyName: reminder.property?.name || "Kost",
+    roomName: reminder.room.name,
+    period: firstRentBill?.period || firstUtilityBill?.period || "",
+    customPeriodLabel: undefined,
+    rentPeriod: firstRentBill
+      ? formatDateRange(firstRentBill.periodStartDate, firstRentBill.periodEndDate)
+      : "",
+    utilityPeriod: firstUtilityBill?.period ? formatBillingPeriod(firstUtilityBill.period) : "",
+    occupantCount: reminder.room.occupantCount || 1,
+    daysUntilDue: reminder.daysUntilDue,
+    rentAmount: reminder.totalUnpaidRent || 0,
+    monthsCovered: firstRentBill?.monthsCovered || 1,
+    roomPrice: firstRentBill?.roomPrice || 0,
+    isRentPaid: !reminder.totalUnpaidRent,
+    meterStart: firstUtilityBill?.meterStart,
+    meterEnd: firstUtilityBill?.meterEnd,
+    usageCost: firstUtilityBill?.usageCost || 0,
+    waterFee: firstUtilityBill?.waterFee || 0,
+    trashFee: firstUtilityBill?.trashFee || 0,
+    utilityTotal: reminder.totalUnpaidUtility || 0,
+    isUtilityPaid: !reminder.totalUnpaidUtility,
+    grandTotal: reminder.totalUnpaid,
+    invoiceUrl: invoiceUrl || undefined,
+  };
 
-  if (reminder.totalUnpaidRent > 0) {
-    message += `Sewa Kamar:\n`;
-    message += `  ${formatCurrency(reminder.totalUnpaidRent)}\n\n`;
-  }
-  if (reminder.totalUnpaidUtility > 0) {
-    message += `Utilitas (Listrik/Air):\n`;
-    message += `  ${formatCurrency(reminder.totalUnpaidUtility)}\n\n`;
-  }
-
-  message += `================================\n`;
-  message += `*TOTAL: ${formatCurrency(reminder.totalUnpaid)}*\n`;
-  message += `================================\n\n`;
-
-  // Add invoice link
-  if (invoiceUrl) {
-    message += `Lihat & Bayar Invoice:\n${invoiceUrl}\n\n`;
-    message += `(Klik link untuk melihat detail & bayar online)\n\n`;
-  }
-
-  message += `Mohon segera melakukan pembayaran.\nTerima kasih.`;
+  const message = buildMessage(template.message, billingData);
 
   const opened = openWhatsApp(reminder.tenant.contact, message, pendingTab);
   if (!opened) {

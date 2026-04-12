@@ -3,7 +3,153 @@
  * Implements Opsi A: Template with auto-injected billing details and payment links
  */
 
+import { useKosStore } from '~/stores/kos'
+import { getDefaultWhatsAppTemplate } from '#shared/whatsapp-template-defaults'
+
 export type TemplateType = 'billing' | 'reminder_overdue' | 'reminder_due_soon' | 'general'
+export type WhatsAppDetailField =
+  | 'property_name'
+  | 'room_name'
+  | 'tenant_name'
+  | 'occupant_count'
+  | 'rent_section'
+  | 'utility_section'
+  | 'grand_total'
+  | 'payment_status'
+
+export const DEFAULT_WHATSAPP_DETAIL_FIELDS: WhatsAppDetailField[] = [
+  'property_name',
+  'room_name',
+  'tenant_name',
+  'occupant_count',
+  'rent_section',
+  'utility_section',
+  'grand_total',
+  'payment_status',
+]
+
+export const WHATSAPP_DETAIL_FIELD_OPTIONS: Array<{ value: WhatsAppDetailField; label: string; description: string }> = [
+  { value: 'property_name', label: 'Nama properti', description: 'Menampilkan nama properti di bagian atas detail tagihan.' },
+  { value: 'room_name', label: 'Nama kamar', description: 'Menampilkan nama kamar tenant.' },
+  { value: 'tenant_name', label: 'Nama penghuni', description: 'Menampilkan nama penghuni pada detail tagihan.' },
+  { value: 'occupant_count', label: 'Jumlah penghuni', description: 'Menampilkan jumlah penghuni bila lebih dari satu.' },
+  { value: 'rent_section', label: 'Rincian sewa', description: 'Menampilkan blok rincian sewa kamar.' },
+  { value: 'utility_section', label: 'Rincian utilitas', description: 'Menampilkan blok rincian listrik, air, dan sampah.' },
+  { value: 'grand_total', label: 'Total tagihan', description: 'Menampilkan total akhir tagihan.' },
+  { value: 'payment_status', label: 'Status tagihan', description: 'Menampilkan status lunas atau belum lunas.' },
+]
+
+export function normalizeWhatsAppDetailFields(fields?: unknown): WhatsAppDetailField[] {
+  if (!Array.isArray(fields)) {
+    return [...DEFAULT_WHATSAPP_DETAIL_FIELDS]
+  }
+
+  const filtered = fields.filter((field): field is WhatsAppDetailField =>
+    DEFAULT_WHATSAPP_DETAIL_FIELDS.includes(field as WhatsAppDetailField)
+  )
+
+  return filtered.length > 0 ? filtered : [...DEFAULT_WHATSAPP_DETAIL_FIELDS]
+}
+
+function appendLabeledLine(lines: string[], label: string, value?: string | number | null) {
+  if (value === undefined || value === null || value === '') return
+  lines.push(`${label} : ${value}`)
+}
+
+function formatCurrencyValue(value?: string | number | null) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+  }).format(Number(value || 0))
+}
+
+function appendSection(lines: string[], sectionLines: string[]) {
+  if (sectionLines.length === 0) return
+  if (lines.length > 0 && lines[lines.length - 1] !== '') {
+    lines.push('')
+  }
+  lines.push(...sectionLines)
+}
+
+export function getBillingStatusLabel(isRentPaid?: boolean, isUtilityPaid?: boolean) {
+  return isRentPaid && isUtilityPaid ? 'LUNAS' : 'BELUM LUNAS'
+}
+
+export function buildRentDetailBlock(options: {
+  periodLabel?: string
+  monthsCovered?: number
+  roomPrice?: number | string
+  totalAmount?: number | string
+}): string[] {
+  const totalAmount = Number(options.totalAmount || 0)
+  if (totalAmount <= 0) return []
+
+  const lines = ['*Sewa Kamar*']
+  appendLabeledLine(lines, 'Periode Sewa', options.periodLabel)
+
+  if (options.monthsCovered && options.roomPrice && Number(options.roomPrice) > 0) {
+    lines.push(`${options.monthsCovered} bln x ${formatCurrencyValue(options.roomPrice)}`)
+  }
+
+  appendLabeledLine(lines, 'Total', formatCurrencyValue(totalAmount))
+
+  return lines
+}
+
+export function buildUtilityDetailBlock(options: {
+  periodLabel?: string
+  usageCost?: number | string
+  waterFee?: number | string
+  trashFee?: number | string
+  totalAmount?: number | string
+}): string[] {
+  const totalAmount = Number(options.totalAmount || 0)
+  if (totalAmount <= 0) return []
+
+  const lines = ['*Utilitas*']
+  appendLabeledLine(lines, 'Periode Pemakaian', options.periodLabel)
+
+  if (Number(options.usageCost || 0) > 0) {
+    appendLabeledLine(lines, 'Listrik', formatCurrencyValue(options.usageCost))
+  }
+
+  if (Number(options.waterFee || 0) > 0) {
+    appendLabeledLine(lines, 'Air', formatCurrencyValue(options.waterFee))
+  }
+
+  if (Number(options.trashFee || 0) > 0) {
+    appendLabeledLine(lines, 'Sampah', formatCurrencyValue(options.trashFee))
+  }
+
+  appendLabeledLine(lines, 'Total', formatCurrencyValue(totalAmount))
+
+  return lines
+}
+
+export function buildBillingSummaryBlock(options: {
+  grandTotal?: number | string
+  statusLabel?: string
+  showGrandTotal?: boolean
+  showStatus?: boolean
+}): string[] {
+  if (!options.showGrandTotal && !options.showStatus) {
+    return []
+  }
+
+  const lines = ['=============================']
+
+  if (options.showGrandTotal) {
+    appendLabeledLine(lines, 'TOTAL TAGIHAN', formatCurrencyValue(options.grandTotal))
+  }
+
+  if (options.showStatus) {
+    appendLabeledLine(lines, 'STATUS', options.statusLabel || 'BELUM LUNAS')
+  }
+
+  lines.push('=============================')
+  return lines
+}
 
 interface BillingData {
   tenantName: string
@@ -40,6 +186,9 @@ interface BillingData {
 }
 
 export function useWhatsAppTemplate() {
+  const store = useKosStore()
+  const enabledDetailFields = computed(() => normalizeWhatsAppDetailFields(store.settings?.whatsappDetailFields))
+
   const formatCurrency = (val: number | string) =>
     new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -77,83 +226,71 @@ export function useWhatsAppTemplate() {
       return data.customDetailSection
     }
 
-    const formattedPeriod = formatPeriod(data.period)
-    const formattedRentPeriod = formatPeriodLabel(data.rentPeriod)
+    const hasDetailField = (field: WhatsAppDetailField) => enabledDetailFields.value.includes(field)
+  const formattedRentPeriod = formatPeriodLabel(data.rentPeriod)
     const formattedUtilityPeriod = formatPeriodLabel(data.utilityPeriod)
-    let detail = `*TAGIHAN KOST*\n`
-    detail += `${data.propertyName}\n`
-    detail += `================================\n\n`
-    detail += `Periode: *${formattedPeriod}*\n`
-    detail += `Kamar: *${data.roomName}*\n`
-    detail += `Penghuni: ${data.tenantName}\n`
-    
-    if (data.occupantCount && data.occupantCount > 1) {
-      detail += `Jumlah Penghuni: ${data.occupantCount} orang\n`
-    }
-    
-    detail += `\n================================\n`
+    const statusLabel = getBillingStatusLabel(data.isRentPaid, data.isUtilityPaid)
+    const detailLines = ['*TAGIHAN KOST*']
 
-    // Rent section
-    if (data.rentAmount && Number(data.rentAmount) > 0) {
-      detail += `\n*SEWA KAMAR*\n`
-      if (formattedRentPeriod) {
-        detail += `Periode Sewa: ${formattedRentPeriod}\n`
-      }
-      if (data.monthsCovered && data.roomPrice) {
-        detail += `${data.monthsCovered} bulan x ${formatCurrency(data.roomPrice)}\n`
-      }
-      detail += `Total: ${formatCurrency(data.rentAmount)}`
-      detail += data.isRentPaid ? ' [LUNAS]\n' : '\n'
+    if (hasDetailField('property_name')) {
+      detailLines.push(data.propertyName)
     }
 
-    // Utility section
-    if (data.utilityTotal && Number(data.utilityTotal) > 0) {
-      detail += `\n*UTILITAS*\n\n`
-      if (formattedUtilityPeriod) {
-        detail += `Periode Utilitas: ${formattedUtilityPeriod}\n\n`
-      }
-      
-      // Electricity
-      if (data.meterStart !== undefined && data.meterEnd !== undefined) {
-        const kwhUsage = data.meterEnd - data.meterStart
-        detail += `Listrik:\n`
-        detail += `  ${data.meterStart} -> ${data.meterEnd} = ${kwhUsage} kWh\n`
-        if (data.usageCost) {
-          detail += `  ${formatCurrency(data.usageCost)}\n\n`
-        }
-      }
-      
-      // Water
-      if (data.waterFee && Number(data.waterFee) > 0) {
-        detail += `Air:\n`
-        if (data.occupantCount && data.occupantCount > 1) {
-          const waterPerPerson = Number(data.waterFee) / data.occupantCount
-          detail += `  ${formatCurrency(waterPerPerson)} x ${data.occupantCount} orang\n`
-        }
-        detail += `  ${formatCurrency(data.waterFee)}\n`
-      }
-      
-      // Trash
-      if (data.trashFee && Number(data.trashFee) > 0) {
-        detail += `\nSampah:\n`
-        detail += `  ${formatCurrency(data.trashFee)}\n`
-      }
-      
-      detail += `\nTotal Utilitas: ${formatCurrency(data.utilityTotal)}`
-      detail += data.isUtilityPaid ? ' [LUNAS]\n' : '\n'
+    if (
+      hasDetailField('room_name') ||
+      hasDetailField('tenant_name') ||
+      (hasDetailField('occupant_count') && data.occupantCount && data.occupantCount > 1)
+    ) {
+      detailLines.push('')
     }
 
-    detail += `\n================================\n`
-    detail += `*TOTAL TAGIHAN: ${formatCurrency(data.grandTotal)}*\n`
-    
-    const allPaid = data.isRentPaid && data.isUtilityPaid
-    if (!allPaid) {
-      detail += `Status: *BELUM LUNAS*\n`
+    if (hasDetailField('room_name')) {
+      appendLabeledLine(detailLines, 'Kamar', data.roomName)
     }
-    
-    detail += `================================`
-    
-    return detail
+    if (hasDetailField('tenant_name')) {
+      appendLabeledLine(detailLines, 'Penghuni', data.tenantName)
+    }
+
+    if (hasDetailField('occupant_count') && data.occupantCount && data.occupantCount > 1) {
+      appendLabeledLine(detailLines, 'Jumlah Penghuni', `${data.occupantCount} orang`)
+    }
+
+    appendSection(
+      detailLines,
+      hasDetailField('rent_section')
+        ? buildRentDetailBlock({
+            periodLabel: formattedRentPeriod,
+            monthsCovered: data.monthsCovered,
+            roomPrice: data.roomPrice,
+            totalAmount: data.rentAmount,
+          })
+        : [],
+    )
+
+    appendSection(
+      detailLines,
+      hasDetailField('utility_section')
+        ? buildUtilityDetailBlock({
+            periodLabel: formattedUtilityPeriod,
+            usageCost: data.usageCost,
+            waterFee: data.waterFee,
+            trashFee: data.trashFee,
+            totalAmount: data.utilityTotal,
+          })
+        : [],
+    )
+
+    appendSection(
+      detailLines,
+      buildBillingSummaryBlock({
+        grandTotal: data.grandTotal,
+        statusLabel,
+        showGrandTotal: hasDetailField('grand_total'),
+        showStatus: hasDetailField('payment_status'),
+      }),
+    )
+
+    return detailLines.join('\n')
   }
 
   /**
@@ -197,6 +334,10 @@ export function useWhatsAppTemplate() {
           : `${data.daysUntilDue} hari lagi`
       message = message.replace(/{tanggal_jatuh_tempo}/g, dueStatus)
     }
+
+    if (linkSection && data.invoiceUrl && !message.includes(data.invoiceUrl)) {
+      message = `${message.trim()}\n\n${linkSection.trim()}`
+    }
     
     return message.trim()
   }
@@ -212,8 +353,7 @@ export function useWhatsAppTemplate() {
       console.error('Failed to fetch template:', error)
       // Fallback to basic template
       return {
-        name: 'Fallback Template',
-        message: `Halo {nama_penyewa},\n\n{detail_tagihan}\n\n{link_pembayaran}\n\nMohon segera melakukan pembayaran.\nTerima kasih.`
+        ...getDefaultWhatsAppTemplate(type),
       }
     }
   }

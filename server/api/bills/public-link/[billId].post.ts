@@ -2,7 +2,7 @@ import { requireRole, Role } from '../../../utils/permissions'
 import { db } from '../../../utils/drizzle'
 import { rentBills, utilityBills, rooms } from '../../../database/schema'
 import { eq } from 'drizzle-orm'
-import crypto from 'crypto'
+import { createPublicInvoiceShortLink } from '../../../utils/public-links'
 
 /**
  * POST /api/bills/public-link/[billId]
@@ -11,6 +11,8 @@ import crypto from 'crypto'
  */
 export default defineEventHandler(async (event) => {
   requireRole(event, [Role.ADMIN, Role.OWNER, Role.STAFF])
+
+  const buildFallbackUrl = (token: string) => `${getRequestURL(event).origin}/invoice/${token}`
 
   const billId = getRouterParam(event, 'billId')
   const body = await readBody<{ billType?: 'rent' | 'utility'; roomId?: string; period?: string; rentBillId?: string; utilBillId?: string }>(event)
@@ -28,10 +30,18 @@ export default defineEventHandler(async (event) => {
 
     const tokenData = `${body.rentBillId}+${body.utilBillId}`
     const token = Buffer.from(tokenData).toString('base64url')
+    let publicUrl = buildFallbackUrl(token)
+
+    try {
+      const shortLink = await createPublicInvoiceShortLink(event, token)
+      publicUrl = shortLink.publicUrl
+    } catch (error) {
+      console.error('Failed to create short invoice link:', error)
+    }
 
     return {
       token,
-      publicUrl: `${getRequestURL(event).origin}/invoice/${token}`
+      publicUrl
     }
   }
 
@@ -47,10 +57,18 @@ export default defineEventHandler(async (event) => {
     // Generate token for combined view
     const tokenData = `${body.roomId}:${body.period}`
     const token = Buffer.from(tokenData).toString('base64url')
+    let publicUrl = buildFallbackUrl(token)
+
+    try {
+      const shortLink = await createPublicInvoiceShortLink(event, token)
+      publicUrl = shortLink.publicUrl
+    } catch (error) {
+      console.error('Failed to create short invoice link:', error)
+    }
 
     return {
       token,
-      publicUrl: `${getRequestURL(event).origin}/invoice/${token}`
+      publicUrl
     }
   }
 
@@ -70,9 +88,17 @@ export default defineEventHandler(async (event) => {
   // Generate unique token (we'll use billId + billType encoded)
   const tokenData = `${billId}:${body.billType}`
   const token = Buffer.from(tokenData).toString('base64url')
+  let publicUrl = buildFallbackUrl(token)
+
+  try {
+    const shortLink = await createPublicInvoiceShortLink(event, token)
+    publicUrl = shortLink.publicUrl
+  } catch (error) {
+    console.error('Failed to create short invoice link:', error)
+  }
 
   return {
     token,
-    publicUrl: `${getRequestURL(event).origin}/invoice/${token}`
+    publicUrl
   }
 })

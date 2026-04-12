@@ -22,6 +22,7 @@ import {
 } from './schema';
 import bcrypt from 'bcrypt';
 import 'dotenv/config';
+import { getAllDefaultWhatsAppTemplates } from '../../shared/whatsapp-template-defaults';
 
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
@@ -91,73 +92,10 @@ async function seedUsers() {
 export async function seedWhatsAppTemplates(userId: string) {
     console.log('Seeding WhatsApp templates...');
 
-    const templates = [
-        {
-            userId,
-            name: 'Tagihan Bulanan',
-            templateType: 'billing' as const,
-            isDefault: true,
-            message: `Halo {nama_penyewa},
-
-Berikut tagihan kost Anda:
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Mohon segera melakukan pembayaran.
-Terima kasih.`
-        },
-        {
-            userId,
-            name: 'Reminder Lewat Jatuh Tempo',
-            templateType: 'reminder_overdue' as const,
-            isDefault: true,
-            message: `Halo {nama_penyewa},
-
-*PEMBERITAHUAN PENTING*
-
-Tagihan Anda sudah *LEWAT JATUH TEMPO*.
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Mohon segera melakukan pembayaran untuk menghindari denda.
-Terima kasih.`
-        },
-        {
-            userId,
-            name: 'Reminder Jatuh Tempo Segera',
-            templateType: 'reminder_due_soon' as const,
-            isDefault: true,
-            message: `Halo {nama_penyewa},
-
-*PENGINGAT*
-
-Tagihan Anda akan segera jatuh tempo.
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Silakan lakukan pembayaran sebelum jatuh tempo.
-Terima kasih!`
-        },
-        {
-            userId,
-            name: 'Template Umum',
-            templateType: 'general' as const,
-            isDefault: true,
-            message: `Halo {nama_penyewa},
-
-{detail_tagihan}
-
-{link_pembayaran}
-
-Terima kasih.`
-        }
-    ];
+    const templates = getAllDefaultWhatsAppTemplates().map((template) => ({
+        ...template,
+        userId,
+    }));
 
     for (const template of templates) {
         await db.insert(whatsappTemplates)

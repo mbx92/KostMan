@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { useKosStore } from '~/stores/kos';
 import { storeToRefs } from 'pinia';
+import {
+    buildBillingSummaryBlock,
+    buildRentDetailBlock,
+    buildUtilityDetailBlock,
+    getBillingStatusLabel,
+    normalizeWhatsAppDetailFields,
+} from '~/composables/useWhatsAppTemplate';
 
 const kosStore = useKosStore();
-const { properties, reminders, remindersLoading, rentBills, utilityBills, rooms, tenants } = storeToRefs(kosStore);
+const { properties, reminders, remindersLoading, rentBills, settings, utilityBills, rooms, tenants } = storeToRefs(kosStore);
 const toast = useToast();
 const hasMounted = ref(false);
 
@@ -19,6 +26,7 @@ onMounted(async () => {
         kosStore.fetchRentBills(),
         kosStore.fetchUtilityBills(),
         kosStore.fetchRooms({ all: true }),
+        kosStore.fetchSettings(),
         kosStore.fetchTenants({ all: true }),
     ]);
 });
@@ -433,6 +441,8 @@ const formatSelectedPeriods = (periods: string[]) => {
 }
 
 const buildPerPeriodReminderDetail = (room: any, rentBills: any[], utilityBills: any[]) => {
+    const enabledFields = normalizeWhatsAppDetailFields(settings.value?.whatsappDetailFields);
+    const hasDetailField = (field: string) => enabledFields.includes(field as any);
     const grouped = new Map<string, {
         label: string;
         sortKey: string;
@@ -469,59 +479,97 @@ const buildPerPeriodReminderDetail = (room: any, rentBills: any[], utilityBills:
     const sections = Array.from(grouped.values())
         .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
         .map((group) => {
-            const lines = [`*Periode: ${group.label || '-'}*`];
+            const lines: string[] = [];
 
-            if (group.rentBills.length > 0) {
+            if (hasDetailField('rent_section') && group.rentBills.length > 0) {
                 const rentTotal = group.rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
                 const monthCount = group.rentBills.reduce((sum, bill) => sum + Number(bill.monthsCovered || 1), 0);
                 const roomPrice = group.rentBills[0]?.roomPrice;
+                const rentPeriodLabel = group.rentBills.length === 1
+                    ? formatDateRange(group.rentBills[0].periodStartDate, group.rentBills[0].periodEndDate)
+                    : group.label;
 
-                lines.push(`Sewa: ${formatCurrency(rentTotal)}`);
-                if (roomPrice) {
-                    lines.push(`  ${monthCount} bulan x ${formatCurrency(roomPrice)}`);
-                }
+                if (lines.length > 0) lines.push('');
+                lines.push(...buildRentDetailBlock({
+                    periodLabel: rentPeriodLabel,
+                    monthsCovered: monthCount,
+                    roomPrice,
+                    totalAmount: rentTotal,
+                }));
             }
 
-            if (group.utilityBills.length > 0) {
+            if (hasDetailField('utility_section') && group.utilityBills.length > 0) {
                 const utilityTotal = group.utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
                 const usageCost = group.utilityBills.reduce((sum, bill) => sum + Number(bill.usageCost || 0), 0);
                 const waterFee = group.utilityBills.reduce((sum, bill) => sum + Number(bill.waterFee || 0), 0);
                 const trashFee = group.utilityBills.reduce((sum, bill) => sum + Number(bill.trashFee || 0), 0);
+                const utilityPeriodLabel = group.utilityBills.length === 1
+                    ? formatPeriodMonth(group.utilityBills[0].period)
+                    : group.label;
 
-                lines.push(`Utilitas: ${formatCurrency(utilityTotal)}`);
-                if (usageCost > 0) lines.push(`  Listrik: ${formatCurrency(usageCost)}`);
-                if (waterFee > 0) lines.push(`  Air: ${formatCurrency(waterFee)}`);
-                if (trashFee > 0) lines.push(`  Sampah: ${formatCurrency(trashFee)}`);
+                if (lines.length > 0) lines.push('');
+                lines.push(...buildUtilityDetailBlock({
+                    periodLabel: utilityPeriodLabel,
+                    usageCost,
+                    waterFee,
+                    trashFee,
+                    totalAmount: utilityTotal,
+                }));
             }
-
-            const periodTotal = group.rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0) +
-                group.utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
-            lines.push(`Total Periode: ${formatCurrency(periodTotal)}`);
 
             return lines.join('\n');
         });
 
     const overallTotal = rentBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0) +
         utilityBills.reduce((sum, bill) => sum + Number(bill.totalAmount || 0), 0);
+    const statusLabel = getBillingStatusLabel(
+        rentBills.length > 0 ? rentBills.every((bill) => bill.isPaid) : true,
+        utilityBills.length > 0 ? utilityBills.every((bill) => bill.isPaid) : true,
+    );
 
-    let detail = `*TAGIHAN KOST*\n`;
-    detail += `${room.property?.name}\n`;
-    detail += `================================\n\n`;
-    detail += `Kamar: *${room.name}*\n`;
-    detail += `Penghuni: ${room.tenantName || room.tenant?.name}\n`;
-
-    if ((room.occupantCount || 1) > 1) {
-        detail += `Jumlah Penghuni: ${room.occupantCount} orang\n`;
+    const detailLines = ['*TAGIHAN KOST*'];
+    if (hasDetailField('property_name') && room.property?.name) {
+        detailLines.push(room.property?.name);
     }
 
-    detail += `\n================================\n\n`;
-    detail += sections.join(`\n\n--------------------------------\n\n`);
-    detail += `\n\n================================\n`;
-    detail += `*TOTAL TAGIHAN: ${formatCurrency(overallTotal)}*\n`;
-    detail += `Status: *BELUM LUNAS*\n`;
-    detail += `================================`;
+    if (
+        hasDetailField('room_name') ||
+        hasDetailField('tenant_name') ||
+        (hasDetailField('occupant_count') && (room.occupantCount || 1) > 1)
+    ) {
+        detailLines.push('');
+    }
 
-    return detail;
+    if (hasDetailField('room_name')) {
+        detailLines.push(`Kamar : ${room.name}`);
+    }
+    if (hasDetailField('tenant_name')) {
+        detailLines.push(`Penghuni : ${room.tenantName || room.tenant?.name}`);
+    }
+
+    if (hasDetailField('occupant_count') && (room.occupantCount || 1) > 1) {
+        detailLines.push(`Jumlah Penghuni : ${room.occupantCount} orang`);
+    }
+
+    const visibleSections = sections.filter(Boolean);
+    if (visibleSections.length > 0) {
+        detailLines.push('');
+        detailLines.push(...visibleSections.join(`\n\n-----------------------------\n\n`).split('\n'));
+    }
+
+    const summaryLines = buildBillingSummaryBlock({
+        grandTotal: overallTotal,
+        statusLabel,
+        showGrandTotal: hasDetailField('grand_total'),
+        showStatus: hasDetailField('payment_status'),
+    });
+
+    if (summaryLines.length > 0) {
+        detailLines.push('');
+        detailLines.push(...summaryLines);
+    }
+
+    return detailLines.join('\n');
 }
 
 const initializeSelectedBills = () => {

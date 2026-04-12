@@ -1,6 +1,7 @@
 import { db } from '../utils/drizzle';
 import { rentBills, utilityBills } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { createPublicInvoiceShortLink } from '../utils/public-links';
 
 export default defineEventHandler(async (event) => {
     // Get tenant from session
@@ -81,12 +82,18 @@ export default defineEventHandler(async (event) => {
     const tokenData = `${billId}:${billType}:${timestamp}`;
     const publicToken = Buffer.from(tokenData).toString('base64url');
 
-    // Get base URL from request headers
     const headers = getHeaders(event);
     const protocol = headers['x-forwarded-proto'] || 'http';
     const host = headers.host || 'localhost:3000';
     const baseUrl = `${protocol}://${host}`;
-    const publicUrl = `${baseUrl}/invoice/${publicToken}`;
+    let publicUrl = `${baseUrl}/invoice/${publicToken}`;
+
+    try {
+        const shortLink = await createPublicInvoiceShortLink(event, publicToken);
+        publicUrl = shortLink.publicUrl;
+    } catch (error) {
+        console.error('Failed to create short invoice link:', error);
+    }
 
     return {
         success: true,

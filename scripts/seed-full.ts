@@ -24,6 +24,7 @@ import {
   expenseCategories,
 } from '../server/database/schema'
 import { eq } from 'drizzle-orm'
+import { getAllDefaultWhatsAppTemplates } from '../shared/whatsapp-template-defaults'
 import bcrypt from 'bcrypt'
 
 // ============= HELPERS =============
@@ -113,12 +114,11 @@ async function seedFull() {
   // Create WhatsApp templates
   console.log('📱 Creating WhatsApp templates...')
   await db.delete(whatsappTemplates).where(eq(whatsappTemplates.userId, user.id))
-  const waTemplates = [
-    { name: 'Tagihan Bulanan', type: 'billing' as const, msg: 'Halo {nama_penyewa},\n\nBerikut tagihan kost Anda:\n\n{detail_tagihan}\n\n{link_pembayaran}\n\nMohon segera melakukan pembayaran.\nTerima kasih. 🙏' },
-    { name: 'Reminder Overdue', type: 'reminder_overdue' as const, msg: 'Halo {nama_penyewa},\n\n⚠️ *PEMBERITAHUAN PENTING*\n\nTagihan Anda sudah *LEWAT JATUH TEMPO*.\n\n{detail_tagihan}\n\n{link_pembayaran}\n\nMohon segera melakukan pembayaran.\nTerima kasih. 🙏' },
-    { name: 'Reminder Due Soon', type: 'reminder_due_soon' as const, msg: 'Halo {nama_penyewa},\n\n🔔 *PENGINGAT*\n\nTagihan Anda akan segera jatuh tempo.\n\n{detail_tagihan}\n\n{link_pembayaran}\n\nSilakan lakukan pembayaran sebelum jatuh tempo.\nTerima kasih! 😊' },
-    { name: 'Template Umum', type: 'general' as const, msg: 'Halo {nama_penyewa},\n\n{detail_tagihan}\n\n{link_pembayaran}\n\nTerima kasih. 🙏' }
-  ]
+  const waTemplates = getAllDefaultWhatsAppTemplates().map((template) => ({
+    name: template.name,
+    type: template.templateType,
+    msg: template.message,
+  }))
   for (const t of waTemplates) {
     await db.insert(whatsappTemplates).values({
       userId: user.id,

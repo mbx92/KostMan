@@ -67,6 +67,7 @@ export interface GlobalSettings {
     costPerKwh: number | string
     trashFee: number | string
     waterFee: number | string
+    whatsappDetailFields: string[]
 }
 
 export interface RentBill {
@@ -177,7 +178,17 @@ export const useKosStore = defineStore('kos', () => {
         appName: 'KostMan',
         costPerKwh: 1500,
         trashFee: 25000,
-        waterFee: 50000
+        waterFee: 50000,
+        whatsappDetailFields: [
+            'property_name',
+            'room_name',
+            'tenant_name',
+            'occupant_count',
+            'rent_section',
+            'utility_section',
+            'grand_total',
+            'payment_status'
+        ]
     })
     const settingsLoading = ref(false)
     const settingsError = ref<string | null>(null)
@@ -206,6 +217,9 @@ export const useKosStore = defineStore('kos', () => {
                 costPerKwh: Number(data.costPerKwh),
                 trashFee: Number(data.trashFee),
                 waterFee: Number(data.waterFee),
+                whatsappDetailFields: Array.isArray(data.whatsappDetailFields)
+                    ? data.whatsappDetailFields
+                    : [...settings.value.whatsappDetailFields],
             }
         } catch (err: any) {
             settingsError.value = err?.data?.message || err?.message || 'Failed to fetch settings'
@@ -229,6 +243,9 @@ export const useKosStore = defineStore('kos', () => {
                 costPerKwh: Number(data.costPerKwh),
                 trashFee: Number(data.trashFee),
                 waterFee: Number(data.waterFee),
+                whatsappDetailFields: Array.isArray(data.whatsappDetailFields)
+                    ? data.whatsappDetailFields
+                    : [...settings.value.whatsappDetailFields],
             }
             return data
         } catch (err: any) {

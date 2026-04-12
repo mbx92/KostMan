@@ -92,6 +92,20 @@
       "when": 1768961000000,
       "tag": "0012_add_room_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775969400000,
+      "tag": "0013_add_whatsapp_detail_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775969700000,
+      "tag": "0014_add_public_invoice_links",
+      "breakpoints": true
     }
   ]
 }

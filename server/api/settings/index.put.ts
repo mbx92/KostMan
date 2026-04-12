@@ -1,8 +1,13 @@
-import { eq } from 'drizzle-orm'
-import { globalSettings } from '../../database/schema'
 import { requireRole, Role } from '../../utils/permissions'
-import { db } from '../../utils/drizzle'
 import { z } from 'zod'
+import {
+  DEFAULT_WHATSAPP_DETAIL_FIELDS,
+  createGlobalSettingsForUser,
+  getGlobalSettingsForUser,
+  updateGlobalSettingsForUser,
+} from '../../utils/global-settings'
+
+const whatsappDetailFieldSchema = z.enum(DEFAULT_WHATSAPP_DETAIL_FIELDS)
 
 const updateSettingsSchema = z.object({
   appName: z.string().min(1).max(255).optional(),
@@ -18,6 +23,9 @@ const updateSettingsSchema = z.object({
     (val) => Number(val) >= 0,
     { message: 'Trash fee cannot be negative' }
   ).optional(),
+  whatsappDetailFields: z.array(whatsappDetailFieldSchema)
+    .min(1, 'Minimal satu item detail tagihan harus dipilih')
+    .optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -28,39 +36,24 @@ export default defineEventHandler(async (event) => {
   const data = updateSettingsSchema.parse(body)
 
   // Ensure settings exist
-  let settings = await db
-    .select()
-    .from(globalSettings)
-    .where(eq(globalSettings.userId, userId))
-    .then(rows => rows[0])
+  let settings = await getGlobalSettingsForUser(userId)
 
   if (!settings) {
     // Create with provided values
-    const [newSettings] = await db
-      .insert(globalSettings)
-      .values({
-        userId,
-        appName: data.appName || 'KostMan',
-        costPerKwh: String(data.costPerKwh || '1500'),
-        waterFee: String(data.waterFee || '50000'),
-        trashFee: String(data.trashFee || '25000'),
-      })
-      .returning()
-    return newSettings
+    return createGlobalSettingsForUser(userId, {
+      appName: data.appName || 'KostMan',
+      costPerKwh: String(data.costPerKwh || '1500'),
+      waterFee: String(data.waterFee || '50000'),
+      trashFee: String(data.trashFee || '25000'),
+      whatsappDetailFields: data.whatsappDetailFields || [...DEFAULT_WHATSAPP_DETAIL_FIELDS],
+    })
   }
 
-  // Update existing settings
-  const updateData: any = {}
-  if (data.appName !== undefined) updateData.appName = data.appName
-  if (data.costPerKwh !== undefined) updateData.costPerKwh = String(data.costPerKwh)
-  if (data.waterFee !== undefined) updateData.waterFee = String(data.waterFee)
-  if (data.trashFee !== undefined) updateData.trashFee = String(data.trashFee)
-
-  const [updated] = await db
-    .update(globalSettings)
-    .set(updateData)
-    .where(eq(globalSettings.userId, userId))
-    .returning()
-
-  return updated
+  return updateGlobalSettingsForUser(userId, {
+    appName: data.appName,
+    costPerKwh: data.costPerKwh !== undefined ? String(data.costPerKwh) : undefined,
+    waterFee: data.waterFee !== undefined ? String(data.waterFee) : undefined,
+    trashFee: data.trashFee !== undefined ? String(data.trashFee) : undefined,
+    whatsappDetailFields: data.whatsappDetailFields,
+  })
 })
