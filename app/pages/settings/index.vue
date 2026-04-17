@@ -11,7 +11,7 @@ import {
 import { getDefaultWhatsAppTemplate } from '#shared/whatsapp-template-defaults'
 
 const store = useKosStore()
-const { settings, integrations, settingsLoading, integrationsLoading } = storeToRefs(store)
+const { settings, integrations, settingsLoading, integrationsLoading, properties } = storeToRefs(store)
 const toast = useToast()
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
@@ -33,7 +33,8 @@ const templateForm = reactive({
   name: '',
   message: '',
   templateType: 'general' as 'billing' | 'reminder_overdue' | 'reminder_due_soon' | 'general',
-  isDefault: false
+  isDefault: false,
+  propertyIds: [] as string[]
 })
 const templateLoading = ref(false)
 
@@ -43,6 +44,18 @@ const templateTypeOptions = [
   { label: 'Reminder Overdue', value: 'reminder_overdue' },
   { label: 'Reminder Jatuh Tempo', value: 'reminder_due_soon' }
 ]
+
+const propertyOptions = computed(() => properties.value.map((property) => ({
+  label: property.name,
+  value: property.id,
+  description: property.address,
+})))
+
+const selectedPropertyPreview = computed(() => {
+  if (templateForm.propertyIds.length === 0) return []
+
+  return properties.value.filter((property) => templateForm.propertyIds.includes(property.id))
+})
 
 const schema = z.object({
   appName: z.string().min(1, 'App Name is required'),
@@ -170,12 +183,14 @@ function openTemplateForm(template?: any) {
     templateForm.message = template.message
     templateForm.templateType = template.templateType || 'general'
     templateForm.isDefault = template.isDefault
+    templateForm.propertyIds = Array.isArray(template.mappedPropertyIds) ? [...template.mappedPropertyIds] : []
   } else {
     editingTemplate.value = null
     templateForm.name = ''
     templateForm.message = getDefaultTemplate()
     templateForm.templateType = 'general'
     templateForm.isDefault = false
+    templateForm.propertyIds = []
   }
   templateFormOpen.value = true
 }
@@ -205,6 +220,7 @@ async function saveTemplate() {
           message: templateForm.message,
           templateType: templateForm.templateType,
           isDefault: templateForm.isDefault,
+          propertyIds: templateForm.propertyIds,
         }
       })
       toast.add({
@@ -221,6 +237,7 @@ async function saveTemplate() {
           message: templateForm.message,
           templateType: templateForm.templateType,
           isDefault: templateForm.isDefault,
+          propertyIds: templateForm.propertyIds,
         }
       })
       toast.add({
@@ -303,6 +320,7 @@ onMounted(async () => {
   await Promise.all([
     store.fetchSettings(),
     store.fetchIntegrations(),
+    store.fetchProperties(),
     loadBackupHistory(),
     loadWhatsAppTemplates()
   ])
@@ -604,6 +622,18 @@ onMounted(async () => {
             <div class="text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto">
               {{ template.message }}
             </div>
+
+            <div v-if="template.mappedPropertyNames?.length" class="flex flex-wrap gap-2">
+              <UBadge
+                v-for="propertyName in template.mappedPropertyNames"
+                :key="propertyName"
+                color="neutral"
+                variant="soft"
+                size="sm"
+              >
+                {{ propertyName }}
+              </UBadge>
+            </div>
           </div>
         </UCard>
       </div>
@@ -646,26 +676,6 @@ onMounted(async () => {
         </div>
         <UButton to="/settings/logs" icon="i-heroicons-document-text" variant="soft">
           Open Logs
-        </UButton>
-      </UCard>
-    </section>
-
-    <!-- Database Configuration Section -->
-    <section class="space-y-6">
-      <div class="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Database Configuration</h2>
-          <p class="text-sm text-gray-500">Manage database connections for different environments.</p>
-        </div>
-      </div>
-
-      <UCard class="flex items-center justify-between">
-        <div>
-          <h3 class="font-medium text-gray-900 dark:text-white">Multi-Environment Database Setup</h3>
-          <p class="text-sm text-gray-500 mt-1 mb-2">Configure and switch between Development, Staging, and Production databases.</p>
-        </div>
-        <UButton to="/settings/database-config" icon="i-heroicons-circle-stack" variant="soft" color="primary">
-          Configure Databases
         </UButton>
       </UCard>
     </section>
@@ -769,69 +779,104 @@ onMounted(async () => {
       <template #default />
       
       <template #content>
-        <div class="p-6 space-y-4 max-w-3xl">
-          <UFormField label="Jenis Template">
-            <USelect 
-              v-model="templateForm.templateType" 
-              :items="templateTypeOptions"
-              value-key="value"
-              label-key="label"
-              class="w-full"
-            />
-          </UFormField>
+        <div class="max-w-3xl max-h-[85vh] flex flex-col">
+          <div class="p-6 space-y-4 overflow-y-auto">
+            <UFormField label="Jenis Template">
+              <USelect 
+                v-model="templateForm.templateType" 
+                :items="templateTypeOptions"
+                value-key="value"
+                label-key="label"
+                class="w-full"
+              />
+            </UFormField>
 
-          <UFormField label="Nama Template" required>
-            <UInput 
-              v-model="templateForm.name" 
-              placeholder="Contoh: Reminder Pembayaran Bulanan"
-              class="w-full"
-            />
-          </UFormField>
+            <UFormField label="Nama Template" required>
+              <UInput 
+                v-model="templateForm.name" 
+                placeholder="Contoh: Reminder Pembayaran Bulanan"
+                class="w-full"
+              />
+            </UFormField>
 
-          <UFormField label="Pesan Template" required>
-            <UTextarea 
-              v-model="templateForm.message" 
-              :rows="10"
-              placeholder="Tulis template pesan di sini..."
-              class="w-full font-mono text-sm"
-            />
-          </UFormField>
+            <UFormField label="Terapkan ke Properti">
+              <USelect
+                v-model="templateForm.propertyIds"
+                :items="propertyOptions"
+                value-key="value"
+                label-key="label"
+                multiple
+                class="w-full"
+                placeholder="Pilih satu atau lebih properti"
+              />
+              <p class="mt-1 text-xs text-gray-500">
+                Satu template bisa dipakai banyak properti untuk tipe yang sama. Properti yang dipilih akan otomatis memakai template ini.
+              </p>
+            </UFormField>
 
-          <!-- Quick Insert Variables -->
-          <div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
-            <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Sisipkan Variabel:
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <UButton 
-                v-for="variable in [
-                  '{nama_penyewa}',
-                  '{detail_tagihan}',
-                  '{link_pembayaran}'
-                ]"
-                :key="variable"
-                size="xs"
-                color="primary"
-                variant="soft"
-                @click="insertVariable(variable)"
-              >
-                {{ variable }}
-              </UButton>
+            <div v-if="selectedPropertyPreview.length" class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
+              <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Properti Terpilih:
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <UBadge
+                  v-for="property in selectedPropertyPreview"
+                  :key="property.id"
+                  color="primary"
+                  variant="soft"
+                  size="sm"
+                >
+                  {{ property.name }}
+                </UBadge>
+              </div>
+            </div>
+
+            <UFormField label="Pesan Template" required>
+              <UTextarea 
+                v-model="templateForm.message" 
+                :rows="10"
+                placeholder="Tulis template pesan di sini..."
+                class="w-full font-mono text-sm"
+              />
+            </UFormField>
+
+            <!-- Quick Insert Variables -->
+            <div class="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
+              <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Sisipkan Variabel:
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <UButton 
+                  v-for="variable in [
+                    '{nama_penyewa}',
+                    '{detail_tagihan}',
+                    '{link_pembayaran}'
+                  ]"
+                  :key="variable"
+                  size="xs"
+                  color="primary"
+                  variant="soft"
+                  @click="insertVariable(variable)"
+                >
+                  {{ variable }}
+                </UButton>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3 py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">Jadikan Template Default</p>
+                <p class="text-xs text-gray-500">Template ini akan digunakan secara otomatis</p>
+              </div>
+              <USwitch v-model="templateForm.isDefault" />
             </div>
           </div>
 
-          <div class="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div>
-              <p class="text-sm font-medium text-gray-900 dark:text-white">Jadikan Template Default</p>
-              <p class="text-xs text-gray-500">Template ini akan digunakan secara otomatis</p>
-            </div>
-            <USwitch v-model="templateForm.isDefault" />
-          </div>
-
-          <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sticky bottom-0">
             <UButton 
               color="neutral" 
-              variant="soft" 
+              variant="soft"
+              class="w-full sm:w-auto"
               @click="templateFormOpen = false"
             >
               Batal
@@ -839,6 +884,7 @@ onMounted(async () => {
             <UButton 
               color="primary" 
               :loading="templateLoading"
+              class="w-full sm:w-auto"
               @click="saveTemplate"
             >
               {{ editingTemplate ? 'Perbarui' : 'Simpan' }} Template

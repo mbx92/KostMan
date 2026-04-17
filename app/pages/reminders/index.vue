@@ -712,8 +712,11 @@ const sendWhatsApp = async (room: any) => {
     ];
     const customDetailSection = buildPerPeriodReminderDetail(room, rentBills, utilityBills);
 
-    const templateType = 'reminder_due_soon';
-    const template = await getDefaultTemplate(templateType);
+    const roomStatus = getRoomStatus(room.id);
+    const templateType = roomStatus.daysUntilDue !== null && roomStatus.daysUntilDue < 0
+        ? 'reminder_overdue'
+        : 'reminder_due_soon';
+    const template = await getDefaultTemplate(templateType, room.propertyId || room.property?.id);
 
     const billingData = {
         tenantName: room.tenantName || room.tenant?.name,
@@ -724,7 +727,7 @@ const sendWhatsApp = async (room: any) => {
         rentPeriod: formatSelectedPeriods(rentBills.map((bill: any) => formatDateRange(bill.periodStartDate, bill.periodEndDate))),
         utilityPeriod: formatSelectedPeriods(utilityBills.map((bill: any) => formatPeriodMonth(bill.period))),
         occupantCount: room.occupantCount || 1,
-        daysUntilDue: 0,
+        daysUntilDue: roomStatus.daysUntilDue ?? 0,
         rentAmount: rentTotal,
         monthsCovered: rentBills.length > 0 ? totalMonthsCovered : undefined,
         roomPrice: rentBills.length === 1 ? firstRentBill?.roomPrice || 0 : undefined,

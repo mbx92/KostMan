@@ -1280,7 +1280,7 @@ const sendToWhatsApp = async (item: {
 
   try {
     // Get template from database
-    const template = await getDefaultTemplate("billing");
+    const template = await getDefaultTemplate("billing", propFallback.id);
 
     // Build billing data for template
     const totalRent = item.rent ? Number(item.rent.totalAmount) : 0;
@@ -1450,7 +1450,7 @@ const sendReminder = async (reminder: any) => {
       ? "reminder_due_soon"
       : "general";
 
-  const template = await getDefaultTemplate(templateType);
+  const template = await getDefaultTemplate(templateType, reminder.property?.id || reminder.room?.propertyId);
   const firstRentBill = reminder.unpaidRentBills?.[0];
   const firstUtilityBill = reminder.unpaidUtilityBills?.[0];
 

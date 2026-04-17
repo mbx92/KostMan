@@ -1,4 +1,4 @@
-CREATE TABLE "public_invoice_links" (
+CREATE TABLE IF NOT EXISTS "public_invoice_links" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"code" varchar(16) NOT NULL,
 	"token" text NOT NULL,

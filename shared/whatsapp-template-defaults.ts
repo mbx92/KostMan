@@ -1,5 +1,18 @@
 export type DefaultWhatsAppTemplateType = 'billing' | 'reminder_overdue' | 'reminder_due_soon' | 'general'
 
+export type PropertyWhatsAppTemplateField =
+  | 'billingWhatsappTemplateId'
+  | 'reminderOverdueWhatsappTemplateId'
+  | 'reminderDueSoonWhatsappTemplateId'
+  | 'generalWhatsappTemplateId'
+
+export const PROPERTY_WHATSAPP_TEMPLATE_FIELD_MAP: Record<DefaultWhatsAppTemplateType, PropertyWhatsAppTemplateField> = {
+  billing: 'billingWhatsappTemplateId',
+  reminder_overdue: 'reminderOverdueWhatsappTemplateId',
+  reminder_due_soon: 'reminderDueSoonWhatsappTemplateId',
+  general: 'generalWhatsappTemplateId',
+}
+
 export interface DefaultWhatsAppTemplateDefinition {
   name: string
   templateType: DefaultWhatsAppTemplateType

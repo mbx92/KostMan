@@ -55,6 +55,24 @@ export const users = pgTable("users", {
     .$onUpdate(() => new Date()),
 });
 
+export const templateTypeEnum = pgEnum("template_type", ["billing", "reminder_overdue", "reminder_due_soon", "general"]);
+
+export const whatsappTemplates = pgTable("whatsapp_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  message: text("message").notNull(),
+  templateType: templateTypeEnum("template_type").default("general"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
 export const properties = pgTable("properties", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
@@ -65,6 +83,10 @@ export const properties = pgTable("properties", {
   description: varchar("description"),
   image: varchar("image", { length: 500 }),
   mapUrl: varchar("map_url", { length: 500 }),
+  billingWhatsappTemplateId: uuid("billing_whatsapp_template_id").references(() => whatsappTemplates.id),
+  reminderOverdueWhatsappTemplateId: uuid("reminder_overdue_whatsapp_template_id").references(() => whatsappTemplates.id),
+  reminderDueSoonWhatsappTemplateId: uuid("reminder_due_soon_whatsapp_template_id").references(() => whatsappTemplates.id),
+  generalWhatsappTemplateId: uuid("general_whatsapp_template_id").references(() => whatsappTemplates.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -335,26 +357,6 @@ export const systemSettings = pgTable("system_settings", {
   description: text("description"),
   updatedAt: timestamp("updated_at")
     .defaultNow()
-    .$onUpdate(() => new Date()),
-});
-
-// Template Type Enum for WhatsApp messages
-export const templateTypeEnum = pgEnum("template_type", ["billing", "reminder_overdue", "reminder_due_soon", "general"]);
-
-// WhatsApp Templates - Message templates for billing reminders
-export const whatsappTemplates = pgTable("whatsapp_templates", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  name: varchar("name", { length: 100 }).notNull(),
-  message: text("message").notNull(),
-  templateType: templateTypeEnum("template_type").default("general"),
-  isDefault: boolean("is_default").default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .notNull()
     .$onUpdate(() => new Date()),
 });
 

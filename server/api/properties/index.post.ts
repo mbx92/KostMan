@@ -1,8 +1,31 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { properties, propertySettings } from '../../database/schema';
+import { properties, propertySettings, whatsappTemplates } from '../../database/schema';
 import { propertySchema } from '../../validations/property';
+import { and, eq, inArray } from 'drizzle-orm';
+
+async function validateTemplateOwnership(userId: string, templateIds: Array<string | null | undefined>) {
+    const normalizedIds = [...new Set(templateIds.filter((templateId): templateId is string => Boolean(templateId)))];
+
+    if (normalizedIds.length === 0) {
+        return;
+    }
+
+    const ownedTemplates = await db.select({ id: whatsappTemplates.id })
+        .from(whatsappTemplates)
+        .where(and(
+            eq(whatsappTemplates.userId, userId),
+            inArray(whatsappTemplates.id, normalizedIds),
+        ));
+
+    if (ownedTemplates.length !== normalizedIds.length) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: 'One or more WhatsApp templates are invalid for this property',
+        });
+    }
+}
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
@@ -18,7 +41,27 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const { name, address, description, image, mapUrl, costPerKwh, waterFee, trashFee } = parseResult.data;
+    const {
+        name,
+        address,
+        description,
+        image,
+        mapUrl,
+        billingWhatsappTemplateId,
+        reminderOverdueWhatsappTemplateId,
+        reminderDueSoonWhatsappTemplateId,
+        generalWhatsappTemplateId,
+        costPerKwh,
+        waterFee,
+        trashFee,
+    } = parseResult.data;
+
+    await validateTemplateOwnership(user.id, [
+        billingWhatsappTemplateId,
+        reminderOverdueWhatsappTemplateId,
+        reminderDueSoonWhatsappTemplateId,
+        generalWhatsappTemplateId,
+    ]);
 
     // Use transaction to ensure both are inserted or neither
     const newProperty = await db.transaction(async (tx) => {
@@ -29,6 +72,10 @@ export default defineEventHandler(async (event) => {
             description,
             image,
             mapUrl,
+            billingWhatsappTemplateId,
+            reminderOverdueWhatsappTemplateId,
+            reminderDueSoonWhatsappTemplateId,
+            generalWhatsappTemplateId,
         }).returning();
 
         const propertyId = insertedProperty[0].id;

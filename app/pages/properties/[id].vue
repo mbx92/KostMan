@@ -33,9 +33,13 @@ async function loadProperty() {
   }
 }
 
-onMounted(() => {
-  loadProperty();
-});
+watch(
+  () => propertyId.value,
+  async () => {
+    await loadProperty();
+  },
+  { immediate: true }
+);
 
 const isPreviewOpen = ref(false);
 
@@ -448,6 +452,7 @@ try {
             </div>
           </div>
         </div>
+
       </div>
 
       <!-- Right Col: Quick Actions & Image URL -->

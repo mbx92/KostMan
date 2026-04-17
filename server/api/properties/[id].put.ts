@@ -1,9 +1,33 @@
 
 import { requireRole, Role } from '../../utils/permissions';
 import { db } from '../../utils/drizzle';
-import { properties, propertySettings } from '../../database/schema';
+import { properties, propertySettings, whatsappTemplates } from '../../database/schema';
 import { propertySchema } from '../../validations/property';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
+
+async function validateTemplateOwnership(userId: string, templateIds: Array<string | null | undefined>, allowedExistingIds: string[] = []) {
+    const normalizedIds = [...new Set(templateIds.filter((templateId): templateId is string => Boolean(templateId)))];
+    const allowedIds = new Set(allowedExistingIds.filter(Boolean));
+    const idsToValidate = normalizedIds.filter((templateId) => !allowedIds.has(templateId));
+
+    if (idsToValidate.length === 0) {
+        return;
+    }
+
+    const ownedTemplates = await db.select({ id: whatsappTemplates.id })
+        .from(whatsappTemplates)
+        .where(and(
+            eq(whatsappTemplates.userId, userId),
+            inArray(whatsappTemplates.id, idsToValidate),
+        ));
+
+    if (ownedTemplates.length !== idsToValidate.length) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: 'One or more WhatsApp templates are invalid for this property',
+        });
+    }
+}
 
 export default defineEventHandler(async (event) => {
     const user = requireRole(event, [Role.ADMIN, Role.OWNER]);
@@ -27,6 +51,12 @@ export default defineEventHandler(async (event) => {
     }
 
     const targetProperty = property[0];
+    const existingTemplateIds = [
+        targetProperty.billingWhatsappTemplateId,
+        targetProperty.reminderOverdueWhatsappTemplateId,
+        targetProperty.reminderDueSoonWhatsappTemplateId,
+        targetProperty.generalWhatsappTemplateId,
+    ].filter((templateId): templateId is string => Boolean(templateId));
 
     if (user.role !== Role.ADMIN && targetProperty.userId !== user.id) {
         throw createError({
@@ -47,7 +77,27 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const { name, address, description, image, mapUrl, costPerKwh, waterFee, trashFee } = parseResult.data;
+    const {
+        name,
+        address,
+        description,
+        image,
+        mapUrl,
+        billingWhatsappTemplateId,
+        reminderOverdueWhatsappTemplateId,
+        reminderDueSoonWhatsappTemplateId,
+        generalWhatsappTemplateId,
+        costPerKwh,
+        waterFee,
+        trashFee,
+    } = parseResult.data;
+
+    await validateTemplateOwnership(user.id, [
+        billingWhatsappTemplateId,
+        reminderOverdueWhatsappTemplateId,
+        reminderDueSoonWhatsappTemplateId,
+        generalWhatsappTemplateId,
+    ], existingTemplateIds);
 
     const updatedProperty = await db.transaction(async (tx) => {
         const updated = await tx.update(properties)
@@ -57,6 +107,10 @@ export default defineEventHandler(async (event) => {
                 description,
                 image,
                 mapUrl,
+                billingWhatsappTemplateId,
+                reminderOverdueWhatsappTemplateId,
+                reminderDueSoonWhatsappTemplateId,
+                generalWhatsappTemplateId,
                 updatedAt: new Date(),
             })
             .where(eq(properties.id, id))

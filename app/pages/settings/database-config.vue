@@ -6,6 +6,8 @@ definePageMeta({
   layout: 'default'
 })
 
+await navigateTo('/settings', { replace: true })
+
 const toast = useToast()
 
 // State

@@ -107,7 +107,7 @@ export function buildUtilityDetailBlock(options: {
   const totalAmount = Number(options.totalAmount || 0)
   if (totalAmount <= 0) return []
 
-  const lines = ['*Utilitas*']
+  const lines = ['*Utilitas ( Tagihan Listrik, Air & Sampah )*']
   appendLabeledLine(lines, 'Periode Pemakaian', options.periodLabel)
 
   if (Number(options.usageCost || 0) > 0) {
@@ -345,9 +345,11 @@ export function useWhatsAppTemplate() {
   /**
    * Fetch default template for a type from API
    */
-  async function getDefaultTemplate(type: TemplateType): Promise<{ message: string; name: string }> {
+  async function getDefaultTemplate(type: TemplateType, propertyId?: string | null): Promise<{ message: string; name: string }> {
     try {
-      const response = await $fetch<{ template: { message: string; name: string } }>(`/api/whatsapp-templates/default/${type}`)
+      const response = await $fetch<{ template: { message: string; name: string } }>(`/api/whatsapp-templates/default/${type}`, {
+        query: propertyId ? { propertyId } : undefined,
+      })
       return response.template
     } catch (error) {
       console.error('Failed to fetch template:', error)

@@ -25,6 +25,10 @@ export interface Property {
     description: string
     image: string
     mapUrl?: string
+    billingWhatsappTemplateId?: string | null
+    reminderOverdueWhatsappTemplateId?: string | null
+    reminderDueSoonWhatsappTemplateId?: string | null
+    generalWhatsappTemplateId?: string | null
     settings?: PropertySettings | null
     createdAt?: string
     updatedAt?: string
