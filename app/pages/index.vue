@@ -34,7 +34,7 @@ const meterStats = ref({ total: 0, recorded: 0, pending: 0 })
 const totalProperties = computed(() => kosStore.properties.length);
 const totalRooms = computed(() => kosStore.rooms.length);
 const occupiedRooms = computed(() => kosStore.rooms.filter(r => r.status === 'occupied').length);
-const totalTenants = computed(() => kosStore.tenants.length);
+const totalTenants = computed(() => kosStore.tenantsMeta.total);
 </script>
 
 <template>
