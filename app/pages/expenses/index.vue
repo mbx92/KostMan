@@ -25,7 +25,15 @@ const { data: categoriesData } = useAuthFetch('/api/expenses/categories') as { d
 const allCategories = computed(() => {
   const defaults = categoriesData.value?.categories?.default || []
   const custom = categoriesData.value?.categories?.custom || []
-  return [...defaults, ...custom]
+  const combined = [...defaults, ...custom]
+  
+  const othersIndex = combined.findIndex((c: any) => c.name === 'others')
+  if (othersIndex !== -1) {
+    const others = combined.splice(othersIndex, 1)[0]
+    combined.push(others)
+  }
+  
+  return combined
 })
 
 const propertyOptions = computed(() => [
