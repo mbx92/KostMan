@@ -1,0 +1,1 @@
+ALTER TABLE "expenses" ADD COLUMN "category_others" varchar(50);

@@ -60,6 +60,7 @@ export default defineEventHandler(async (event) => {
             propertyId: expenses.propertyId,
             propertyName: properties.name,
             category: expenses.category,
+            categoryOthers: expenses.categoryOthers,
             description: expenses.description,
             amount: expenses.amount,
             type: expenses.type,

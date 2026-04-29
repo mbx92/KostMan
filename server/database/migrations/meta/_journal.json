@@ -113,6 +113,20 @@
       "when": 1776132000000,
       "tag": "0015_property_whatsapp_template_mapping",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1777460135253,
+      "tag": "0016_low_iron_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777464434327,
+      "tag": "0017_glossy_cargill",
+      "breakpoints": true
     }
   ]
 }

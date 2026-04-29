@@ -305,7 +305,8 @@ export const expenses = pgTable("expenses", {
     .notNull(),
 
   // Expense Details
-  category: varchar("category", { length: 50 }).notNull(), // Can be default category or custom category name
+  category: varchar("category", { length: 50 }).notNull(), // Fixed categories: Maintenance, Token, Salary, Others
+  categoryOthers: varchar("category_others", { length: 50 }), // Detail when category = 'Others'
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
 

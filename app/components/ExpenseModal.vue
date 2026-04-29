@@ -7,6 +7,7 @@ interface Expense {
   propertyId?: string
   propertyName?: string
   category: string
+  categoryOthers?: string
   description: string
   amount: string
   type: 'property' | 'global'
@@ -33,6 +34,7 @@ const isSaving = ref(false)
 const state = reactive({
   propertyId: '',
   category: '',
+  categoryOthers: '',
   description: '',
   amount: 0,
   type: 'property' as 'property' | 'global',
@@ -42,6 +44,13 @@ const state = reactive({
   paymentMethod: '',
   receiptUrl: '',
   notes: ''
+})
+
+const isOthersCategory = computed(() => state.category === 'others')
+
+// Clear categoryOthers when switching away from others
+watch(() => state.category, (val) => {
+  if (val !== 'others') state.categoryOthers = ''
 })
 
 
@@ -54,18 +63,19 @@ const propertyOptions = computed(() => {
   }))
 })
 
-const categoryOptions = [
-  { label: 'Maintenance', value: 'Maintenance' },
-  { label: 'Token', value: 'Token' },
-  { label: 'Salary', value: 'Salary' },
-  { label: 'Others', value: 'Others' }
-]
+const categoryOptions = computed(() => [
+  ...props.categories.map((c: any) => ({
+    label: c.name.charAt(0).toUpperCase() + c.name.slice(1),
+    value: c.name
+  }))
+])
 
 
 // Validation Schema
 const schema = z.object({
   propertyId: z.string().optional(),
   category: z.string().min(1, 'Kategori wajib diisi'),
+  categoryOthers: z.string().max(50, 'Maksimal 50 karakter').optional(),
   description: z.string().min(3, 'Deskripsi terlalu pendek'),
   amount: z.number().int('Jumlah harus bilangan bulat').positive('Jumlah harus positif'),
   type: z.enum(['property', 'global']),
@@ -83,15 +93,39 @@ const schema = z.object({
 }, {
   message: 'Properti wajib dipilih untuk pengeluaran properti',
   path: ['propertyId']
+}).refine(data => {
+  if (data.category === 'others' && !data.categoryOthers?.trim()) {
+    return false
+  }
+  return true
+}, {
+  message: 'Jenis pengeluaran wajib diisi',
+  path: ['categoryOthers']
 })
 
 type Schema = z.output<typeof schema>
 
 // Sync with prop for Edit Mode
+const resetForm = () => {
+  state.propertyId = ''
+  state.category = ''
+  state.categoryOthers = ''
+  state.description = ''
+  state.amount = 0
+  state.type = 'property'
+  state.expenseDate = new Date().toISOString().split('T')[0]
+  state.paidDate = ''
+  state.isPaid = false
+  state.paymentMethod = ''
+  state.receiptUrl = ''
+  state.notes = ''
+}
+
 watch(() => props.expense, (newVal) => {
   if (newVal) {
     state.propertyId = newVal.propertyId || ''
     state.category = newVal.category
+    state.categoryOthers = newVal.categoryOthers || ''
     state.description = newVal.description
     state.amount = Math.round(Number(newVal.amount) || 0)
     state.type = newVal.type
@@ -102,18 +136,7 @@ watch(() => props.expense, (newVal) => {
     state.receiptUrl = newVal.receiptUrl || ''
     state.notes = newVal.notes || ''
   } else {
-    // Reset for Add Mode
-    state.propertyId = ''
-    state.category = ''
-    state.description = ''
-    state.amount = 0
-    state.type = 'property'
-    state.expenseDate = new Date().toISOString().split('T')[0]
-    state.paidDate = ''
-    state.isPaid = false
-    state.paymentMethod = ''
-    state.receiptUrl = ''
-    state.notes = ''
+    resetForm()
   }
 }, { immediate: true })
 
@@ -150,6 +173,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
   try {
     const payload = {
       ...data,
+      categoryOthers: data.category === 'others' ? (data.categoryOthers?.trim() || null) : null,
       propertyId: data.type === 'global' ? null : data.propertyId,
       paidDate: data.paidDate || null,
       paymentMethod: data.paymentMethod || null,
@@ -177,6 +201,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         description: 'Pengeluaran baru berhasil ditambahkan.',
         color: 'success',
       })
+      resetForm()
     }
     
     emit('saved')
@@ -204,8 +229,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           <div class="space-y-4">
             <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Rincian Pengeluaran</h3>
             
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipe</label>
+            <UFormField name="type" label="Tipe">
               <USelect 
                 v-model="state.type" 
                 :items="typeOptions" 
@@ -213,10 +237,9 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
                 label-key="label"
                 class="w-full"
               />
-            </div>
+            </UFormField>
 
-            <div v-if="state.type === 'property'" class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Properti</label>
+            <UFormField v-if="state.type === 'property'" name="propertyId" label="Properti">
               <USelect 
                 v-model="state.propertyId" 
                 :items="propertyOptions" 
@@ -225,10 +248,9 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
                 placeholder="Pilih properti"
                 class="w-full"
               />
-            </div>
+            </UFormField>
 
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Kategori</label>
+            <UFormField name="category" label="Kategori">
               <USelect 
                 v-model="state.category" 
                 :items="categoryOptions" 
@@ -237,24 +259,33 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
                 placeholder="Pilih kategori"
                 class="w-full"
               />
-            </div>
+            </UFormField>
 
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi</label>
+            <UFormField v-if="isOthersCategory" name="categoryOthers" label="Jenis Pengeluaran">
+              <UInput
+                v-model="state.categoryOthers"
+                placeholder="contoh: Renovasi, Pajak, dll..."
+                :maxlength="50"
+                class="w-full"
+              />
+              <template #hint>
+                <span class="text-xs text-gray-400">{{ state.categoryOthers.length }}/50</span>
+              </template>
+            </UFormField>
+
+            <UFormField name="description" label="Deskripsi">
               <UTextarea v-model="state.description" placeholder="contoh: Perbaikan AC di Kamar 101" class="w-full" />
-            </div>
+            </UFormField>
 
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah</label>
+            <UFormField name="amount" label="Jumlah">
               <UInput v-model="state.amount" type="number" step="1" placeholder="0" class="w-full">
                 <template #leading>Rp</template>
               </UInput>
-            </div>
+            </UFormField>
 
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Pengeluaran</label>
+            <UFormField name="expenseDate" label="Tanggal Pengeluaran">
               <DatePicker v-model="state.expenseDate" granularity="day" class="w-full" />
-            </div>
+            </UFormField>
           </div>
 
           <!-- Payment Details -->
@@ -268,13 +299,11 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
             </div>
 
             <div v-if="state.isPaid" class="space-y-4 animate-fade-in">
-              <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Bayar</label>
+              <UFormField name="paidDate" label="Tanggal Bayar">
                 <DatePicker v-model="state.paidDate" granularity="day" class="w-full" />
-              </div>
+              </UFormField>
 
-              <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Metode Pembayaran</label>
+              <UFormField name="paymentMethod" label="Metode Pembayaran">
                 <USelect 
                   v-model="state.paymentMethod" 
                   :items="paymentMethods" 
@@ -283,7 +312,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
                   placeholder="Pilih metode pembayaran"
                   class="w-full"
                 />
-              </div>
+              </UFormField>
             </div>
           </div>
 
@@ -291,16 +320,16 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           <div class="space-y-4">
             <h3 class="font-medium text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800">Informasi Tambahan</h3>
             
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">URL Kuitansi</label>
+            <UFormField name="receiptUrl" label="URL Kuitansi">
               <UInput v-model="state.receiptUrl" placeholder="https://..." class="w-full" />
-              <p class="text-xs text-gray-500 mt-1">Tautan ke gambar atau PDF kuitansi</p>
-            </div>
+              <template #hint>
+                <span class="text-xs text-gray-500">Tautan ke gambar atau PDF kuitansi</span>
+              </template>
+            </UFormField>
 
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Catatan</label>
+            <UFormField name="notes" label="Catatan">
               <UTextarea v-model="state.notes" placeholder="Catatan tambahan..." class="w-full" />
-            </div>
+            </UFormField>
           </div>
 
           <div class="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">

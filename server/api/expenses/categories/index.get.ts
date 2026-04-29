@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
         { name: "supplies", description: "Supplies and materials", color: "#10b981", isDefault: true },
         { name: "salary", description: "Salaries and wages", color: "#f59e0b", isDefault: true },
         { name: "tax", description: "Taxes and fees", color: "#8b5cf6", isDefault: true },
-        { name: "other", description: "Other expenses", color: "#6b7280", isDefault: true },
+        { name: "others", description: "Other expenses", color: "#6b7280", isDefault: true },
     ];
 
     return {

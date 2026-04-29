@@ -42,6 +42,7 @@ const statusLabel = computed(() => {
               <div class="w-3 h-3 rounded-full shrink-0" :style="{ backgroundColor: getCategoryColor(expense.category) }" />
               <span class="font-bold text-gray-900 dark:text-white text-lg truncate">
                 {{ expense.category }}
+                <span v-if="expense.category === 'others' && expense.categoryOthers" class="font-normal text-gray-400 text-base">({{ expense.categoryOthers }})</span>
               </span>
             </div>
           </div>

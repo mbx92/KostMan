@@ -3,7 +3,7 @@ import ConfirmDialog from "~/components/ConfirmDialog.vue";
 
 const toast = useToast()
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
-const { data: authData } = await useAuthFetch('/api/auth/me')
+const { data: authData } = await useAuthFetch('/api/auth/me') as { data: Ref<any> }
 const isStaff = computed(() => authData.value?.user?.role === 'staff')
 
 // Modals
@@ -11,8 +11,8 @@ const expenseModalOpen = ref(false)
 const selectedExpense = ref<any>(null)
 
 // Fetch properties for filter
-const { data: propertiesData } = useAuthFetch('/api/properties')
-const properties = computed(() => propertiesData.value || [])
+const { data: propertiesData } = useAuthFetch('/api/properties') as { data: Ref<any> }
+const properties = computed<any[]>(() => (propertiesData.value as any) || [])
 
 // Filters
 const selectedPropertyId = ref('all')
@@ -21,7 +21,7 @@ const selectedCategory = ref('all')
 const selectedStatus = ref<'all' | 'paid' | 'unpaid'>('all')
 
 // Fetch categories
-const { data: categoriesData } = useAuthFetch('/api/expenses/categories')
+const { data: categoriesData } = useAuthFetch('/api/expenses/categories') as { data: Ref<any> }
 const allCategories = computed(() => {
   const defaults = categoriesData.value?.categories?.default || []
   const custom = categoriesData.value?.categories?.custom || []
@@ -78,7 +78,7 @@ watch([selectedPropertyId, selectedType, selectedCategory, selectedStatus], () =
 const { data: expensesData, pending: expensesLoading, refresh: refreshExpenses } = useAuthFetch('/api/expenses', {
   query: queryParams,
   watch: [page, selectedPropertyId, selectedType, selectedCategory, selectedStatus]
-})
+}) as { data: Ref<any>, pending: Ref<boolean>, refresh: () => Promise<void> }
 
 const expenses = computed(() => expensesData.value?.expenses || [])
 const totalExpensesCount = computed(() => expensesData.value?.pagination?.total || 0)
@@ -216,7 +216,7 @@ const onExpenseSaved = async () => {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Total Pengeluaran</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(totalExpenses) }}</p>
+            <ClientOnly><p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ formatCurrency(totalExpenses) }}</p><template #fallback><p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">-</p></template></ClientOnly>
           </div>
           <div class="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
             <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -228,7 +228,7 @@ const onExpenseSaved = async () => {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Sudah Dibayar</p>
-            <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{{ formatCurrency(totalPaid) }}</p>
+            <ClientOnly><p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{{ formatCurrency(totalPaid) }}</p><template #fallback><p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">-</p></template></ClientOnly>
           </div>
           <div class="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
             <UIcon name="i-heroicons-check-circle" class="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -240,7 +240,7 @@ const onExpenseSaved = async () => {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Belum Dibayar</p>
-            <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{{ formatCurrency(totalUnpaid) }}</p>
+            <ClientOnly><p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{{ formatCurrency(totalUnpaid) }}</p><template #fallback><p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">-</p></template></ClientOnly>
           </div>
           <div class="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
             <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -319,75 +319,87 @@ const onExpenseSaved = async () => {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            <tr v-if="expensesLoading">
-              <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
-                <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto" />
-              </td>
-            </tr>
-            <tr v-else-if="filteredExpenses.length === 0">
-              <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
-                Tidak ada pengeluaran ditemukan
-              </td>
-            </tr>
-            <template v-else>
-              <tr v-for="expense in filteredExpenses" :key="expense.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                {{ formatDate(expense.expenseDate) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getCategoryColor(expense.category) }" />
-                  <span class="text-sm text-gray-900 dark:text-white">{{ expense.category }}</span>
-                </div>
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-900 dark:text-white max-w-xs truncate">
-                {{ expense.description }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                <span v-if="expense.type === 'global'" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
-                  Global
-                </span>
-                <span v-else>{{ expense.propertyName || '-' }}</span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                {{ formatCurrency(expense.amount) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span v-if="expense.isPaid" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
-                  Lunas
-                </span>
-                <span v-else class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-                  Belum Dibayar
-                </span>
-              </td>
-              <td v-if="!isStaff" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <div class="flex items-center justify-end gap-2">
-                  <UButton 
-                    icon="i-heroicons-pencil" 
-                    size="sm"
-                    color="neutral" 
-                    variant="ghost"
-                    @click="openEditExpense(expense)"
-                  />
-                  <UButton 
-                    v-if="!expense.isPaid"
-                    icon="i-heroicons-check" 
-                    size="sm"
-                    color="success" 
-                    variant="ghost"
-                    @click="markAsPaid(expense.id)"
-                  />
-                  <UButton 
-                    icon="i-heroicons-trash" 
-                    size="sm"
-                    color="error" 
-                    variant="ghost"
-                    @click="deleteExpense(expense.id)"
-                  />
-                </div>
-              </td>
-            </tr>
-            </template>
+            <ClientOnly>
+              <template #fallback>
+                <tr>
+                  <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
+                    <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto" />
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="expensesLoading">
+                <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
+                  <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto" />
+                </td>
+              </tr>
+              <tr v-else-if="filteredExpenses.length === 0">
+                <td :colspan="isStaff ? 6 : 7" class="px-6 py-8 text-center text-gray-500">
+                  Tidak ada pengeluaran ditemukan
+                </td>
+              </tr>
+              <template v-else>
+                <tr v-for="expense in filteredExpenses" :key="expense.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {{ formatDate(expense.expenseDate) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center gap-2">
+                      <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getCategoryColor(expense.category) }" />
+                      <span class="text-sm text-gray-900 dark:text-white">
+                        {{ expense.category }}
+                        <span v-if="expense.category === 'others' && expense.categoryOthers" class="text-gray-400">({{ expense.categoryOthers }})</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-gray-900 dark:text-white max-w-xs truncate">
+                    {{ expense.description }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <span v-if="expense.type === 'global'" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                      Global
+                    </span>
+                    <span v-else>{{ expense.propertyName || '-' }}</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    {{ formatCurrency(expense.amount) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span v-if="expense.isPaid" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+                      Lunas
+                    </span>
+                    <span v-else class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+                      Belum Dibayar
+                    </span>
+                  </td>
+                  <td v-if="!isStaff" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div class="flex items-center justify-end gap-2">
+                      <UButton 
+                        icon="i-heroicons-pencil" 
+                        size="sm"
+                        color="neutral" 
+                        variant="ghost"
+                        @click="openEditExpense(expense)"
+                      />
+                      <UButton 
+                        v-if="!expense.isPaid"
+                        icon="i-heroicons-check" 
+                        size="sm"
+                        color="success" 
+                        variant="ghost"
+                        @click="markAsPaid(expense.id)"
+                      />
+                      <UButton 
+                        icon="i-heroicons-trash" 
+                        size="sm"
+                        color="error" 
+                        variant="ghost"
+                        @click="deleteExpense(expense.id)"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </ClientOnly>
           </tbody>
         </table>
       </div>
@@ -395,26 +407,32 @@ const onExpenseSaved = async () => {
 
     <!-- Expenses Cards - Mobile -->
     <div class="md:hidden space-y-3">
-      <div v-if="expensesLoading" class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center">
-        <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto text-gray-500" />
-      </div>
-      <div v-else-if="filteredExpenses.length === 0" class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500">
-        Tidak ada pengeluaran ditemukan
-      </div>
-      
-      <ExpensesExpenseCard 
-        v-else 
-        v-for="expense in filteredExpenses" 
-        :key="expense.id"
-        :expense="expense"
-        :format-currency="formatCurrency"
-        :format-date="formatDate"
-        :get-category-color="getCategoryColor"
-        :show-actions="!isStaff"
-        @edit="openEditExpense"
-        @mark-paid="markAsPaid"
-        @delete="deleteExpense"
-      />
+      <ClientOnly>
+        <template #fallback>
+          <div class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center">
+            <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto text-gray-500" />
+          </div>
+        </template>
+        <div v-if="expensesLoading" class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center">
+          <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin mx-auto text-gray-500" />
+        </div>
+        <div v-else-if="filteredExpenses.length === 0" class="bg-white dark:bg-gray-900 rounded-xl border-2 border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500">
+          Tidak ada pengeluaran ditemukan
+        </div>
+        <ExpensesExpenseCard 
+          v-else 
+          v-for="expense in filteredExpenses" 
+          :key="expense.id"
+          :expense="expense"
+          :format-currency="formatCurrency"
+          :format-date="formatDate"
+          :get-category-color="getCategoryColor"
+          :show-actions="!isStaff"
+          @edit="openEditExpense"
+          @mark-paid="markAsPaid"
+          @delete="deleteExpense"
+        />
+      </ClientOnly>
     </div>
 
     <!-- Pagination -->

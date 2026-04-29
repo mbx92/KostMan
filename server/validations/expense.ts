@@ -5,6 +5,7 @@ export const createExpenseSchema = z
     .object({
         propertyId: z.string().uuid().optional().nullable(),
         category: z.string().min(1).max(50),
+        categoryOthers: z.string().max(50).optional().nullable(),
         description: z.string().min(3).max(500),
         amount: z.number().positive().transform((val) => Math.round(val)),
         type: z.enum(["property", "global"]),
@@ -47,6 +48,18 @@ export const createExpenseSchema = z
     )
     .refine(
         (data) => {
+            if (data.category === "others" && !data.categoryOthers?.trim()) {
+                return false;
+            }
+            return true;
+        },
+        {
+            message: "Harap isi jenis pengeluaran lainnya (maks. 50 karakter)",
+            path: ["categoryOthers"],
+        },
+    )
+    .refine(
+        (data) => {
             if (data.paidDate && data.expenseDate) {
                 return new Date(data.paidDate) >= new Date(data.expenseDate);
             }
@@ -63,6 +76,7 @@ export const createExpenseSchema = z
 export const updateExpenseSchema = z.object({
     propertyId: z.string().uuid().optional().nullable(),
     category: z.string().min(1).max(50).optional(),
+    categoryOthers: z.string().max(50).optional().nullable(),
     description: z.string().min(3).max(500).optional(),
     amount: z.number().positive().transform((val) => Math.round(val)).optional(),
     type: z.enum(["property", "global"]).optional(),
